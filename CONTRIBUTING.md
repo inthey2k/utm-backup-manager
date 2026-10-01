@@ -17,7 +17,6 @@ submitted directly as pull requests.
 
 - Java 21
 - Maven
-- macOS with UTM for UTM-specific integration testing
 
 Run the complete test suite before submitting changes:
 
