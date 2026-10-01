@@ -1,0 +1,34 @@
+# Maven
+target/
+
+# IntelliJ IDEA
+.idea/
+*.iml
+
+# macOS
+.DS_Store
+
+# IntelliJ inspection exports
+.descriptions.xml
+.xml
+inspect-code-result.tar.gz
+
+# Logs
+*.log
+
+# Local databases
+*.db
+*.db-shm
+*.db-wal
+
+# Temporary files
+*.tmp
+*.swp
+*.bak
+*~
+
+# Local application.properties
+src/main/resources/application.properties
+
+# Application backup leftovers
+.incomplete-*

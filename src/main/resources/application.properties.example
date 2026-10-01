@@ -1,0 +1,34 @@
+# Application
+spring.application.name=utm-backup-manager
+
+# The web interface is intentionally accessible from this computer only.
+server.address=127.0.0.1
+server.port=8085
+
+# Virtual machine provider
+vm.provider=utm
+
+# Directory containing the local UTM VM packages
+vm.utm.directory=/path/to/your/local/vms
+
+# UTM VM package suffix
+vm.utm.package-suffix=.utm
+
+# Path to the UTM command-line interface
+vm.utm.cli=/path/to/utmctl
+
+# Directory where VM backups will be stored.
+# This directory must already exist.
+backup.root=/target/path/to/store/your/backups
+
+# SQLite database containing application metadata
+backup.metadata-db=${user.home}/.utm-backup-manager/backup-manager.db
+
+# Optional legacy state file used by older versions
+backup.legacy-state-file=${backup.root}/backup-state.tsv
+
+# Thymeleaf
+spring.thymeleaf.cache=false
+
+# Do not use the operating system locale as a fallback
+spring.messages.fallback-to-system-locale=false

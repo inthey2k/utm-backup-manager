@@ -1,0 +1,1111 @@
+<!doctype html>
+<html lang="en" th:lang="${#locale.language}">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>UTM Backup Manager</title>
+    <link rel="stylesheet" th:href="@{/css/backup-manager.css}">
+</head>
+
+<body>
+
+<main>
+
+    <header class="page-header">
+        <div class="page-header-main">
+            <div class="page-title">
+                <h1>
+                    <span th:text="${providerName}">UTM</span>
+                    <span th:text="#{app.title.suffix}">Backup Manager</span>
+                </h1>
+
+                <p th:text="#{app.subtitle}">
+                    Overview of your VM backups
+                </p>
+
+                <div class="header-paths">
+                    <div class="header-path">
+                        <span th:text="#{config.vmDirectory}">Local VMs</span>
+                        <code th:text="${configuration.localVmDirectory()}"></code>
+                    </div>
+
+                    <div class="header-path">
+                        <span th:text="#{config.backupRoot}">Backup root</span>
+                        <code th:text="${configuration.backupRoot()}"></code>
+                    </div>
+                </div>
+            </div>
+
+            <div class="page-header-actions">
+                <button type="button"
+                        class="create-backup-button"
+                        id="create-backup-button"
+                        th:disabled="${!backupRootAvailable or backupJobRunning}"
+                        th:attr="data-job-running=${backupJobRunning},
+                             data-label-ready=#{backup.create},
+                             data-label-running=#{backup.job.running}"
+                        th:text="${backupJobRunning
+                        ? #messages.msg('backup.job.running')
+                        : #messages.msg('backup.create')}">
+                    Create backup
+                </button>
+
+                <button type="button"
+                        class="header-menu-button"
+                        id="header-menu-button"
+                        th:aria-label="#{settings.open}"
+                        aria-haspopup="true"
+                        aria-expanded="false">
+                    ⋮
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <div class="header-menu"
+         id="header-menu"
+         hidden>
+
+        <section class="header-menu-section">
+            <strong th:text="#{retention.label}">Retention limit</strong>
+
+            <form class="retention-settings"
+                  method="post"
+                  action="/settings/retention">
+                <label for="retentionLimit"
+                       th:text="#{retention.label}">
+                    Retention limit
+                </label>
+                <input id="retentionLimit"
+                       name="retentionLimit"
+                       type="number"
+                       min="1"
+                       max="99"
+                       th:value="${configuration.retentionLimit()}">
+
+                <button type="submit"
+                        th:text="#{retention.save}">
+                    Save
+                </button>
+            </form>
+        </section>
+
+        <section class="header-menu-section">
+            <strong th:text="#{settings.language}">Language</strong>
+
+            <nav class="language-switcher"
+                 th:aria-label="#{settings.language}">
+                <th:block th:each="language, stat : ${availableLanguages}">
+                    <a th:href="@{/(lang=${language.code()})}"
+                       th:classappend="${#locale.language == language.code()} ? ' active' : ''"
+                       th:text="${language.label()}">EN</a>
+                    <span th:unless="${stat.last}">·</span>
+                </th:block>
+            </nav>
+        </section>
+        <section class="header-menu-section">
+            <button type="button"
+                    class="configuration-button"
+                    id="configuration-button"
+                    th:text="#{config.show}">
+                Show configuration
+            </button>
+        </section>
+    </div>
+
+    <div class="ok flash-message"
+         th:if="${message}"
+         data-timeout="5000">
+        <span th:text="${message}"></span>
+        <button type="button"
+                class="flash-close"
+                th:aria-label="#{dialog.close}">×</button>
+    </div>
+    <div class="err flash-message"
+         th:if="${error}"
+         data-timeout="5000">
+        <span th:text="${error}"></span>
+        <button type="button"
+                class="flash-close"
+                th:aria-label="#{dialog.close}">×</button>
+    </div>
+
+    <section class="backup-progress"
+             id="backup-progress"
+             th:classappend="${backupJobRunning} ? '' : ' hidden'"
+             th:attr="data-label-running=#{backup.progress.running},
+                      data-label-of=#{backup.progress.of},
+                      data-label-vm=#{backup.progress.vm}">
+        <div class="backup-progress-heading">
+            <div class="backup-progress-heading-left">
+                <strong id="backup-progress-title" th:text="#{backup.progress.running}">
+                    Backup running
+                </strong>
+                <button type="button" class="secondary" id="backup-cancel-button" th:text="#{backup.cancel}">
+                    Cancel backup
+                </button>
+            </div>
+            <div class="backup-progress-vms" id="backup-progress-vms"></div>
+            <strong id="backup-progress-percent"></strong>
+        </div>
+        <div class="backup-progress-track"
+             id="backup-progress-track"
+             role="progressbar"
+             aria-valuemin="0"
+             aria-valuemax="100"
+             aria-valuenow="0">
+            <div class="backup-progress-bar" id="backup-progress-bar"></div>
+        </div>
+        <div class="backup-progress-details" id="backup-progress-details"></div>
+    </section>
+
+    <dialog class="backup-cancel-dialog" id="backup-cancel-dialog">
+        <div class="dialog-header">
+            <div>
+                <small th:text="#{backup.cancel}">
+                    Cancel backup
+                </small>
+                <h2 th:text="#{backup.cancel.question}">
+                    Cancel the running backup?
+                </h2>
+            </div>
+            <button type="button"
+                    class="dialog-close"
+                    th:aria-label="#{dialog.close}">
+                ×
+            </button>
+        </div>
+        <p th:text="#{backup.cancel.description}">
+            The running backup will be stopped and incomplete backup data will be deleted.
+        </p>
+
+        <div class="dialog-actions">
+            <button type="button" class="secondary dialog-cancel" th:text="#{dialog.cancel}">
+                Continue backup
+            </button>
+            <button type="button"
+                    id="backup-cancel-confirm"
+                    th:text="#{backup.cancel.confirm}"
+                    th:attr="data-cancelling-label=#{backup.cancel.cancelling}">
+                Cancel backup
+            </button>
+        </div>
+    </dialog>
+
+    <!-- VM overview -->
+    <p th:if="${backupRootAvailable and overview.vms().isEmpty()}"
+       th:text="#{overview.empty}">
+        No VMs or backups found.
+    </p>
+
+    <div class="vm-grid"
+         th:if="${backupRootAvailable and !overview.vms().isEmpty()}">
+        <section class="vm-column"
+                 th:each="vm : ${overview.vms()}">
+
+            <!-- VM header -->
+            <header class="vm-header">
+                <div class="vm-name">
+                    <span class="vm-status"
+                          th:classappend="${vm.status().cssClass()}"
+                          th:title="${vm.status().name()}"
+                          th:aria-label="${vm.status().name()}">
+                    </span>
+                    <strong th:text="${vm.name()}"></strong>
+                </div>
+
+                <span>
+                    <b th:text="${vm.backupCount()}"></b>
+                    <span th:text="${vm.backupCount() == 1
+                            ? #messages.msg('backup.singular')
+                            : #messages.msg('backup.plural')}">
+                        Backups
+                    </span>
+                </span>
+
+                <span>
+                    <span th:text="#{backup.stable}">Stable</span>:
+                    <b th:text="${vm.stableCount()}"></b>
+                </span>
+                <span class="normal-count"
+                      th:classappend="${overview.retentionExceeded().contains(vm.id())}
+                        ? ' exceeded'
+                        : ''">
+                    <span th:text="#{backup.normal}">Normal</span>:<b th:text="${vm.normalCount()}"></b>/<span th:text="${overview.retentionLimit()}"></span>
+                </span>
+
+                <div class="vm-change-status"
+                     th:if="${vm.status().name() == 'STOPPED'}"
+                     th:classappend="${vm.changeStatus().cssClass()}"
+                     th:text="${#messages.msg('vm.changeStatus.' + vm.changeStatus().name())}">
+                </div>
+                <div class="vm-change-status"
+                     th:unless="${vm.status().name() == 'STOPPED'}">&nbsp;</div>
+            </header>
+
+            <!-- VM without backups -->
+            <div class="no-backups"
+                 th:if="${vm.backups().isEmpty()}">
+                <span th:text="#{backup.none}">
+                    No backups yet
+                </span>
+            </div>
+
+            <!-- Backups -->
+            <div class="vm-backups">
+                <div th:each="backup : ${vm.backups()}"
+                     class="card"
+                     th:classappend="${backup.stable()} ? ' stable' : ''">
+
+                    <!-- Retention candidate -->
+                    <div class="retention-candidate"
+                         th:if="${overview.retentionCandidatesForDeletion().contains(backup.id())}"
+                         th:text="#{backup.retentionCandidate}">
+                        DELETE CANDIDATE
+                    </div>
+
+                    <!-- Stable marker -->
+                    <strong class="badge"
+                            th:if="${backup.stable()}">
+                        ★ STABLE
+                    </strong>
+
+                    <!-- Original backup comment -->
+                    <p class="backup-comment"
+                       th:text="${backup.comment().isBlank()
+                           ? #messages.msg('backup.noComment')
+                           : backup.comment()}"
+                       th:title="${backup.comment()}">
+                    </p>
+
+                    <!-- Additional note -->
+                    <p class="note"
+                       th:if="${backup.note() != null and !backup.note().isBlank()}"
+                       th:text="${backup.note()}"
+                       th:title="${backup.note()}">
+                    </p>
+
+                    <!-- Backup date -->
+                    <div class="backup-date">
+                        <strong th:text="${#temporals.format(
+                            backup.backupTime(),
+                            'dd.MM.yyyy HH:mm:ss'
+                            )}">
+                        </strong>
+                    </div>
+
+                    <!-- Action menu -->
+                    <div class="actions">
+                        <!-- Pin to mark as stable -->
+                        <form th:action="@{/stable/{id}(id=${backup.id()})}"
+                              method="post">
+                            <input type="hidden"
+                                   name="stable"
+                                   th:value="${!backup.stable()}">
+                            <button type="submit"
+                                    class="icon-button pin"
+                                    th:classappend="${backup.stable()} ? ' active' : ''"
+                                    th:title="${backup.stable()
+                                        ? #messages.msg('backup.stable.remove')
+                                        : #messages.msg('backup.stable.add')}"
+                                    th:aria-label="${backup.stable()
+                                        ? #messages.msg('backup.stable.remove')
+                                        : #messages.msg('backup.stable.add')}">
+                                <svg viewBox="0 0 24 24"
+                                     aria-hidden="true">
+                                    <path d="M12 17v5"/>
+                                    <path d="M5 17h14"/>
+                                    <path d="M7 3h10"/>
+                                    <path d="M8 3l1 8-4 6h14l-4-6 1-8"/>
+                                </svg>
+                            </button>
+                        </form>
+
+                        <!-- Write Note to backup -->
+                        <button type="button"
+                                class="icon-button note-button"
+                                th:classappend="${backup.note() != null and !backup.note().isBlank()} ? ' active' : ''"
+                                th:title="#{backup.note.edit}"
+                                th:aria-label="#{backup.note.edit}"
+                                th:attr="data-dialog-id=${'note-' + backup.id()}">
+                            <svg viewBox="0 0 24 24"
+                                 aria-hidden="true">
+                                <path d="M21 15a4 4 0 0 1-4 4H8l-5 3V7a4 4 0 0 1 4-4h10a4 4 0 0 1 4 4z"/>
+                            </svg>
+                        </button>
+
+                        <!-- Delete VM -->
+                        <button th:if="${!backup.stable()}"
+                                type="button"
+                                class="icon-button delete delete-button"
+                                th:title="#{backup.delete}"
+                                th:aria-label="#{backup.delete}"
+                                th:attr="data-dialog-id=${'delete-' + backup.id()}">
+                            <svg viewBox="0 0 24 24"
+                                 aria-hidden="true">
+                                <path d="M3 6h18"/>
+                                <path d="M8 6V4h8v2"/>
+                                <path d="M19 6l-1 15H6L5 6"/>
+                                <path d="M10 11v6"/>
+                                <path d="M14 11v6"/>
+                            </svg>
+                        </button>
+
+                        <!-- Disable deleting Stable backups -->
+                        <span th:if="${backup.stable()}"
+                              class="icon-button delete disabled"
+                              th:title="#{backup.delete.stableBlocked}"
+                              th:aria-label="#{backup.delete.blocked}">
+                            <svg viewBox="0 0 24 24"
+                                 aria-hidden="true">
+                                <path d="M3 6h18"/>
+                                <path d="M8 6V4h8v2"/>
+                                <path d="M19 6l-1 15H6L5 6"/>
+                                <path d="M10 11v6"/>
+                                <path d="M14 11v6"/>
+                            </svg>
+                        </span>
+                    </div>
+
+                    <!-- Note dialog -->
+                    <dialog class="note-dialog"
+                            th:id="${'note-' + backup.id()}">
+                        <form th:action="@{/note/{id}(id=${backup.id()})}"
+                              method="post">
+                            <div class="dialog-header">
+                                <div>
+                                    <small th:text="#{backup.note.for}">
+                                        Note for
+                                    </small>
+                                    <h2 th:text="${vm.name}"></h2>
+                                </div>
+                                <button type="button"
+                                        class="dialog-close"
+                                        th:aria-label="#{dialog.close}">
+                                    ×
+                                </button>
+                            </div>
+                            <label>
+                                <textarea name="note"
+                                   rows="5"
+                                    th:aria-label="#{backup.note.placeholder}"
+                                    th:placeholder="#{backup.note.placeholder}"
+                                    th:text="${backup.note()}">
+                                </textarea>
+                            </label>
+                            <div class="dialog-actions">
+                                <button type="button"
+                                        class="secondary dialog-cancel"
+                                        th:text="#{dialog.cancel}">
+                                    Cancel
+                                </button>
+                                <button type="submit"
+                                        th:text="#{dialog.save}">
+                                    Save
+                                </button>
+                            </div>
+                        </form>
+                    </dialog>
+
+                    <!-- Delete VM dialog -->
+                    <dialog class="delete-dialog"
+                            th:id="${'delete-' + backup.id()}">
+                        <form th:action="@{/delete/{id}(id=${backup.id()})}"
+                              method="post"
+                              class="delete-form">
+                            <div class="dialog-header">
+                                <div>
+                                    <small th:text="#{backup.delete.title}">
+                                        Delete VM backup
+                                    </small>
+                                    <h2 th:text="${vm.name}"></h2>
+                                </div>
+                                <button type="button"
+                                        class="dialog-close delete-cancel"
+                                        th:aria-label="#{dialog.close}">
+                                    ×
+                                </button>
+                            </div>
+                            <div class="delete-warning">
+                                <div class="retention-delete-info"
+                                     th:if="${overview.retentionCandidatesForDeletion().contains(backup.id())}">
+                                    <strong th:text="#{backup.retentionCandidate.title}">
+                                        Retention candidate
+                                    </strong>
+                                    <span th:text="#{backup.retentionCandidate.description}">
+                                         This backup exceeds the configured retention limit.
+                                    </span>
+                                </div>
+                                <strong th:text="#{backup.delete.question}">
+                                    Do you really want to permanently delete this backup?
+                                </strong>
+                                <p>
+                                    <b th:text="#{backup.label}">Backup:</b>
+
+                                    <span th:text="${#temporals.format(
+                                        backup.backupTime(),
+                                        'dd.MM.yyyy HH:mm:ss'
+                                    )}">
+                                    </span>
+                                </p>
+                                <p th:if="${!backup.comment().isBlank()}"
+                                   th:text="${backup.comment()}">
+                                </p>
+                                <p th:text="#{backup.delete.scope}">
+                                    Only this package will be permanently removed.
+                                    Other VMs in the same backup directory remain untouched.
+                                </p>
+                            </div>
+                            <div class="delete-dialog-actions">
+                                <button type="button"
+                                        class="cancel-delete delete-cancel"
+                                        autofocus
+                                        th:text="#{dialog.cancel}">
+                                    Cancel
+                                </button>
+                                <button type="submit"
+                                        class="confirm-delete"
+                                        th:text="#{backup.delete.confirm}">
+                                    Delete backup permanently
+                                </button>
+                            </div>
+                        </form>
+                    </dialog>
+                </div>
+            </div>
+        </section>
+    </div>
+
+    <dialog class="configuration-dialog"
+            id="configuration-dialog">
+
+        <div class="dialog-header">
+            <h2 th:text="#{config.title}">Configuration</h2>
+
+            <button type="button"
+                    class="dialog-close"
+                    id="configuration-close"
+                    th:aria-label="#{dialog.close}">
+                ×
+            </button>
+        </div>
+
+        <p class="configuration-hint"
+           th:text="#{config.readOnly}">
+            These values show the currently effective configuration.
+        </p>
+
+        <dl class="configuration-list">
+            <dt th:text="#{config.provider}">VM provider</dt>
+            <dd th:text="${configuration.providerName()}"></dd>
+
+            <dt th:text="#{config.providerId}">Provider ID</dt>
+            <dd><code th:text="${configuration.providerId()}"></code></dd>
+
+            <dt th:text="#{config.vmDirectory.label}">VM directory</dt>
+            <dd><code th:text="${configuration.localVmDirectory()}"></code></dd>
+
+            <dt th:text="#{config.packageSuffix}">VM package suffix</dt>
+            <dd><code th:text="${configuration.packageSuffix()}"></code></dd>
+
+            <dt th:text="#{config.providerCli}">Provider CLI</dt>
+            <dd><code th:text="${configuration.providerCli()}"></code></dd>
+
+            <dt th:text="#{config.backupRoot.label}">Backup directory</dt>
+            <dd><code th:text="${configuration.backupRoot()}"></code></dd>
+
+            <dt th:text="#{config.metadataDb}">Metadata database</dt>
+            <dd><code th:text="${configuration.metadataDb()}"></code></dd>
+
+            <dt th:text="#{config.legacyStateFile}">Legacy state file</dt>
+            <dd><code th:text="${configuration.legacyStateFile()}"></code></dd>
+
+            <dt th:text="#{config.retentionLimit}">Retention limit</dt>
+            <dd th:text="${configuration.retentionLimit()}"></dd>
+        </dl>
+    </dialog>
+    <dialog class="backup-dialog"
+            id="backup-dialog"
+            th:if="${backupRootAvailable}">
+        <form action="/backup"
+              method="post">
+            <div class="dialog-header">
+                <div>
+                    <small th:text="#{backup.create}">
+                        Create backup
+                    </small>
+                    <h2 th:text="#{backup.create.select}">
+                        Select virtual machines
+                    </h2>
+                </div>
+
+                <button type="button"
+                        class="dialog-close"
+                        th:aria-label="#{dialog.close}">
+                    ×
+                </button>
+            </div>
+
+            <div class="backup-vm-selection">
+                <label class="backup-vm-option"
+                       th:each="vm : ${overview.vms()}"
+                       th:if="${vm.local()}">
+
+                    <input type="checkbox"
+                           name="vmIds"
+                           th:value="${vm.id()}"
+                           th:disabled="${vm.status().name() != 'STOPPED'}">
+
+                    <span class="vm-status"
+                          th:classappend="${vm.status().cssClass()}"
+                          th:title="${vm.status().name()}"
+                          th:aria-label="${vm.status().name()}">
+                    </span>
+                    <span class="backup-vm-name" th:text="${vm.name()}">
+                    </span>
+                    <span class="backup-vm-size" th:attr="data-vm-id=${vm.id()}">
+                        <span class="vm-size-spinner" aria-hidden="true"></span>
+                    </span>
+                    <span class="backup-vm-status" th:text="${#messages.msg('vm.status.' + vm.status().name())}">
+                    </span>
+                </label>
+            </div>
+            <div class="backup-selection-size"
+                 id="backup-selection-size"
+                 th:attr="data-label=#{backup.size.selected},
+              data-loading=#{backup.size.loading}">
+            </div>            <label class="backup-comment-label">
+            <span th:text="#{backup.comment}">
+                Comment
+            </span>
+
+                <textarea name="comment"
+                          rows="4"
+                          th:placeholder="#{backup.comment.placeholder}"></textarea>
+            </label>
+
+            <div class="dialog-actions">
+                <button type="button"
+                        class="secondary dialog-cancel"
+                        th:text="#{dialog.cancel}">
+                    Cancel
+                </button>
+
+                <button type="submit"
+                        id="backup-submit-button"
+                        th:text="#{backup.create}"
+                        th:attr="data-starting-label=#{backup.starting}">
+                    Create backup
+                </button>
+            </div>
+        </form>
+    </dialog>
+    <dialog class="backup-root-dialog"
+            id="backup-root-dialog"
+            th:if="${!backupRootAvailable}">
+        <div class="dialog-header">
+            <div>
+                <small th:text="#{backup.root.unavailable.title}">
+                    Backup directory not available
+                </small>
+                <h2 th:text="#{backup.root.unavailable.heading}">
+                    Backup storage cannot be accessed
+                </h2>
+            </div>
+        </div>
+
+        <p th:text="#{backup.root.unavailable.message}">
+            The configured backup directory could not be found.
+        </p>
+
+        <code th:text="${backupRoot}"></code>
+
+        <p th:text="#{backup.root.unavailable.hint}">
+            Check whether the backup drive or network directory is mounted and accessible.
+        </p>
+
+        <div class="dialog-actions">
+            <button type="button"
+                    onclick="window.location.reload()"
+                    th:text="#{backup.root.retry}">
+                Check again
+            </button>
+        </div>
+    </dialog>
+</main>
+
+
+<script>
+    const backupProgressVms =
+        document.getElementById("backup-progress-vms");
+
+    const backupCancelButton =
+        document.getElementById("backup-cancel-button");
+
+    const backupCancelDialog =
+        document.getElementById("backup-cancel-dialog");
+
+    const backupCancelConfirm =
+        document.getElementById("backup-cancel-confirm");
+
+    const headerMenuButton = document.getElementById("header-menu-button");
+    const headerMenu = document.getElementById("header-menu");
+    const configurationButton = document.getElementById("configuration-button");
+    const configurationDialog = document.getElementById("configuration-dialog");
+    const configurationClose = document.getElementById("configuration-close");
+
+    document.querySelectorAll(".note-button").forEach(button => {
+        button.addEventListener("click", () => {
+            const dialog = document.getElementById(button.dataset.dialogId);
+
+            if (dialog) {
+                dialog.showModal();
+            }
+        });
+    });
+
+    document.querySelectorAll(".dialog-close, .dialog-cancel").forEach(button => {
+        button.addEventListener("click", () => {
+            button.closest("dialog").close();
+        });
+    });
+
+    const createBackupButton = document.getElementById("create-backup-button");
+    const backupDialog = document.getElementById("backup-dialog");
+    const backupForm = backupDialog?.querySelector("form");
+    const backupCheckboxes = backupDialog?.querySelectorAll(
+        'input[name="vmIds"]:not(:disabled)'
+    );
+    const backupSubmitButton = backupDialog?.querySelector(
+        'button[type="submit"]'
+    );
+
+    backupForm?.addEventListener("submit", () => {
+        if (!backupSubmitButton) {
+            return;
+        }
+
+        backupSubmitButton.disabled = true;
+        backupSubmitButton.textContent =
+            backupSubmitButton.dataset.startingLabel;
+    });
+    const backupSelectionSize = document.getElementById("backup-selection-size");
+    const backupProgress = document.getElementById("backup-progress");
+    const backupProgressTitle = document.getElementById("backup-progress-title");
+    const backupProgressPercent = document.getElementById("backup-progress-percent");
+    const backupProgressTrack = document.getElementById("backup-progress-track");
+    const backupProgressBar = document.getElementById("backup-progress-bar");
+    const backupProgressDetails = document.getElementById("backup-progress-details");
+
+    const vmSizes = new Map();
+
+    let backupJobRunning =
+        createBackupButton?.dataset.jobRunning === "true";
+    let backupJobPollTimer = null;
+
+    function updateCreateBackupButton() {
+        if (!createBackupButton) {
+            return;
+        }
+
+        createBackupButton.disabled =
+            backupJobRunning || !backupDialog;
+
+        createBackupButton.textContent = backupJobRunning
+            ? createBackupButton.dataset.labelRunning
+            : createBackupButton.dataset.labelReady;
+    }
+
+    function updateBackupProgress(job) {
+        if (!backupProgress) {
+            return;
+        }
+
+        if (job.status !== "RUNNING") {
+            backupProgress.classList.add("hidden");
+            return;
+        }
+
+        backupProgress.classList.remove("hidden");
+
+        const hasProgress = job.totalBytes > 0;
+        const percent = hasProgress ? job.progressPercent : 0;
+        backupProgressTitle.textContent =
+            backupProgress.dataset.labelRunning;
+
+        updateBackupProgressVms(job);
+
+        backupProgressPercent.textContent = hasProgress
+            ? percent + " %"
+            : "";
+
+        backupProgressBar.style.width = percent + "%";
+        backupProgressTrack.setAttribute("aria-valuenow", String(percent));
+
+        const details = [];
+        if (hasProgress) {
+            details.push(
+                formatBytes(job.copiedBytes)
+                + " " + backupProgress.dataset.labelOf + " "
+                + formatBytes(job.totalBytes)
+            );
+        }
+        if (job.currentVmNumber > 0 && job.vmCount > 0) {
+            details.push(
+                backupProgress.dataset.labelVm + " "
+                + job.currentVmNumber + " "
+                + backupProgress.dataset.labelOf + " "
+                + job.vmCount
+            );
+        }
+        backupProgressDetails.textContent = details.join(" · ");
+    }
+
+    function updateBackupProgressVms(job) {
+        if (!backupProgressVms) {
+            return;
+        }
+
+        backupProgressVms.replaceChildren();
+
+        const vmNames = job.vmNames || [];
+
+        vmNames.forEach((vmName, index) => {
+            const vmNumber = index + 1;
+
+            const vmElement = document.createElement("span");
+            vmElement.className = "backup-progress-vm";
+
+            const icon = document.createElement("span");
+            icon.className = "backup-progress-vm-icon";
+            icon.setAttribute("aria-hidden", "true");
+
+            if (job.status === "COMPLETED"
+                || vmNumber < job.currentVmNumber) {
+                vmElement.classList.add("completed");
+                icon.classList.add("completed");
+                icon.textContent = "✓";
+            } else if (vmNumber === job.currentVmNumber) {
+                vmElement.classList.add("current");
+                icon.classList.add("current", "spinner");
+            } else {
+                vmElement.classList.add("waiting");
+                icon.classList.add("waiting");
+                icon.textContent = "◷";
+            }
+
+            const label = document.createElement("span");
+            label.textContent = vmName;
+
+            vmElement.append(icon, label);
+            backupProgressVms.appendChild(vmElement);
+        });
+    }
+
+    async function pollBackupJob() {
+        if (!backupJobRunning) {
+            return;
+        }
+
+        try {
+            const response = await fetch("/backup/status", {
+                cache: "no-store"
+            });
+
+            if (!response.ok) {
+                return;
+            }
+
+            const job = await response.json();
+            updateBackupProgress(job);
+
+            if (job.status === "RUNNING") {
+                return;
+            }
+
+            backupJobRunning = false;
+            updateCreateBackupButton();
+
+            if (backupJobPollTimer !== null) {
+                clearInterval(backupJobPollTimer);
+                backupJobPollTimer = null;
+            }
+
+            if (job.status === "COMPLETED") {
+                window.location.reload();
+                return;
+            }
+
+            if (job.status === "CANCELLED") {
+                window.location.reload();
+                return;
+            }
+
+            if (job.status === "FAILED") {
+                window.alert(job.errorMessage || "Backup failed.");
+            }
+        } catch (error) {
+            // A temporary polling failure must not affect the running backup.
+        }
+    }
+
+    function startBackupJobPolling() {
+        if (!backupJobRunning || backupJobPollTimer !== null) {
+            return;
+        }
+
+        // Show the current state immediately, then continue with a low-cost poll.
+        pollBackupJob();
+        backupJobPollTimer = window.setInterval(pollBackupJob, 5000);
+    }
+
+    function formatBytes(bytes) {
+        const gigabytes = bytes / 1_000_000_000;
+
+        return new Intl.NumberFormat(document.documentElement.lang, {
+            minimumFractionDigits: 1,
+            maximumFractionDigits: 1
+        }).format(gigabytes) + " GB";
+    }
+
+    function updateBackupSubmitButton() {
+        if (!backupSubmitButton || !backupCheckboxes) {
+            return;
+        }
+
+        backupSubmitButton.disabled =
+            !Array.from(backupCheckboxes).some(checkbox => checkbox.checked);
+    }
+
+    function updateSelectedSize() {
+        if (!backupSelectionSize || !backupCheckboxes) {
+            return;
+        }
+
+        const selected = Array.from(backupCheckboxes)
+            .filter(checkbox => checkbox.checked);
+
+        if (selected.length === 0) {
+            backupSelectionSize.textContent = "";
+            return;
+        }
+
+        const allSizesKnown = selected.every(
+            checkbox => vmSizes.has(checkbox.value)
+        );
+
+        if (!allSizesKnown) {
+            backupSelectionSize.textContent =
+                backupSelectionSize.dataset.loading;
+            return;
+        }
+
+        const totalBytes = selected.reduce(
+            (sum, checkbox) => sum + vmSizes.get(checkbox.value),
+            0
+        );
+
+        backupSelectionSize.textContent =
+            backupSelectionSize.dataset.label + ": " + formatBytes(totalBytes);
+    }
+
+    async function loadVmSize(sizeElement) {
+        const vmId = sizeElement.dataset.vmId;
+
+        sizeElement.innerHTML =
+            '<span class="vm-size-spinner" aria-hidden="true"></span>';
+
+        try {
+            const response = await fetch(
+                "/vm/" + encodeURIComponent(vmId) + "/size"
+            );
+
+            if (!response.ok) {
+                throw new Error("Could not determine VM size");
+            }
+
+            const result = await response.json();
+
+            vmSizes.set(vmId, result.bytes);
+            sizeElement.textContent = "(" + formatBytes(result.bytes) + ")";
+        } catch (error) {
+            sizeElement.textContent = "…";
+        } finally {
+            updateSelectedSize();
+        }
+    }
+
+    function loadVmSizes() {
+        if (!backupDialog) {
+            return;
+        }
+
+        backupDialog.querySelectorAll(".backup-vm-size").forEach(sizeElement => {
+            const vmId = sizeElement.dataset.vmId;
+
+            if (!vmSizes.has(vmId)) {
+                loadVmSize(sizeElement);
+            }
+        });
+    }
+
+    headerMenuButton?.addEventListener("click", event => {
+        event.stopPropagation();
+
+        const opening = headerMenu.hidden;
+        headerMenu.hidden = !opening;
+        headerMenuButton.setAttribute("aria-expanded", String(opening));
+    });
+
+    headerMenu?.addEventListener("click", event => {
+        event.stopPropagation();
+    });
+
+    document.addEventListener("click", () => {
+        if (headerMenu && !headerMenu.hidden) {
+            headerMenu.hidden = true;
+            headerMenuButton?.setAttribute("aria-expanded", "false");
+        }
+    });
+
+    configurationButton?.addEventListener("click", () => {
+        headerMenu.hidden = true;
+        headerMenuButton?.setAttribute("aria-expanded", "false");
+        configurationDialog?.showModal();
+    });
+
+    configurationClose?.addEventListener("click", () => {
+        configurationDialog?.close();
+    });
+
+    configurationDialog?.addEventListener("click", event => {
+        if (event.target === configurationDialog) {
+            configurationDialog.close();
+        }
+    });
+
+    createBackupButton?.addEventListener("click", () => {
+        if (backupJobRunning) {
+            return;
+        }
+
+        backupDialog?.showModal();
+        loadVmSizes();
+    });
+
+    backupDialog?.addEventListener("click", event => {
+        if (event.target === backupDialog) {
+            backupDialog.close();
+        }
+    });
+
+    backupCheckboxes?.forEach(checkbox => {
+        checkbox.addEventListener("change", () => {
+            updateBackupSubmitButton();
+            updateSelectedSize();
+        });
+    });
+
+    updateBackupSubmitButton();
+    updateSelectedSize();
+    updateCreateBackupButton();
+    startBackupJobPolling();
+
+    backupCancelButton?.addEventListener("click", () => {
+        if (!backupJobRunning) {
+            return;
+        }
+
+        backupCancelDialog?.showModal();
+    });
+
+    backupCancelConfirm?.addEventListener("click", async () => {
+        backupCancelConfirm.disabled = true;
+        backupCancelConfirm.textContent =
+            backupCancelConfirm.dataset.cancellingLabel;
+
+        try {
+            const response = await fetch("/backup/cancel", {
+                method: "POST"
+            });
+
+            if (!response.ok) {
+                throw new Error("Could not cancel backup");
+            }
+
+            backupCancelDialog?.close();
+        } catch (error) {
+            backupCancelConfirm.disabled = false;
+            window.alert(error.message);
+        }
+    });
+
+    document.querySelectorAll(".note-dialog").forEach(dialog => {
+        dialog.addEventListener("click", event => {
+            if (event.target === dialog) {
+                dialog.close();
+            }
+        });
+    });
+
+    document.querySelectorAll(".delete-button").forEach(button => {
+        button.addEventListener("click", () => {
+            const dialog = document.getElementById(button.dataset.dialogId);
+
+            if (dialog) {
+                dialog.showModal();
+
+                const cancelButton = dialog.querySelector(".cancel-delete");
+
+                if (cancelButton) {
+                    cancelButton.focus();
+                }
+            }
+        });
+    });
+
+    document.querySelectorAll(".delete-cancel").forEach(button => {
+        button.addEventListener("click", () => {
+            button.closest("dialog").close();
+        });
+    });
+
+    document.querySelectorAll(".delete-dialog").forEach(dialog => {
+
+        dialog.addEventListener("click", event => {
+            if (event.target === dialog) {
+                dialog.close();
+            }
+        });
+
+        dialog.addEventListener("keydown", event => {
+            if (event.key === "Enter") {
+                event.preventDefault();
+                dialog.close();
+            }
+        });
+    });
+    // show status messages for five seconds by default
+    document.querySelectorAll(".flash-message").forEach(message => {
+        const closeButton = message.querySelector(".flash-close");
+        const timeout = Number(message.dataset.timeout);
+
+        const close = () => {
+            message.classList.add("hiding");
+            setTimeout(() => message.remove(), 250);
+        };
+
+        closeButton?.addEventListener("click", close);
+
+        if (timeout > 0) {
+            setTimeout(close, timeout);
+        }
+    });
+
+    const backupRootDialog = document.getElementById("backup-root-dialog");
+    backupRootDialog?.showModal();
+
+</script>
+
+</body>
+</html>
