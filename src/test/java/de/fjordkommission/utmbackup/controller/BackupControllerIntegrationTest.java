@@ -19,6 +19,8 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.context.ActiveProfiles;
 
 import static org.junit.jupiter.api.Assertions.*;
+import org.springframework.test.context.DynamicPropertyRegistry;
+import org.springframework.test.context.DynamicPropertySource;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.flash;
@@ -42,6 +44,27 @@ class BackupControllerIntegrationTest {
     private BackupJobService backupJobService;
     @Autowired
     private Environment environment;
+
+    @DynamicPropertySource
+    static void testProperties(DynamicPropertyRegistry registry) {
+        Path testRoot = Path.of(
+                System.getProperty("java.io.tmpdir"),
+                "utm-backup-manager-test"
+        );
+
+        registry.add(
+                "backup.root",
+                () -> testRoot.resolve("backups").toString()
+        );
+        registry.add(
+                "backup.metadata-db",
+                () -> testRoot.resolve("backup-manager.db").toString()
+        );
+        registry.add(
+                "backup.legacy-state-file",
+                () -> testRoot.resolve("backups/backup-state.tsv").toString()
+        );
+    }
 
     @BeforeEach
     void cleanTestBackups() throws IOException {
