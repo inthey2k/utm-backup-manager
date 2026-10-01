@@ -28,7 +28,7 @@ inspect-code-result.tar.gz
 *~
 
 # Local application.properties
-src/main/resources/application.properties
+/application.properties
 
 # Application backup leftovers
 .incomplete-*

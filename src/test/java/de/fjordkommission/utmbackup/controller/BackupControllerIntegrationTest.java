@@ -2,6 +2,7 @@ package de.fjordkommission.utmbackup.controller;
 
 import static org.hamcrest.Matchers.containsString;
 
+import de.fjordkommission.utmbackup.AbstractIntegrationTest;
 import de.fjordkommission.utmbackup.service.BackupJobService;
 import de.fjordkommission.utmbackup.service.BackupScanner;
 import org.junit.jupiter.api.Test;
@@ -33,8 +34,7 @@ import static org.hamcrest.Matchers.startsWith;
 @SpringBootTest
 @AutoConfigureMockMvc
 @ActiveProfiles("test")
-class BackupControllerIntegrationTest {
-
+class BackupControllerIntegrationTest extends AbstractIntegrationTest {
     @Autowired
     private MockMvc mockMvc;
     private Path backupRoot;
@@ -68,11 +68,7 @@ class BackupControllerIntegrationTest {
 
     @BeforeEach
     void cleanTestBackups() throws IOException {
-        backupRoot = Path.of(
-                System.getProperty("java.io.tmpdir"),
-                "utm-backup-manager-test",
-                "backups"
-        );
+        backupRoot = TEST_BACKUP_ROOT;
 
         if (Files.exists(backupRoot)) {
             try (var paths = Files.walk(backupRoot)) {
@@ -89,12 +85,7 @@ class BackupControllerIntegrationTest {
 
         Files.createDirectories(backupRoot);
 
-        Path testVm = Path.of(
-                System.getProperty("java.io.tmpdir"),
-                "utm-backup-manager-test",
-                "vms",
-                "TestLinux.utm"
-        );
+        Path testVm = TEST_ROOT.resolve("vms").resolve("TestLinux.utm");
 
         Files.createDirectories(testVm.resolve("Data"));
         Files.writeString(
@@ -129,26 +120,25 @@ class BackupControllerIntegrationTest {
     @Test
     void usesTestPaths() {
         assertEquals(
-                Path.of(System.getProperty("java.io.tmpdir"), "utm-backup-manager-test", "backups").toString(),
+                TEST_BACKUP_ROOT.toString(),
                 environment.getProperty("backup.root")
         );
 
         assertEquals(
-                Path.of(System.getProperty("java.io.tmpdir"), "utm-backup-manager-test", "backups", "backup-state.tsv").toString(),
+                TEST_BACKUP_ROOT.resolve("backup-state.tsv").toString(),
                 environment.getProperty("backup.legacy-state-file")
         );
 
         assertEquals(
-                Path.of(System.getProperty("java.io.tmpdir"), "utm-backup-manager-test", "backup-manager.db").toString(),
+                TEST_ROOT.resolve("backup-manager.db").toString(),
                 environment.getProperty("backup.metadata-db")
         );
 
         assertEquals(
-                Path.of(System.getProperty("java.io.tmpdir"), "utm-backup-manager-test", "backups"),
+                TEST_BACKUP_ROOT,
                 backupScanner.root()
         );
     }
-
     @Test
     void startsBackupForStoppedVmAndReportsStatus() throws Exception {
         mockMvc.perform(post("/backup")

@@ -1,5 +1,6 @@
 package de.fjordkommission.utmbackup.service;
 
+import de.fjordkommission.utmbackup.AbstractIntegrationTest;
 import de.fjordkommission.utmbackup.model.BackupOverview;
 import de.fjordkommission.utmbackup.model.VmBackup;
 import de.fjordkommission.utmbackup.model.VmOverview;
@@ -10,8 +11,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.ActiveProfiles;
-import org.springframework.test.context.DynamicPropertyRegistry;
-import org.springframework.test.context.DynamicPropertySource;
+
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -22,11 +22,7 @@ import static org.junit.jupiter.api.Assertions.*;
 
 @SpringBootTest
 @ActiveProfiles("test")
-class BackupScannerIntegrationTest {
-
-    private static final Path TEST_ROOT = createTestRoot();
-    private static final Path BACKUP_ROOT = TEST_ROOT.resolve("backups");
-    private static final Path DATABASE = TEST_ROOT.resolve("backup-manager.db");
+class BackupScannerIntegrationTest extends AbstractIntegrationTest {
 
     @Autowired
     private BackupScanner scanner;
@@ -37,17 +33,11 @@ class BackupScannerIntegrationTest {
     @Autowired
     private StableRepository stableRepository;
 
-    @DynamicPropertySource
-    static void testProperties(DynamicPropertyRegistry registry) {
-        registry.add("backup.root", BACKUP_ROOT::toString);
-        registry.add("backup.metadata-db", DATABASE::toString);
-        registry.add("vm.provider", () -> "test");
-    }
 
     @BeforeEach
     void cleanBackups() throws IOException {
-        if (Files.exists(BACKUP_ROOT)) {
-            try (var paths = Files.walk(BACKUP_ROOT)) {
+        if (Files.exists(TEST_BACKUP_ROOT)) {
+            try (var paths = Files.walk(TEST_BACKUP_ROOT)) {
                 paths.sorted(Comparator.reverseOrder())
                         .forEach(path -> {
                             try {
@@ -59,7 +49,11 @@ class BackupScannerIntegrationTest {
             }
         }
 
-        Files.createDirectories(BACKUP_ROOT);
+        Files.createDirectories(TEST_BACKUP_ROOT);
+
+        stableRepository.findAll()
+                .keySet()
+                .forEach(stableRepository::delete);
     }
 
     @Test
@@ -156,21 +150,21 @@ class BackupScannerIntegrationTest {
 
     @Test
     void missingBackupRootIsReportedAsUnavailable() throws IOException {
-        Files.delete(BACKUP_ROOT);
+        Files.delete(TEST_BACKUP_ROOT);
 
         BackupRootUnavailableException exception = assertThrows(
                 BackupRootUnavailableException.class,
                 scanner::scan
         );
 
-        assertEquals(BACKUP_ROOT, exception.root());
+        assertEquals(TEST_BACKUP_ROOT, exception.root());
     }
 
     @Test
     void deletingOneBackupFromBatchKeepsOtherBackup() throws IOException {
         String directoryName = "2026-09-30_1200";
 
-        Path batchDirectory = BACKUP_ROOT.resolve(directoryName);
+        Path batchDirectory = TEST_BACKUP_ROOT.resolve(directoryName);
         Path vmDirectory = batchDirectory.resolve("VMs");
 
         Path firstVmPath = vmDirectory.resolve("deletable-test-vm");
@@ -218,7 +212,7 @@ class BackupScannerIntegrationTest {
     void deletingLastBackupRemovesEmptyBatchDirectory() throws IOException {
         String directoryName = "2026-09-30_1300";
 
-        Path batchDirectory = BACKUP_ROOT.resolve(directoryName);
+        Path batchDirectory = TEST_BACKUP_ROOT.resolve(directoryName);
         Path vmDirectory = batchDirectory.resolve("VMs");
         Path vmPath = vmDirectory.resolve("deletable-test-vm");
         Path backupInfo = batchDirectory.resolve("BACKUP-INFO.txt");
@@ -252,7 +246,7 @@ class BackupScannerIntegrationTest {
     void backupsFromSameBatchHaveDifferentIds() throws IOException {
         String directoryName = "2026-09-30_1400";
 
-        Path vmDirectory = BACKUP_ROOT
+        Path vmDirectory = TEST_BACKUP_ROOT
                 .resolve(directoryName)
                 .resolve("VMs");
 
@@ -287,7 +281,7 @@ class BackupScannerIntegrationTest {
 
     private void createBackup(String directoryName) throws IOException {
         Files.createDirectories(
-                BACKUP_ROOT
+                TEST_BACKUP_ROOT
                         .resolve(directoryName)
                         .resolve("VMs")
                         .resolve("test-linux-vm")
@@ -306,18 +300,9 @@ class BackupScannerIntegrationTest {
                 .orElseThrow();
     }
 
-    private static Path createTestRoot() {
-        try {
-            return Files.createTempDirectory(
-                    "utm-backup-manager-scanner-test-"
-            );
-        } catch (IOException e) {
-            throw new ExceptionInInitializerError(e);
-        }
-    }
 
     private Path createDeletableBackup(String directoryName) throws IOException {
-        Path vmPath = BACKUP_ROOT
+        Path vmPath = TEST_BACKUP_ROOT
                 .resolve(directoryName)
                 .resolve("VMs")
                 .resolve("deletable-test-vm");

@@ -54,14 +54,20 @@ replaced by a local directory with the same path.
 
 ## Configuration
 
-The repository contains
-`src/main/resources/application.properties.example`. Copy it to
-`src/main/resources/application.properties` and adapt the values to your
-environment.
+The repository contains a sample configuration file
+`application.properties.example`.
+
+Create your local configuration from the example:
+
+```bash
+cp application.properties.example application.properties
+```
+
+Then edit `application.properties` and adapt the values to your environment.
 
 Example:
 
-``` properties
+```properties
 spring.application.name=utm-backup-manager
 server.address=127.0.0.1
 server.port=8085
@@ -81,25 +87,32 @@ spring.messages.fallback-to-system-locale=false
 
 Typical UTM installations on macOS store VM packages below:
 
-``` text
+```text
 ${user.home}/Library/Containers/com.utmapp.UTM/Data/Documents
 ```
 
 and provide `utmctl` at:
 
-``` text
+```text
 /Applications/UTM.app/Contents/MacOS/utmctl
 ```
+This is the CLI executable of the Virtualization tool you use, with which the application 
+communicates to fetch the list of VMs and request their status.
 
-These paths may differ depending on the installation.
+The paths may of course differ depending on the installation.
+#### Notes
+The real `application.properties` intentionally remains outside
+`src/main/resources` and is excluded from Git. This prevents
+machine-specific paths and settings from being packaged into the executable
+JAR. The committed `application.properties.example` contains only example
+values.
 
-`application.properties` contains machine-specific configuration and is
-intentionally excluded from Git. `application.properties.example`
-contains only example values and can safely be committed.
+When the application is started from the project directory, Spring Boot
+loads the external `application.properties`.
 
-The SQLite database contains supplemental metadata and settings. The
-backup directories themselves remain the primary source for the actual
-VM backup data.
+The SQLite database contains supplemental metadata and settings. The backup
+directories themselves remain the primary source for the actual VM backup
+data.
 
 ## Running from source
 
@@ -130,6 +143,11 @@ For version 1.0.0 the executable JAR is expected at:
 ``` text
 target/utm-backup-manager-1.0.0.jar
 ```
+You can run the JAR file using:
+```bash
+java -jar target/utm-backup-manager-1.0.0.jar
+```
+from the project folder.
 
 Before publishing the first release, the packaged JAR and its
 external-configuration workflow should be verified from a clean
