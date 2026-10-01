@@ -10,6 +10,8 @@ tests, translations, and code changes.
 For larger changes, please open an issue first so the proposed approach can be
 discussed before significant work is invested.
 
+Issues can be reported at: https://jira.fjordkommission.de
+
 Small bug fixes, documentation corrections, and minor improvements can be
 submitted directly as pull requests.
 

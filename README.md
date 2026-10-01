@@ -263,6 +263,10 @@ Thymeleaf, SQLite and embedded Tomcat. The application uses a provider
 abstraction for virtualization-specific integration; version 1.0.0
 includes the UTM provider.
 
+## Issues
+
+If you find a problem in the application, feel free to report it at https://jira.fjordkommission.de
+
 ## Project status
 
 Version 1.0.0 is the first public release candidate of the project.
