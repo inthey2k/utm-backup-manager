@@ -237,23 +237,28 @@ independently before relying on them for disaster recovery.
 
 ## Known limitations in 1.0.0
 
--   **UTM on macOS is the only implemented VM provider.** The provider
+-   **Currently, UTM on macOS is the only implemented VM provider.** The provider
     architecture is extensible, but other virtualization platforms are
-    not yet supported.
--   **VM shutdown is not automated.** Running VMs must be stopped before
-    starting their backup.
+    not yet supported. Please see [CONTRIBUTING.md](CONTRIBUTING.md) if you would 
+    like to extend the application with new providers.
+-   **VM shutdown is not yet automated.** Running VMs must be stopped before
+    starting their backup. In a future release, the application will ask if it
+    should shut down a VM before backing it up.
 -   **Only one backup job can run at a time.**
 -   **A hard application or system termination can leave a
-    `.incomplete-*` directory behind.** Normal cancellation through the
-    web interface cleans it up.
+    `.incomplete-*` directory behind.** You will have to delete such directories 
+    manually. Normal cancellation through the web interface cleans up those files.
 -   **Sparse disk images may consume substantially more physical space
-    in the backup destination.** Whether sparse regions are preserved
+    in the backup destination.** I.e. the backup file size amounts to the size of 
+    the virtual disk, not its actual use. Whether sparse regions are preserved
     depends on the destination filesystem and storage/mount
     implementation. Plan backup capacity according to the logical VM
     size when in doubt.
--   **Change detection is timestamp-based.** It is an operational hint,
-    not a byte-for-byte or cryptographic comparison.
--   **The web interface is intended for local use.** Authentication and
+-   **Change detection is timestamp-based.** It is just an operational hint,
+    not a byte-for-byte or cryptographic comparison. I.e. merely starting a VM can 
+    cause the application to mark it as "Changed", even if you did not make any 
+    changes to it.
+-   **The web interface is intended for local use only.** Authentication and
     remote multi-user operation are not part of version 1.0.0.
 
 ## Technology
@@ -283,9 +288,15 @@ spinning icon, and the waiting VM(s) with a clock icon.
 ![UTM Backup Manager - Backup Progress](docs/screenshots/03-backup-progress.png)
 
 ### Settings
-In the menu in the top-right corner you can select your language and configure the number of backups 
+In the menu in the top-right corner you can configure the number of backups 
 you want to keep on top of the ones marked as "Stable", which will not be cleaned up automatically.
-The button "Show configuration" displays the values set in the application.properties.
+
+Secondly, you can select your language to show the application's texts. Currently available are English,
+German, and Spanish. If you want to add more languages, just copy `messages.properties` to e.g. 
+`messages_it.properties` (for Italian), and translate the texts inside it. Switching the language
+takes effect, immediately.
+
+Lastly, the button "Show configuration" displays the values set in the `application.properties`.
 
 ![UTM Backup Manager - Settings](docs/screenshots/04-settings-menu.png)
 ![UTM Backup Manager - Configuration Dialog](docs/screenshots/05-configuration-dialog.png)
@@ -306,4 +317,5 @@ Version 1.0.0 is the first public release candidate of the project.
 
 ## License
 
-A license has not yet been selected for the project.
+UTM Backup Manager is licensed under the GNU General Public License v3.0
+(GPL-3.0-only). See the `LICENSE` file for details.
