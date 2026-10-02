@@ -276,7 +276,9 @@ The main page lists all your existing VMs as columns and their backups as 'cards
 
 ### Create Backup
 When you click the button to create a new backup, the following dialog allows you to select which 
-VMs to backup and write a comment to the backup. E.g. "Before updating the kernel".
+VMs to backup and write a comment to the backup. E.g. "Before updating the kernel". This comment
+will be stored in the file `BACKUP-INFO.txt and is kept for all VMs included in the backup job.
+Later, you can add individual notes to a single VM backup (see below).
 
 ![UTM Backup Manager - Create new backup](docs/screenshots/02-create-backup.png)
 
@@ -306,6 +308,13 @@ Next to the list of VMs in the progress panel there is a button "Cancel backup" 
 copying process. When you cancel a backup, the files that have been copied so far will automatically 
 be deleted.
 ![UTM Backup Manager - Cancel Backup](docs/screenshots/06-cancel-backup-dialog.png)
+
+### Writing a Note to a Backup
+When you create a new backup, you can write a comment to it. This comment applies to all VMs that are 
+copied with that backup. If you want to add more info to an individual VM backup, you can use the "Note" 
+button in each card to enter info on a certain backup. 
+
+![UTM Backup Manager - Edit Note to Backup](docs/screenshots/07-edit-note-to-backup.png)
 
 ## Issues
 

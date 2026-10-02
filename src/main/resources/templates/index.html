@@ -156,7 +156,30 @@
              aria-valuenow="0">
             <div class="backup-progress-bar" id="backup-progress-bar"></div>
         </div>
-        <div class="backup-progress-details" id="backup-progress-details"></div>
+        <div class="backup-progress-details">
+            <span class="progress-vm">
+                <span th:text="#{backup.progress.vm}">VM</span>
+                <span id="backup-progress-vm-number">0/0</span>
+            </span>
+            <span class="separator">-</span>
+            <span class="progress-copied">
+            <span class="progress-percent-block">
+                <span id="backup-progress-percent-inline">0</span>%</span>
+                <span th:text="#{backup.progress.copied}">copied</span>
+            </span>
+            <span class="separator">-</span>
+            <span class="progress-time">
+                <span th:text="#{backup.progress.elapsed}">Elapsed:</span>
+                <span id="backup-progress-elapsed" class="progress-time-value">00:00</span>
+                <span th:text="#{backup.progress.minutes.short}">min</span>
+            </span>
+            <span class="separator">-</span>
+            <span class="progress-time">
+            <span th:text="#{backup.progress.remaining}">Remaining:</span>
+            <span id="backup-progress-remaining" class="progress-time-value">--:--</span>
+            <span th:text="#{backup.progress.minutes.short}">min</span>
+        </span>
+        </div>
     </section>
 
     <dialog class="backup-cancel-dialog" id="backup-cancel-dialog">
@@ -385,12 +408,23 @@
                                     ×
                                 </button>
                             </div>
+                            <div class="backup-comment-context"
+                                 th:if="${!backup.comment().isBlank()}">
+                                <small th:text="#{backup.comment}">
+                                    Comment
+                                </small>
+                                <p th:text="${backup.comment()}"></p>
+                            </div>
+
                             <label>
+                                <span th:text="#{backup.note.additional}">
+                                    Additional note:
+                                </span>
                                 <textarea name="note"
-                                   rows="5"
-                                    th:aria-label="#{backup.note.placeholder}"
-                                    th:placeholder="#{backup.note.placeholder}"
-                                    th:text="${backup.note()}">
+                                          rows="5"
+                                          th:aria-label="#{backup.note.placeholder}"
+                                          th:placeholder="#{backup.note.placeholder}"
+                                          th:text="${backup.note()}">
                                 </textarea>
                             </label>
                             <div class="dialog-actions">
@@ -696,12 +730,17 @@
     const backupProgressTrack = document.getElementById("backup-progress-track");
     const backupProgressBar = document.getElementById("backup-progress-bar");
     const backupProgressDetails = document.getElementById("backup-progress-details");
-
+    const backupProgressVmNumber = document.getElementById("backup-progress-vm-number");
+    const backupProgressPercentInline = document.getElementById("backup-progress-percent-inline");
+    const backupProgressElapsed = document.getElementById("backup-progress-elapsed");
+    const backupProgressRemaining = document.getElementById("backup-progress-remaining");
     const vmSizes = new Map();
 
-    let backupJobRunning =
-        createBackupButton?.dataset.jobRunning === "true";
+    let backupJobRunning = createBackupButton?.dataset.jobRunning === "true";
     let backupJobPollTimer = null;
+    let displayedElapsedSeconds = 0;
+    let displayedRemainingSeconds = null;
+    let backupTimeTimer = null;
 
     function updateCreateBackupButton() {
         if (!createBackupButton) {
@@ -730,35 +769,33 @@
 
         const hasProgress = job.totalBytes > 0;
         const percent = hasProgress ? job.progressPercent : 0;
-        backupProgressTitle.textContent =
-            backupProgress.dataset.labelRunning;
+        backupProgressTitle.textContent = backupProgress.dataset.labelRunning;
 
         updateBackupProgressVms(job);
 
-        backupProgressPercent.textContent = hasProgress
-            ? percent + " %"
-            : "";
+        backupProgressPercent.textContent = hasProgress ? percent + " %" : "";
 
         backupProgressBar.style.width = percent + "%";
         backupProgressTrack.setAttribute("aria-valuenow", String(percent));
 
-        const details = [];
-        if (hasProgress) {
-            details.push(
-                formatBytes(job.copiedBytes)
-                + " " + backupProgress.dataset.labelOf + " "
-                + formatBytes(job.totalBytes)
-            );
+        if (backupProgressVmNumber) {
+            backupProgressVmNumber.textContent =
+                job.currentVmNumber > 0 && job.vmCount > 0
+                    ? job.currentVmNumber + "/" + job.vmCount
+                    : "0/0";
         }
-        if (job.currentVmNumber > 0 && job.vmCount > 0) {
-            details.push(
-                backupProgress.dataset.labelVm + " "
-                + job.currentVmNumber + " "
-                + backupProgress.dataset.labelOf + " "
-                + job.vmCount
-            );
+
+        if (backupProgressPercentInline) {
+            backupProgressPercentInline.textContent = hasProgress ? String(percent) : "0";
         }
-        backupProgressDetails.textContent = details.join(" · ");
+
+        displayedElapsedSeconds = job.elapsedSeconds || 0;
+
+        displayedRemainingSeconds = calculateRemainingSeconds(displayedElapsedSeconds,percent);
+
+        updateBackupTimes();
+        startBackupTimeTimer();
+
     }
 
     function updateBackupProgressVms(job) {
@@ -802,6 +839,68 @@
         });
     }
 
+    function formatDuration(seconds) {
+        const totalSeconds = Math.max(0, Math.round(seconds));
+        const minutes = Math.floor(totalSeconds / 60);
+        const secs = totalSeconds % 60;
+
+        return String(minutes).padStart(2, "0")
+            + ":"
+            + String(secs).padStart(2, "0");
+    }
+
+    function calculateRemainingSeconds(elapsedSeconds, percent) {
+        if (elapsedSeconds < 10 || percent < 5 || percent >= 100) {
+            return null;
+        }
+
+        return Math.round(
+            elapsedSeconds * (100 - percent) / percent
+        );
+    }
+
+    function updateBackupTimes() {
+        if (backupProgressElapsed) {
+            backupProgressElapsed.textContent =
+                formatDuration(displayedElapsedSeconds);
+        }
+
+        if (backupProgressRemaining) {
+            backupProgressRemaining.textContent =
+                displayedRemainingSeconds === null
+                    ? "--:--"
+                    : formatDuration(displayedRemainingSeconds);
+        }
+    }
+
+    function startBackupTimeTimer() {
+        if (backupTimeTimer !== null) {
+            return;
+        }
+
+        backupTimeTimer = window.setInterval(() => {
+            if (!backupJobRunning) {
+                return;
+            }
+
+            displayedElapsedSeconds++;
+
+            if (displayedRemainingSeconds !== null
+                && displayedRemainingSeconds > 0) {
+                displayedRemainingSeconds--;
+            }
+
+            updateBackupTimes();
+        }, 1000);
+    }
+
+    function stopBackupTimeTimer() {
+        if (backupTimeTimer !== null) {
+            clearInterval(backupTimeTimer);
+            backupTimeTimer = null;
+        }
+    }
+
     async function pollBackupJob() {
         if (!backupJobRunning) {
             return;
@@ -830,6 +929,8 @@
                 clearInterval(backupJobPollTimer);
                 backupJobPollTimer = null;
             }
+
+            stopBackupTimeTimer();
 
             if (job.status === "COMPLETED") {
                 window.location.reload();

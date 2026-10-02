@@ -333,8 +333,7 @@ code { overflow-wrap: anywhere; }
 
 .backup-progress.hidden { display: none; }
 
-.backup-progress-heading,
-.backup-progress-details {
+.backup-progress-heading {
     display: flex;
     justify-content: space-between;
     gap: 12px;
@@ -343,6 +342,80 @@ code { overflow-wrap: anywhere; }
 .backup-progress-heading {
     margin-bottom: 8px;
     font-size: .85rem;
+}
+.backup-progress-details {
+    display: flex;
+    align-items: baseline;
+    justify-content: flex-start;
+    gap: 0.55rem;
+    margin-top: 6px;
+    white-space: nowrap;
+}
+
+.backup-progress-details > span {
+    flex: 0 0 auto;
+}
+
+.backup-progress-details .separator {
+    opacity: 0.65;
+}
+
+.progress-copied {
+    display: inline-flex;
+    align-items: baseline;
+    gap: 0.2rem;
+    white-space: nowrap;
+}
+
+.progress-percent-block {
+    display: inline-block;
+    width: 4ch;
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: "tnum";
+}
+
+.progress-vm {
+    display: inline-grid;
+    grid-template-columns: auto 5ch;
+    align-items: baseline;
+    column-gap: 0.2rem;
+}
+
+.progress-vm-value,
+.progress-time-value {
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: "tnum";
+}
+.progress-vm-value {
+    width: 5ch;
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: "tnum";
+}
+.progress-time {
+    display: inline-grid;
+    grid-template-columns: auto 5.5ch auto;
+    align-items: baseline;
+    column-gap: 0;
+}
+
+.progress-time-value {
+    display: inline-block;
+    width: auto;
+    margin: 0;
+    justify-self: end;
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: "tnum";
+}
+
+.progress-time > span:first-child {
+    margin-right: 0.3rem;
+}
+
+.progress-time > span:last-child {
+    margin-left: 0.2rem;
 }
 
 .backup-progress-track {
@@ -754,6 +827,10 @@ code { overflow-wrap: anywhere; }
 .backup-dialog form,
 .backup-cancel-dialog {
     padding: 20px;
+}
+
+.note-dialog textarea {
+    margin-top: 10px;
 }
 
 .dialog-header {

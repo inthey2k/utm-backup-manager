@@ -20,6 +20,8 @@ import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
+import java.time.Duration;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
 
@@ -286,7 +288,8 @@ public class BackupController {
             String currentVmName,
             int currentVmNumber,
             int vmCount,
-            List<String> vmNames
+            List<String> vmNames,
+            long elapsedSeconds
     ) {
         static BackupJobResponse from(
                 BackupJob job,
@@ -302,7 +305,17 @@ public class BackupController {
                     job.currentVmName(),
                     job.currentVmNumber(),
                     job.vmCount(),
-                    vmNames
+                    vmNames,
+                    Math.max(
+                            0,
+                            Duration.between(
+                                    job.startedAt(),
+                                    job.finishedAt() != null
+                                            ? job.finishedAt()
+                                            : LocalDateTime.now()
+                            ).getSeconds()
+                    )
+
             );
         }
         static BackupJobResponse idle() {
@@ -316,7 +329,8 @@ public class BackupController {
                     null,
                     0,
                     0,
-                    List.of()
+                    List.of(),
+                    0
             );
         }
     }
