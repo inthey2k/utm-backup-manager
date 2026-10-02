@@ -13,4 +13,21 @@ public record BackupProperties(
         Path metadataDb,
         Path legacyStateFile
 ) {
+
+    public BackupProperties {
+        root = trim(root);
+        metadataDb = trim(metadataDb);
+        legacyStateFile = trim(legacyStateFile);
+    }
+
+    /**
+     * Removes accidental leading or trailing whitespace from configured paths.
+     */
+    private static Path trim(Path path) {
+        if (path == null) {
+            return null;
+        }
+
+        return Path.of(path.toString().trim());
+    }
 }
