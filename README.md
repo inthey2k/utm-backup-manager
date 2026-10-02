@@ -263,6 +263,39 @@ Thymeleaf, SQLite and embedded Tomcat. The application uses a provider
 abstraction for virtualization-specific integration; version 1.0.0
 includes the UTM provider.
 
+## Screenshots
+### Backup Overview
+The main page lists all your existing VMs as columns and their backups as 'cards' below them.
+
+![UTM Backup Manager - Overview](docs/screenshots/01-overview-of-vms.png)
+
+### Create Backup
+When you click the button to create a new backup, the following dialog allows you to select which 
+VMs to backup and write a comment to the backup. E.g. "Before updating the kernel".
+
+![UTM Backup Manager - Create new backup](docs/screenshots/02-create-backup.png)
+
+### Backup Progress
+Once the backup has started, no second backup can be initiated until it is finished. The overview
+page shows the current progress of copying the file, indicating the currently backed-up VM with a 
+spinning icon, and the waiting VM(s) with a clock icon.
+
+![UTM Backup Manager - Backup Progress](docs/screenshots/03-backup-progress.png)
+
+### Settings
+In the menu in the top-right corner you can select your language and configure the number of backups 
+you want to keep on top of the ones marked as "Stable", which will not be cleaned up automatically.
+The button "Show configuration" displays the values set in the application.properties.
+
+![UTM Backup Manager - Settings](docs/screenshots/04-settings-menu.png)
+![UTM Backup Manager - Configuration Dialog](docs/screenshots/05-configuration-dialog.png)
+
+### Cancelling a Running Backup
+Next to the list of VMs in the progress panel there is a button "Cancel backup" to cancel the running 
+copying process. When you cancel a backup, the files that have been copied so far will automatically 
+be deleted.
+![UTM Backup Manager - Cancel Backup](docs/screenshots/06-cancel-backup-dialog.png)
+
 ## Issues
 
 If you find a problem in the application, feel free to report it at https://jira.fjordkommission.de
