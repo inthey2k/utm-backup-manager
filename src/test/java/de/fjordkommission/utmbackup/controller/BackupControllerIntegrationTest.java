@@ -24,12 +24,8 @@ import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.flash;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.view;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.hamcrest.Matchers.startsWith;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 @SpringBootTest
 @AutoConfigureMockMvc
@@ -193,12 +189,21 @@ class BackupControllerIntegrationTest extends AbstractIntegrationTest {
         }
     }
 
+    @Test
+    void usesCookieOnlySessionTracking() {
+        assertEquals(
+                "cookie",
+                environment.getProperty("server.servlet.session.tracking-modes")
+        );
+    }
 
     @Test
     void rejectsBackupWithoutSelectedVm() throws Exception {
         mockMvc.perform(post("/backup"))
                 .andExpect(status().is3xxRedirection())
                 .andExpect(view().name("redirect:/"))
+                .andExpect(redirectedUrl("/"))
+                .andExpect(header().string("Location", "/"))
                 .andExpect(flash().attributeExists("error"));
 
         assertTrue(isDirectoryEmpty(backupRoot));

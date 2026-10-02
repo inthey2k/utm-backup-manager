@@ -4,6 +4,7 @@ spring.application.name=utm-backup-manager
 # The web interface is intentionally accessible from this computer only.
 server.address=127.0.0.1
 server.port=8085
+server.servlet.session.tracking-modes=cookie
 
 # Virtual machine provider
 vm.provider=utm
