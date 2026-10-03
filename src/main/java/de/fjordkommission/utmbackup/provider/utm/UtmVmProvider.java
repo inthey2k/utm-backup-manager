@@ -4,6 +4,8 @@ import de.fjordkommission.utmbackup.config.VmProperties;
 import de.fjordkommission.utmbackup.model.LocalVm;
 import de.fjordkommission.utmbackup.model.VmStatus;
 import de.fjordkommission.utmbackup.provider.VmProvider;
+
+import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Component;
 
 import java.io.IOException;
@@ -26,6 +28,7 @@ import java.util.stream.Stream;
  * therefore exposed as the backup source for that VM.
  */
 @Component
+@Profile("!test")
 public class UtmVmProvider implements VmProvider {
 
     private static final Pattern LIST_ROW =
