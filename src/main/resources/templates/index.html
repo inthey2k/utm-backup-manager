@@ -26,9 +26,8 @@
                 <div class="header-paths">
                     <div class="header-path">
                         <span th:text="#{config.vmDirectory}">Local VMs</span>
-                        <code th:text="${configuration.localVmDirectory()}"></code>
+                        <code th:text="${configuration.providerConfigurationValue('localVmDirectory')}"></code>
                     </div>
-
                     <div class="header-path">
                         <span th:text="#{config.backupRoot}">Backup root</span>
                         <code th:text="${configuration.backupRoot()}"></code>
@@ -536,14 +535,14 @@
             <dt th:text="#{config.providerId}">Provider ID</dt>
             <dd><code th:text="${configuration.providerId()}"></code></dd>
 
-            <dt th:text="#{config.vmDirectory.label}">VM directory</dt>
-            <dd><code th:text="${configuration.localVmDirectory()}"></code></dd>
-
-            <dt th:text="#{config.packageSuffix}">VM package suffix</dt>
-            <dd><code th:text="${configuration.packageSuffix()}"></code></dd>
-
-            <dt th:text="#{config.providerCli}">Provider CLI</dt>
-            <dd><code th:text="${configuration.providerCli()}"></code></dd>
+            <th:block th:each="entry : ${configuration.providerConfiguration()}">
+                <dt th:text="${#messages.msg(entry.labelKey())}">
+                    Provider setting
+                </dt>
+                <dd>
+                    <code th:text="${entry.value()}"></code>
+                </dd>
+            </th:block>
 
             <dt th:text="#{config.backupRoot.label}">Backup directory</dt>
             <dd><code th:text="${configuration.backupRoot()}"></code></dd>

@@ -33,6 +33,11 @@ public interface VmProvider {
 
 
     /**
+     * Returns provider-specific configuration values for display in the UI.
+     */
+    List<ConfigurationEntry> configuration();
+
+    /**
      * Returns all locally available VMs managed by this provider.
      */
     List<LocalVm> findAll();
@@ -53,4 +58,16 @@ public interface VmProvider {
      * including timeout handling, is the responsibility of the backup manager.
      */
     void stop(LocalVm vm);
+
+    /**
+     * Representation of provider-specific configurations, to be
+     * handed over to ApplicationConfigurationView
+     * */
+    record ConfigurationEntry(
+            String key,
+            String labelKey,
+            String value
+    ) {
+    }
+
 }
