@@ -6,6 +6,7 @@ import de.fjordkommission.utmbackup.repository.SettingsRepository;
 import org.springframework.stereotype.Component;
 
 import java.nio.file.Path;
+import java.util.List;
 
 /**
  * Provides the effective application configuration for read-only display
@@ -15,18 +16,15 @@ import java.nio.file.Path;
 public class ApplicationConfigurationView {
 
     private final BackupProperties backupProperties;
-    private final VmProperties vmProperties;
     private final VmProviderRegistry vmProviderRegistry;
     private final SettingsRepository settingsRepository;
 
     public ApplicationConfigurationView(
             BackupProperties backupProperties,
-            VmProperties vmProperties,
             VmProviderRegistry vmProviderRegistry,
             SettingsRepository settingsRepository
     ) {
         this.backupProperties = backupProperties;
-        this.vmProperties = vmProperties;
         this.vmProviderRegistry = vmProviderRegistry;
         this.settingsRepository = settingsRepository;
     }
@@ -37,9 +35,7 @@ public class ApplicationConfigurationView {
         return new Configuration(
                 provider.providerId(),
                 provider.displayName(),
-                localVmDirectory(),
-                vmProperties.utm().packageSuffix(),
-                vmProperties.utm().cli(),
+                provider.configuration(),
                 backupProperties.root(),
                 backupProperties.metadataDb(),
                 backupProperties.legacyStateFile(),
@@ -47,25 +43,23 @@ public class ApplicationConfigurationView {
         );
     }
 
-    private Path localVmDirectory() {
-        if (vmProperties.provider().trim().equalsIgnoreCase("utm")) {
-            return vmProperties.utm().directory();
-        } else {
-            return null;
-        }
-    }
-
 
     public record Configuration(
             String providerId,
             String providerName,
-            Path localVmDirectory,
-            String packageSuffix,
-            Path providerCli,
+            List<VmProvider.ConfigurationEntry> providerConfiguration,
             Path backupRoot,
             Path metadataDb,
             Path legacyStateFile,
             int retentionLimit
     ) {
+
+        public String providerConfigurationValue(String key) {
+            return providerConfiguration.stream()
+                    .filter(entry -> entry.key().equals(key))
+                    .map(VmProvider.ConfigurationEntry::value)
+                    .findFirst()
+                    .orElse(null);
+        }
     }
 }

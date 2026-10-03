@@ -92,6 +92,28 @@ public class UtmVmProvider implements VmProvider {
         );
     }
 
+    @Override
+    public List<ConfigurationEntry> configuration() {
+        return List.of(
+                new ConfigurationEntry(
+                        "localVmDirectory",
+                        "config.vmDirectory.label",
+                        vmDirectory.toString()
+                ),
+                new ConfigurationEntry(
+                        "packageSuffix",
+                        "config.packageSuffix",
+                        packageSuffix
+                ),
+                new ConfigurationEntry(
+                        "providerCli",
+                        "config.providerCli",
+                        executable.toString()
+                )
+        );
+    }
+
+
     /**
      * Reads all UTM runtime states in a single utmctl invocation.
      */
@@ -152,6 +174,10 @@ public class UtmVmProvider implements VmProvider {
         };
     }
 
+    /**
+     * Derives the VM display name from its package directory name
+     * by removing the configured package suffix.
+     */
     private String displayName(Path path) {
         String name = path.getFileName().toString();
 
@@ -159,4 +185,6 @@ public class UtmVmProvider implements VmProvider {
                 ? name.substring(0, name.length() - packageSuffix.length())
                 : name;
     }
+
+
 }

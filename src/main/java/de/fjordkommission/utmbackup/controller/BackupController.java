@@ -13,6 +13,7 @@ import de.fjordkommission.utmbackup.service.BackupScanner;
 import de.fjordkommission.utmbackup.service.BackupService;
 import de.fjordkommission.utmbackup.service.VmSizeService;
 
+import org.springframework.boot.info.BuildProperties;
 import org.springframework.context.MessageSource;
 import org.springframework.context.i18n.LocaleContextHolder;
 import org.springframework.stereotype.Controller;
@@ -37,6 +38,7 @@ public class BackupController {
     private final SettingsRepository settings;
     private final VmProviderRegistry vmProviderRegistry;
     private final VmSizeService vmSizeService;
+    private final BuildProperties buildProperties;
 
     public BackupController(
             BackupScanner scanner,
@@ -46,7 +48,8 @@ public class BackupController {
             BackupJobService backupJobService,
             VmSizeService vmSizeService,
             ApplicationConfigurationView configurationView,
-            MessageSource messageSource
+            MessageSource messageSource,
+            BuildProperties buildProperties
     ) {
         this.scanner = scanner;
         this.service = service;
@@ -56,8 +59,8 @@ public class BackupController {
         this.vmSizeService = vmSizeService;
         this.configurationView = configurationView;
         this.messageSource = messageSource;
+        this.buildProperties = buildProperties;
     }
-
     @GetMapping("/")
     String index(Model model) {
         var configuration = configurationView.current();
@@ -78,6 +81,7 @@ public class BackupController {
         } catch (BackupRootUnavailableException e) {
             model.addAttribute("backupRootAvailable", false);
         }
+        model.addAttribute("applicationVersion", buildProperties.getVersion());
 
         return "index";
     }

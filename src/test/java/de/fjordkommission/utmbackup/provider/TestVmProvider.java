@@ -30,6 +30,23 @@ public class TestVmProvider implements VmProvider {
     }
 
     @Override
+    public List<ConfigurationEntry> configuration() {
+        Path testRoot = Path.of(
+                System.getProperty("java.io.tmpdir"),
+                "utm-backup-manager-test",
+                "vms"
+        );
+
+        return List.of(
+                new ConfigurationEntry(
+                        "localVmDirectory",
+                        "config.vmDirectory.label",
+                        testRoot.toString()
+                )
+        );
+    }
+
+    @Override
     public List<LocalVm> findAll() {
         Path testRoot = Path.of(
                 System.getProperty("java.io.tmpdir"),

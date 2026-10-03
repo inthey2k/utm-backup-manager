@@ -53,6 +53,22 @@ code { overflow-wrap: anywhere; }
 
 .muted { color: var(--muted); }
 
+.application-version {
+    display: block;
+    margin-top: 20px;
+    opacity: 0.6;
+    font-size: 0.8rem;
+    text-align: center;
+}
+
+.application-version-corner {
+    position: fixed;
+    right: 12px;
+    bottom: 8px;
+    opacity: 0.45;
+    font-size: 0.75rem;
+    pointer-events: none;
+}
 
 /* ---------- Page header ---------- */
 
