@@ -15,6 +15,13 @@ fi
 
 TAG="v$VERSION"
 
+read -r -p "Create release $TAG? [y/N]: " CONFIRM
+
+if [[ "$CONFIRM" != "y" && "$CONFIRM" != "Y" ]]; then
+    echo "Release cancelled."
+    exit 0
+fi
+
 if [[ -n "$(git status --porcelain)" ]]; then
     echo "Working tree is not clean."
     exit 1
