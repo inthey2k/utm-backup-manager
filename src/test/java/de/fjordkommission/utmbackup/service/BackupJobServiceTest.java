@@ -4,6 +4,7 @@ import de.fjordkommission.utmbackup.model.LocalVm;
 import org.junit.jupiter.api.Test;
 
 import java.nio.file.Path;
+import java.time.Instant;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.concurrent.Executor;
@@ -26,7 +27,8 @@ class BackupJobServiceTest {
         CapturingExecutor executor = new CapturingExecutor();
         BackupJobService service = new BackupJobService(createBackupService, executor);
 
-        BackupJob job = service.start(List.of(vm), "Before update");
+        List<LocalVm> vms = List.of(vm);
+        BackupJob job = service.start(vms, "Before update");
 
         assertEquals(BackupJobStatus.RUNNING, job.status());
         assertNull(job.finishedAt());
@@ -47,7 +49,7 @@ class BackupJobServiceTest {
     void calculatesProgressPercentFromByteCounters() {
         BackupJob job = new BackupJob(
                 BackupJobStatus.RUNNING,
-                LocalDateTime.now(),
+                Instant.now(),
                 null,
                 null,
                 null,
@@ -67,11 +69,12 @@ class BackupJobServiceTest {
         CapturingExecutor executor = new CapturingExecutor();
         BackupJobService service = new BackupJobService(createBackupService, executor);
 
-        service.start(List.of(vm), null);
+        List<LocalVm> vms = List.of(vm);
+        service.start(vms, null);
 
         assertThrows(
                 BackupJobAlreadyRunningException.class,
-                () -> service.start(List.of(vm), null)
+                () -> service.start(vms, null)
         );
 
         verifyNoInteractions(createBackupService);
@@ -86,7 +89,7 @@ class BackupJobServiceTest {
         CreateBackupService.Result result = new CreateBackupService.Result(
                 "2026-09-30_1430",
                 Path.of("backups/2026-09-30_1430"),
-                LocalDateTime.of(2026, 9, 30, 14, 30)
+                LocalDateTime.parse("2026-09-30T14:30:00")
         );
 
         when(createBackupService.create(
@@ -119,7 +122,8 @@ class BackupJobServiceTest {
             return result;
         });
 
-        service.start(List.of(vm), "Before update");
+        List<LocalVm> vms = List.of(vm);
+        service.start(vms, "Before update");
         executor.runCapturedTask();
 
         BackupJob completedJob = service.currentJob().orElseThrow();
@@ -139,7 +143,7 @@ class BackupJobServiceTest {
         CreateBackupService.Result result = new CreateBackupService.Result(
                 "2026-09-30_1430",
                 Path.of("backups/2026-09-30_1430"),
-                LocalDateTime.of(2026, 9, 30, 14, 30)
+                LocalDateTime.parse("2026-09-30T14:30:00")
         );
 
         when(createBackupService.create(
@@ -148,8 +152,8 @@ class BackupJobServiceTest {
                 any(CreateBackupService.ProgressListener.class),
                 any(CreateBackupService.CancellationCheck.class)
         )).thenReturn(result);
-
-        BackupJob runningJob = service.start(List.of(vm), "Before update");
+        List<LocalVm> vms = List.of(vm);
+        BackupJob runningJob = service.start(vms, "Before update");
         executor.runCapturedTask();
 
         BackupJob completedJob = service.currentJob().orElseThrow();
@@ -166,14 +170,15 @@ class BackupJobServiceTest {
         CapturingExecutor executor = new CapturingExecutor();
         BackupJobService service = new BackupJobService(createBackupService, executor);
 
+        List<LocalVm> vms = List.of(vm);
         when(createBackupService.create(
-                eq(List.of(vm)),
+                eq(vms),
                 isNull(),
                 any(CreateBackupService.ProgressListener.class),
                 any(CreateBackupService.CancellationCheck.class)
         )).thenThrow(new IllegalStateException("Backup failed"));
 
-        BackupJob runningJob = service.start(List.of(vm), null);
+        BackupJob runningJob = service.start(vms, null);
         executor.runCapturedTask();
 
         BackupJob failedJob = service.currentJob().orElseThrow();
@@ -193,7 +198,7 @@ class BackupJobServiceTest {
 
         BackupJobService service =
                 new BackupJobService(createBackupService, executor);
-
+        List<LocalVm> vms = List.of(vm);
         doAnswer(invocation -> {
             CreateBackupService.CancellationCheck cancellationCheck =
                     invocation.getArgument(3);
@@ -202,13 +207,13 @@ class BackupJobServiceTest {
 
             throw new BackupCancelledException();
         }).when(createBackupService).create(
-                eq(List.of(vm)),
+                eq(vms),
                 isNull(),
                 any(CreateBackupService.ProgressListener.class),
                 any(CreateBackupService.CancellationCheck.class)
         );
 
-        BackupJob runningJob = service.start(List.of(vm), null);
+        BackupJob runningJob = service.start(vms, null);
 
         service.cancel();
         executor.runCapturedTask();

@@ -1,9 +1,11 @@
 package de.fjordkommission.utmbackup.controller;
 
+import static org.awaitility.Awaitility.await;
 import static org.hamcrest.Matchers.containsString;
 
 import de.fjordkommission.utmbackup.AbstractIntegrationTest;
 import de.fjordkommission.utmbackup.service.BackupJobService;
+import de.fjordkommission.utmbackup.service.BackupJobStatus;
 import de.fjordkommission.utmbackup.service.BackupScanner;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.BeforeEach;
@@ -11,6 +13,7 @@ import org.junit.jupiter.api.BeforeEach;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.Duration;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
@@ -278,20 +281,12 @@ class BackupControllerIntegrationTest extends AbstractIntegrationTest {
      * Waits only for the real background job; file-copy correctness is still
      * verified below as part of this end-to-end controller integration test.
      */
-    private void waitForBackupJob() throws InterruptedException {
-        long deadline = System.nanoTime()
-                + java.util.concurrent.TimeUnit.SECONDS.toNanos(5);
-
-        while (backupJobService.currentJob()
-                .map(job -> job.status().name().equals("RUNNING"))
-                .orElse(false)) {
-
-            if (System.nanoTime() >= deadline) {
-                throw new AssertionError("Backup job did not finish within 5 seconds");
-            }
-
-            Thread.sleep(10);
-        }
+    private void waitForBackupJob() {
+        await()
+                .atMost(Duration.ofSeconds(5))
+                .until(() -> backupJobService.currentJob()
+                        .map(job -> job.status() != BackupJobStatus.RUNNING)
+                        .orElse(true));
     }
 
     private void createTestBackup() throws IOException {

@@ -139,10 +139,10 @@ class BackupScannerIntegrationTest extends AbstractIntegrationTest {
         );
 
         assertTrue(stableBackup.stable());
-
+        String backupId = stableBackup.id();
         assertThrows(
                 IllegalStateException.class,
-                () -> backupService.delete(stableBackup.id())
+                () -> backupService.delete(backupId)
         );
 
         assertTrue(Files.isDirectory(vmPath));

@@ -5,7 +5,7 @@ import de.fjordkommission.utmbackup.model.LocalVm;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Service;
 
-import java.time.LocalDateTime;
+import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.Executor;
@@ -57,7 +57,7 @@ public class BackupJobService {
 
             runningJob = new BackupJob(
                     BackupJobStatus.RUNNING,
-                    LocalDateTime.now(),
+                    Instant.now(),
                     null,
                     null,
                     null,
@@ -115,7 +115,7 @@ public class BackupJobService {
     private void runBackup(
             List<LocalVm> vms,
             String comment,
-            LocalDateTime startedAt
+            Instant startedAt
     ) {
         try {
             CreateBackupService.Result result = createBackupService.create(
@@ -125,56 +125,90 @@ public class BackupJobService {
                     cancellationRequested::get
             );
 
-            BackupJob latest = currentJob;
-            long totalBytes = latest != null ? latest.totalBytes() : 0;
+            completeJob(startedAt, result, vms.size());
 
-            currentJob = new BackupJob(
-                    BackupJobStatus.COMPLETED,
-                    startedAt,
-                    LocalDateTime.now(),
-                    result.backupDirectoryName(),
-                    null,
-                    totalBytes,
-                    totalBytes,
-                    latest != null ? latest.currentVmName() : null,
-                    vms.size(),
-                    vms.size()
-            );
         } catch (BackupCancelledException e) {
-            BackupJob latest = currentJob;
+            cancelJob(startedAt, vms.size());
 
-            currentJob = new BackupJob(
-                    BackupJobStatus.CANCELLED,
-                    startedAt,
-                    LocalDateTime.now(),
-                    null,
-                    null,
-                    latest != null ? latest.copiedBytes() : 0,
-                    latest != null ? latest.totalBytes() : 0,
-                    latest != null ? latest.currentVmName() : null,
-                    latest != null ? latest.currentVmNumber() : 0,
-                    vms.size()
-            );
         } catch (RuntimeException e) {
-            BackupJob latest = currentJob;
-
-            currentJob = new BackupJob(
-                    BackupJobStatus.FAILED,
-                    startedAt,
-                    LocalDateTime.now(),
-                    null,
-                    errorMessage(e),
-                    latest != null ? latest.copiedBytes() : 0,
-                    latest != null ? latest.totalBytes() : 0,
-                    latest != null ? latest.currentVmName() : null,
-                    latest != null ? latest.currentVmNumber() : 0,
-                    vms.size()
-            );
+            failJob(startedAt, vms.size(), e);
         }
+    }
+    private void completeJob(
+            Instant startedAt,
+            CreateBackupService.Result result,
+            int vmCount
+    ) {
+        BackupJob latest = currentJob;
+        long totalBytes = latest != null ? latest.totalBytes() : 0;
+
+        currentJob = new BackupJob(
+                BackupJobStatus.COMPLETED,
+                startedAt,
+                Instant.now(),
+                result.backupDirectoryName(),
+                null,
+                totalBytes,
+                totalBytes,
+                latest != null ? latest.currentVmName() : null,
+                vmCount,
+                vmCount
+        );
+    }
+    private void cancelJob(Instant startedAt, int vmCount) {
+        BackupJob latest = currentJob;
+
+        currentJob = new BackupJob(
+                BackupJobStatus.CANCELLED,
+                startedAt,
+                Instant.now(),
+                null,
+                null,
+                copiedBytes(latest),
+                totalBytes(latest),
+                currentVmName(latest),
+                currentVmNumber(latest),
+                vmCount
+        );
+    }
+    private void failJob(
+            Instant startedAt,
+            int vmCount,
+            RuntimeException exception
+    ) {
+        BackupJob latest = currentJob;
+
+        currentJob = new BackupJob(
+                BackupJobStatus.FAILED,
+                startedAt,
+                Instant.now(),
+                null,
+                errorMessage(exception),
+                copiedBytes(latest),
+                totalBytes(latest),
+                currentVmName(latest),
+                currentVmNumber(latest),
+                vmCount
+        );
+    }
+    private long copiedBytes(BackupJob job) {
+        return job != null ? job.copiedBytes() : 0;
+    }
+
+    private long totalBytes(BackupJob job) {
+        return job != null ? job.totalBytes() : 0;
+    }
+
+    private String currentVmName(BackupJob job) {
+        return job != null ? job.currentVmName() : null;
+    }
+
+    private int currentVmNumber(BackupJob job) {
+        return job != null ? job.currentVmNumber() : 0;
     }
 
     private void updateProgress(
-            LocalDateTime startedAt,
+            Instant startedAt,
             CreateBackupService.Progress progress
     ) {
         BackupJob latest = currentJob;

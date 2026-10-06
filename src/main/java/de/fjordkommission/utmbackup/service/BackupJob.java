@@ -1,14 +1,14 @@
 package de.fjordkommission.utmbackup.service;
 
-import java.time.LocalDateTime;
+import java.time.Instant;
 
 /**
  * Immutable snapshot of the most recently started backup job.
  */
 public record BackupJob(
         BackupJobStatus status,
-        LocalDateTime startedAt,
-        LocalDateTime finishedAt,
+        Instant startedAt,
+        Instant finishedAt,
         String backupDirectoryName,
         String errorMessage,
         long copiedBytes,

@@ -19,6 +19,7 @@ import java.nio.file.attribute.BasicFileAttributes;
 import java.nio.file.attribute.PosixFileAttributeView;
 import java.nio.file.attribute.PosixFileAttributes;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.HashSet;
 import java.util.List;
@@ -103,7 +104,7 @@ public class CreateBackupService {
             );
         }
 
-        LocalDateTime backupTime = LocalDateTime.now();
+        LocalDateTime backupTime = LocalDateTime.now(ZoneId.systemDefault());
         String directoryName = findAvailableDirectoryName(backupTime);
 
         Path backupDirectory = backupRoot.resolve(directoryName);

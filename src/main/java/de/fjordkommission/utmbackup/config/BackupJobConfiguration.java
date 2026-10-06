@@ -1,6 +1,5 @@
 package de.fjordkommission.utmbackup.config;
 
-import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
@@ -23,7 +22,7 @@ public class BackupJobConfiguration {
      * BackupJobService provides the authoritative one-job-at-a-time guard.
      */
     @Bean(defaultCandidate = false)
-    @Qualifier(BACKUP_TASK_EXECUTOR)
+    //@Qualifier(BACKUP_TASK_EXECUTOR)
     public Executor backupTaskExecutor() {
         ThreadPoolTaskExecutor executor = new ThreadPoolTaskExecutor();
         executor.setCorePoolSize(1);

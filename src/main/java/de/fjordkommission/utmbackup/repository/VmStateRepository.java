@@ -6,6 +6,7 @@ import jakarta.annotation.PostConstruct;
 
 import org.springframework.stereotype.Repository;
 
+import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.sql.*;
@@ -20,7 +21,7 @@ public class VmStateRepository {
     }
 
     @PostConstruct
-    void init() throws Exception {
+    void init() throws IOException, SQLException {
         Files.createDirectories(db.getParent());
         try (Connection c = connect(); Statement s = c.createStatement()) {
             s.execute("CREATE TABLE IF NOT EXISTS vm_state (" +

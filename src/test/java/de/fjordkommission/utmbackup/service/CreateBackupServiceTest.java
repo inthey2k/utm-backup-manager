@@ -189,11 +189,12 @@ class CreateBackupServiceTest {
         );
 
         AtomicBoolean cancel = new AtomicBoolean(false);
+        List<LocalVm> vms = List.of(vm);
 
         assertThrows(
                 BackupCancelledException.class,
                 () -> service.create(
-                        List.of(vm),
+                        vms,
                         "Cancellation test",
                         progress -> {
                             if (progress.copiedBytes() > 0) {
@@ -236,13 +237,13 @@ class CreateBackupServiceTest {
         service.create(
                 List.of(vm),
                 "Progress test",
-                progress -> updates.add(progress)
+                updates::add
         );
 
         assertFalse(updates.isEmpty());
 
-        CreateBackupService.Progress first = updates.get(0);
-        CreateBackupService.Progress last = updates.get(updates.size() - 1);
+        CreateBackupService.Progress first = updates.getFirst();
+        CreateBackupService.Progress last = updates.getLast();
 
         assertEquals("Test Linux VM", first.currentVmName());
         assertEquals(1, first.currentVmNumber());
@@ -299,10 +300,12 @@ class CreateBackupServiceTest {
                 List.of(missingSource)
         );
 
+        List<LocalVm> vms = List.of(existingVm, missingVm);
+
         assertThrows(
                 UncheckedIOException.class,
                 () -> service.create(
-                        List.of(existingVm, missingVm),
+                        vms,
                         "This backup must fail"
                 )
         );

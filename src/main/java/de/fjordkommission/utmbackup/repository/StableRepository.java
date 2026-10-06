@@ -6,6 +6,7 @@ import jakarta.annotation.PostConstruct;
 
 import org.springframework.stereotype.Repository;
 
+import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.sql.*;
@@ -22,7 +23,7 @@ public class StableRepository {
     }
 
     @PostConstruct
-    void init() throws Exception {
+    void init() throws IOException, SQLException {
         Files.createDirectories(db.getParent());
 
         try (

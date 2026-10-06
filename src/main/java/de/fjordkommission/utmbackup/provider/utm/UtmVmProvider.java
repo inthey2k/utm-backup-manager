@@ -32,7 +32,7 @@ import java.util.stream.Stream;
 public class UtmVmProvider implements VmProvider {
 
     private static final Pattern LIST_ROW =
-            Pattern.compile("^([0-9A-Fa-f-]{36})\\s+(\\S+)\\s+(.+)$");
+            Pattern.compile("^([0-9A-Fa-f-]{36})\\s++(\\S++)\\s++(.+)$");
 
     private final Path vmDirectory;
     private final Path executable;
