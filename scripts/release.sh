@@ -2,6 +2,16 @@
 
 set -euo pipefail
 
+if ! command -v gh >/dev/null 2>&1; then
+    echo "GitHub CLI (gh) is not installed. Use 'brew install gh' to add it."
+    exit 1
+fi
+
+if ! gh auth status >/dev/null 2>&1; then
+    echo "GitHub CLI is not authenticated."
+    exit 1
+fi
+
 VERSION="${1:-}"
 
 if [[ -z "$VERSION" ]]; then
@@ -14,6 +24,13 @@ if [[ ! "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
 fi
 
 TAG="v$VERSION"
+
+RELEASE_NOTES="docs/release-notes-$VERSION.md"
+
+if [[ ! -f "$RELEASE_NOTES" ]]; then
+    echo "Release notes not found: $RELEASE_NOTES"
+    exit 1
+fi
 
 read -r -p "Create release $TAG? [y/N]: " CONFIRM
 
@@ -64,7 +81,8 @@ mvn clean verify
 
 echo
 echo "Committing release version..."
-git add pom.xml
+git add pom.xml "$RELEASE_NOTES"
+
 git commit -m "Set project version to $VERSION"
 
 echo
@@ -80,4 +98,10 @@ echo "Pushing tag..."
 git push origin "$TAG"
 
 echo
-echo "Release $TAG created successfully."
+echo "Tag $TAG created successfully."
+echo
+echo "Creating GitHub release..."
+gh release create "v$VERSION" --title "v$VERSION" --notes-file "$RELEASE_NOTES"
+
+echo
+echo "Release v$VERSION created successfully."
