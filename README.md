@@ -11,6 +11,10 @@ supplemental application metadata.
 > **Version 1.0.0:** UTM on macOS is currently the only implemented VM
 > provider. The application contains a provider abstraction so
 > additional virtualization platforms can be added in future versions.
+## Roadmap
+
+Planned features and upcoming improvements are listed in the
+[project roadmap](ROADMAP.md).
 
 ## Features
 
