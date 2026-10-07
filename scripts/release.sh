@@ -31,7 +31,16 @@ if [[ ! -f "$RELEASE_NOTES" ]]; then
     echo "Release notes not found: $RELEASE_NOTES"
     exit 1
 fi
+if ! git ls-files --error-unmatch "$RELEASE_NOTES" >/dev/null 2>&1; then
+    echo "Release notes are not committed: $RELEASE_NOTES"
+    exit 1
+fi
 
+git fetch origin main
+if [[ "$(git rev-parse HEAD)" != "$(git rev-parse origin/main)" ]]; then
+    echo "Local main is not synchronized with origin/main."
+    exit 1
+fi
 read -r -p "Create release $TAG? [y/N]: " CONFIRM
 
 if [[ "$CONFIRM" != "y" && "$CONFIRM" != "Y" ]]; then
@@ -51,8 +60,18 @@ if [[ "$BRANCH" != "main" ]]; then
     exit 1
 fi
 
-if git rev-parse "$TAG" >/dev/null 2>&1; then
-    echo "Tag $TAG already exists."
+if gh release view "$TAG" >/dev/null 2>&1; then
+    echo "GitHub release $TAG already exists."
+    exit 1
+fi
+
+if git rev-parse -q --verify "refs/tags/$TAG" >/dev/null 2>&1; then
+    echo "Git tag $TAG already exists locally."
+    exit 1
+fi
+
+if git ls-remote --exit-code --tags origin "refs/tags/$TAG" >/dev/null 2>&1; then
+    echo "Git tag $TAG already exists on origin."
     exit 1
 fi
 
@@ -81,7 +100,7 @@ mvn clean verify
 
 echo
 echo "Committing release version..."
-git add pom.xml "$RELEASE_NOTES"
+git add pom.xml
 
 git commit -m "Set project version to $VERSION"
 
@@ -100,8 +119,21 @@ git push origin "$TAG"
 echo
 echo "Tag $TAG created successfully."
 echo
+echo
 echo "Creating GitHub release..."
-gh release create "v$VERSION" --title "v$VERSION" --notes-file "$RELEASE_NOTES"
+
+if ! gh release create "$TAG" --title "$TAG" --notes-file "$RELEASE_NOTES"; then
+    echo
+    echo "ERROR: GitHub release could not be created."
+    echo "The Git tag $TAG has already been pushed."
+    echo
+    echo "Please try again later using:"
+    echo "gh release create $TAG --title \"$TAG\" --notes-file \"$RELEASE_NOTES\""
+    exit 1
+fi
+
+echo
+echo "Release $TAG created successfully."
 
 echo
 echo "Release v$VERSION created successfully."
