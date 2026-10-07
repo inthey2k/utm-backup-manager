@@ -24,15 +24,19 @@ public class BackupJobService {
     private final Executor backupTaskExecutor;
     private final AtomicBoolean cancellationRequested = new AtomicBoolean(false);
     private final Object jobLock = new Object();
+    private final RetentionCleanupJobService retentionCleanupJobService;
+
     private volatile BackupJob currentJob;
     private volatile List<String> currentVmNames = List.of();
 
     public BackupJobService(
             CreateBackupService createBackupService,
+            RetentionCleanupJobService retentionCleanupJobService,
             @Qualifier(BackupJobConfiguration.BACKUP_TASK_EXECUTOR)
             Executor backupTaskExecutor
     ) {
         this.createBackupService = createBackupService;
+        this.retentionCleanupJobService = retentionCleanupJobService;
         this.backupTaskExecutor = backupTaskExecutor;
     }
 
@@ -42,17 +46,28 @@ public class BackupJobService {
      * A second request is rejected while the current job is still running.
      */
     public BackupJob start(List<LocalVm> vms, String comment) {
+        return start(vms, comment, List.of());
+    }
+    public BackupJob start(
+            List<LocalVm> vms,
+            String comment,
+            List<LocalVm> retentionCleanupVms
+    ) {
         List<LocalVm> selectedVms = List.copyOf(vms);
+        List<LocalVm> cleanupVms = List.copyOf(retentionCleanupVms);
+
         currentVmNames = selectedVms.stream()
                 .map(LocalVm::name)
                 .toList();
+
         BackupJob runningJob;
 
         synchronized (jobLock) {
-            if (currentJob != null && currentJob.status() == BackupJobStatus.RUNNING) {
+            if (currentJob != null
+                    && currentJob.status() == BackupJobStatus.RUNNING) {
                 throw new BackupJobAlreadyRunningException();
             }
-            // init the cancellation flag
+
             cancellationRequested.set(false);
 
             runningJob = new BackupJob(
@@ -67,11 +82,17 @@ public class BackupJobService {
                     0,
                     selectedVms.size()
             );
+
             currentJob = runningJob;
 
             try {
                 backupTaskExecutor.execute(
-                        () -> runBackup(selectedVms, comment, runningJob.startedAt())
+                        () -> runBackup(
+                                selectedVms,
+                                comment,
+                                cleanupVms,
+                                runningJob.startedAt()
+                        )
                 );
             } catch (RuntimeException e) {
                 currentJob = null;
@@ -115,6 +136,7 @@ public class BackupJobService {
     private void runBackup(
             List<LocalVm> vms,
             String comment,
+            List<LocalVm> retentionCleanupVms,
             Instant startedAt
     ) {
         try {
@@ -126,6 +148,8 @@ public class BackupJobService {
             );
 
             completeJob(startedAt, result, vms.size());
+            // only when backup job is complete we will get to clean up
+            startRetentionCleanup(retentionCleanupVms);
 
         } catch (BackupCancelledException e) {
             cancelJob(startedAt, vms.size());
@@ -134,6 +158,7 @@ public class BackupJobService {
             failJob(startedAt, vms.size(), e);
         }
     }
+
     private void completeJob(
             Instant startedAt,
             CreateBackupService.Result result,
@@ -155,6 +180,7 @@ public class BackupJobService {
                 vmCount
         );
     }
+
     private void cancelJob(Instant startedAt, int vmCount) {
         BackupJob latest = currentJob;
 
@@ -171,6 +197,7 @@ public class BackupJobService {
                 vmCount
         );
     }
+
     private void failJob(
             Instant startedAt,
             int vmCount,
@@ -232,6 +259,19 @@ public class BackupJobService {
                 progress.currentVmNumber(),
                 progress.vmCount()
         );
+    }
+
+    private void startRetentionCleanup(List<LocalVm> retentionCleanupVms) {
+        if (retentionCleanupVms.isEmpty()) {
+            return;
+        }
+
+        try {
+            retentionCleanupJobService.start(retentionCleanupVms);
+        } catch (RuntimeException ignored) {
+            // Cleanup has its own lifecycle and must not change
+            // the result of a successfully completed backup.
+        }
     }
 
     private String errorMessage(RuntimeException exception) {

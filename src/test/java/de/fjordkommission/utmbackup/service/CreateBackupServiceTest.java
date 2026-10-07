@@ -477,6 +477,83 @@ class CreateBackupServiceTest {
         verifyNoInteractions(vmChangeStatusService);
     }
 
+    @Test
+    void removesStaleIncompleteDirectoriesAfterSuccessfulBackup() throws Exception {
+        Path source = tempDirectory.resolve("TestLinux.utm");
+        Files.createDirectories(source);
+        Files.writeString(
+                source.resolve("config.plist"),
+                "configuration"
+        );
+
+        Path backupRoot = tempDirectory.resolve("backups");
+        Files.createDirectories(backupRoot);
+
+        Path staleIncomplete1 =
+                backupRoot.resolve(".incomplete-2026-10-01_1200");
+        Path staleIncomplete2 =
+                backupRoot.resolve(".incomplete-2026-10-02_1300");
+
+        Files.createDirectories(staleIncomplete1.resolve("VMs"));
+        Files.createDirectories(staleIncomplete2.resolve("VMs"));
+
+        Files.writeString(
+                staleIncomplete1.resolve("VMs/old-file.txt"),
+                "old"
+        );
+        Files.writeString(
+                staleIncomplete2.resolve("VMs/old-file.txt"),
+                "old"
+        );
+
+        CreateBackupService service = createService(backupRoot);
+
+        LocalVm vm = new LocalVm(
+                "test-linux-vm",
+                "Test Linux VM",
+                List.of(source)
+        );
+
+        CreateBackupService.Result result = service.create(vm);
+
+        assertTrue(Files.isDirectory(result.backupDirectory()));
+        assertFalse(Files.exists(staleIncomplete1));
+        assertFalse(Files.exists(staleIncomplete2));
+    }
+
+    @Test
+    void removesStaleIncompleteDirectoriesWhenBackupFails() throws Exception {
+        Path backupRoot = tempDirectory.resolve("backups");
+        Files.createDirectories(backupRoot);
+
+        Path staleIncomplete =
+                backupRoot.resolve(".incomplete-2026-10-01_1200");
+
+        Files.createDirectories(staleIncomplete.resolve("VMs"));
+        Files.writeString(
+                staleIncomplete.resolve("VMs/old-file.txt"),
+                "old"
+        );
+
+        Path missingSource =
+                tempDirectory.resolve("Missing.utm");
+
+        CreateBackupService service = createService(backupRoot);
+
+        LocalVm vm = new LocalVm(
+                "missing-vm",
+                "Missing VM",
+                List.of(missingSource)
+        );
+
+        assertThrows(
+                UncheckedIOException.class,
+                () -> service.create(vm)
+        );
+
+        assertFalse(Files.exists(staleIncomplete));
+    }
+
     private CreateBackupService createService(Path backupRoot) {
         BackupProperties properties = new BackupProperties(
                 backupRoot,

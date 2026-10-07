@@ -222,7 +222,6 @@
        th:text="#{overview.empty}">
         No VMs or backups found.
     </p>
-
     <div class="vm-grid"
          th:if="${backupRootAvailable and !overview.vms().isEmpty()}">
         <section class="vm-column"
@@ -512,6 +511,8 @@
         </section>
     </div>
 
+
+    <!-- Read-only display of current configuration from application.properties -->
     <dialog class="configuration-dialog"
             id="configuration-dialog">
 
@@ -560,11 +561,17 @@
             <dd th:text="${configuration.retentionLimit()}"></dd>
         </dl>
     </dialog>
+    <!-- Dialog to select VMs to back up -->
     <dialog class="backup-dialog"
             id="backup-dialog"
             th:if="${backupRootAvailable}">
         <form action="/backup"
               method="post">
+            <!-- Holds info about the choice whether backups beyond retention should be deleted -->
+            <input type="hidden"
+                   name="retentionConfirmed"
+                   id="retention-confirmed"
+                   value="false">
             <div class="dialog-header">
                 <div>
                     <small th:text="#{backup.create}">
@@ -590,6 +597,8 @@
                     <input type="checkbox"
                            name="vmIds"
                            th:value="${vm.id()}"
+                           th:attr="data-vm-name=${vm.name()},
+                                    data-retention-cleanup-required=${vm.normalCount() >= overview.retentionLimit()}"
                            th:disabled="${vm.status().name() != 'STOPPED'}">
 
                     <span class="vm-status"
@@ -636,6 +645,7 @@
             </div>
         </form>
     </dialog>
+    <!-- Error message when backup could not be started -->
     <dialog class="backup-root-dialog"
             id="backup-root-dialog"
             th:if="${!backupRootAvailable}">
@@ -668,6 +678,53 @@
             </button>
         </div>
     </dialog>
+    <!-- Notice that backups beyond retention limit will be deleted after job completion -->
+    <dialog class="backup-dialog retention-confirmation-dialog" id="retention-confirmation-dialog">
+        <div class="dialog-header">
+            <div>
+                <small th:text="#{retention.cleanup.warning.title}">
+                    Retention warning
+                </small>
+
+                <h2 th:text="#{retention.cleanup.warning.heading}">
+                    Old backups will be deleted
+                </h2>
+            </div>
+
+            <button type="button"
+                    class="dialog-close"
+                    th:aria-label="#{dialog.close}">
+                ×
+            </button>
+        </div>
+
+        <p th:text="#{retention.cleanup.warning.message}">
+            After this backup run, the oldest backups exceeding the retention
+            limit will be deleted for the following virtual machines:
+        </p>
+
+        <ul id="retention-confirmation-vms"></ul>
+
+        <p th:text="#{retention.cleanup.warning.question}">
+            Do you still want to start the backup?
+        </p>
+
+        <div class="dialog-actions">
+            <button type="button"
+                    class="secondary"
+                    id="retention-confirmation-cancel"
+                    autofocus
+                    th:text="#{dialog.cancel}">
+                Cancel
+            </button>
+
+            <button type="button"
+                    id="retention-confirmation-start"
+                    th:text="#{retention.cleanup.warning.confirm}">
+                Start
+            </button>
+        </div>
+    </dialog>
 </main>
 
 
@@ -683,6 +740,20 @@
 
     const backupCancelConfirm =
         document.getElementById("backup-cancel-confirm");
+
+    const retentionConfirmationDialog =
+        document.getElementById("retention-confirmation-dialog");
+
+    const retentionConfirmationVms =
+        document.getElementById("retention-confirmation-vms");
+
+    const retentionConfirmationCancel =
+        document.getElementById("retention-confirmation-cancel");
+
+    const retentionConfirmationStart =
+        document.getElementById("retention-confirmation-start");
+
+    let retentionConfirmed = false;
 
     const headerMenuButton = document.getElementById("header-menu-button");
     const headerMenu = document.getElementById("header-menu");
@@ -716,15 +787,46 @@
         'button[type="submit"]'
     );
 
-    backupForm?.addEventListener("submit", () => {
+    retentionConfirmationCancel?.addEventListener("click", () => {
+        retentionConfirmationDialog.close();
+    });
+
+    retentionConfirmationStart?.addEventListener("click", () => {
+        retentionConfirmed = true;
+        //set hidden input field with actual value
+        document.getElementById("retention-confirmed").value = "true";
+        retentionConfirmationDialog.close();
+        backupForm?.requestSubmit();
+    });
+
+    backupForm?.addEventListener("submit", event => {
+        const selectedCheckboxes = Array.from(
+            backupCheckboxes || []
+        ).filter(checkbox => checkbox.checked);
+        const affectedVms = selectedCheckboxes.filter(
+            checkbox =>
+                checkbox.dataset.retentionCleanupRequired === "true"
+        );
+        if (affectedVms.length > 0 && !retentionConfirmed) {
+            event.preventDefault();
+            retentionConfirmationVms.replaceChildren();
+            affectedVms.forEach(checkbox => {
+                const item = document.createElement("li");
+                item.textContent = checkbox.dataset.vmName;
+                retentionConfirmationVms.appendChild(item);
+            });
+            retentionConfirmationDialog.showModal();
+            retentionConfirmationCancel.focus();
+            return;
+        }
         if (!backupSubmitButton) {
             return;
         }
-
         backupSubmitButton.disabled = true;
         backupSubmitButton.textContent =
             backupSubmitButton.dataset.startingLabel;
     });
+
     const backupSelectionSize = document.getElementById("backup-selection-size");
     const backupProgress = document.getElementById("backup-progress");
     const backupProgressTitle = document.getElementById("backup-progress-title");
@@ -1090,6 +1192,13 @@
     createBackupButton?.addEventListener("click", () => {
         if (backupJobRunning) {
             return;
+        }
+        //Initialize decision for confirmation dialog
+        retentionConfirmed = false;
+        const retentionConfirmedInput =
+            document.getElementById("retention-confirmed");
+        if (retentionConfirmedInput) {
+            retentionConfirmedInput.value = "false";
         }
 
         backupDialog?.showModal();

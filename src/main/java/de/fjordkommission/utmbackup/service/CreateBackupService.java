@@ -24,6 +24,7 @@ import java.time.format.DateTimeFormatter;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.stream.Stream;
 
 /**
  * Creates new VM backups in the configured backup directory.
@@ -31,6 +32,7 @@ import java.util.Set;
 @Service
 public class CreateBackupService {
 
+    public static final String INCOMPLETE = ".incomplete-";
     private static final DateTimeFormatter DIRECTORY_TIMESTAMP =
             DateTimeFormatter.ofPattern("yyyy-MM-dd_HHmm");
 
@@ -79,7 +81,6 @@ public class CreateBackupService {
     }
     /**
      * Creates a backup and reports copy progress to the supplied listener.
-     *
      * The listener is deliberately independent of the web layer and job model,
      * so this service can still be used without the background-job mechanism.
      */
@@ -109,7 +110,7 @@ public class CreateBackupService {
 
         Path backupDirectory = backupRoot.resolve(directoryName);
         Path incompleteDirectory = backupRoot.resolve(
-                ".incomplete-" + directoryName
+                INCOMPLETE + directoryName
         );
 
         try {
@@ -167,15 +168,15 @@ public class CreateBackupService {
                     backupTime
             );
         } catch (BackupCancelledException e) {
-            cleanupIncompleteDirectory(incompleteDirectory);
             throw e;
         } catch (IOException e) {
-            cleanupIncompleteDirectory(incompleteDirectory);
 
             throw new UncheckedIOException(
                     "Could not create backup",
                     e
             );
+        } finally {
+            cleanupIncompleteDirectories();
         }
     }
 
@@ -317,6 +318,7 @@ public class CreateBackupService {
             );
         }
     }
+
 
     @SuppressWarnings("NullableProblems")
     private void copyDirectory(
@@ -477,8 +479,23 @@ public class CreateBackupService {
         );
     }
 
+
+    private void cleanupIncompleteDirectories() {
+        try (Stream<Path> entries = Files.list(backupRoot)) {
+            entries.filter(Files::isDirectory)
+                    .filter(path -> path.getFileName()
+                            .toString()
+                            .startsWith(INCOMPLETE))
+                    .forEach(this::deleteDirectory);
+        } catch (IOException ignored) {
+            // Cleanup must not affect the backup result.
+        }
+    }
+
+
     @SuppressWarnings("NullableProblems")
-    private void cleanupIncompleteDirectory(Path directory) {
+    private void cleanupIncompleteDirectory(Path directory) throws IOException {
+
         if (!Files.exists(directory)) {
             return;
         }
@@ -513,13 +530,45 @@ public class CreateBackupService {
         }
     }
 
+    @SuppressWarnings("NullableProblems")
+    private void deleteDirectory(Path directory) {
+        try {
+            Files.walkFileTree(directory, new SimpleFileVisitor<>() {
+
+                @Override
+                public FileVisitResult visitFile(
+                        Path file,
+                        BasicFileAttributes attributes
+                ) throws IOException {
+                    Files.delete(file);
+                    return FileVisitResult.CONTINUE;
+                }
+
+                @Override
+                public FileVisitResult postVisitDirectory(
+                        Path dir,
+                        IOException exception
+                ) throws IOException {
+                    if (exception != null) {
+                        throw exception;
+                    }
+
+                    Files.delete(dir);
+                    return FileVisitResult.CONTINUE;
+                }
+            });
+        } catch (IOException ignored) {
+            // Try again after the next backup run.
+        }
+    }
+
     private String findAvailableDirectoryName(LocalDateTime backupTime) {
         String baseName = backupTime.format(DIRECTORY_TIMESTAMP);
         String candidate = baseName;
         int suffix = 2;
 
         while (Files.exists(backupRoot.resolve(candidate))
-                || Files.exists(backupRoot.resolve(".incomplete-" + candidate))) {
+                || Files.exists(backupRoot.resolve(INCOMPLETE + candidate))) {
             candidate = baseName + "_" + suffix++;
         }
 

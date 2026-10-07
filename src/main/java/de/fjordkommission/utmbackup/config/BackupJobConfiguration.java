@@ -13,16 +13,14 @@ import java.util.concurrent.Executor;
 public class BackupJobConfiguration {
 
     public static final String BACKUP_TASK_EXECUTOR = "backupTaskExecutor";
-
+    public static final String RETENTION_CLEANUP_TASK_EXECUTOR = "retentionCleanupTaskExecutor";
     /**
      * Creates a single-threaded executor without a task queue.
-     *
      * The bean is not a default candidate so Spring Boot can retain its
      * auto-configured application task executor for framework integrations.
      * BackupJobService provides the authoritative one-job-at-a-time guard.
      */
-    @Bean(defaultCandidate = false)
-    //@Qualifier(BACKUP_TASK_EXECUTOR)
+    @Bean(name = BACKUP_TASK_EXECUTOR, defaultCandidate = false)
     public Executor backupTaskExecutor() {
         ThreadPoolTaskExecutor executor = new ThreadPoolTaskExecutor();
         executor.setCorePoolSize(1);
@@ -32,6 +30,19 @@ public class BackupJobConfiguration {
         executor.setWaitForTasksToCompleteOnShutdown(false);
         executor.setAcceptTasksAfterContextClose(false);
         executor.initialize();
+        return executor;
+    }
+
+    @Bean(name = RETENTION_CLEANUP_TASK_EXECUTOR)
+    public Executor retentionCleanupTaskExecutor() {
+        ThreadPoolTaskExecutor executor = new ThreadPoolTaskExecutor();
+
+        executor.setCorePoolSize(1);
+        executor.setMaxPoolSize(1);
+        executor.setQueueCapacity(1);
+        executor.setThreadNamePrefix("retention-cleanup-");
+        executor.initialize();
+
         return executor;
     }
 }

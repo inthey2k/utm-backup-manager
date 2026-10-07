@@ -8,6 +8,7 @@ import de.fjordkommission.utmbackup.service.BackupJobService;
 import java.util.List;
 import java.util.Map;
 
+import de.fjordkommission.utmbackup.service.RetentionService;
 import org.springframework.context.MessageSource;
 import org.springframework.context.i18n.LocaleContextHolder;
 import org.springframework.stereotype.Controller;
@@ -25,22 +26,26 @@ public class BackupStartController {
     private final BackupJobService backupJobService;
     private final MessageSource messageSource;
     private final VmProviderRegistry vmProviderRegistry;
+    private final RetentionService retentionService;
 
     public BackupStartController(
             BackupJobService backupJobService,
             MessageSource messageSource,
-            VmProviderRegistry vmProviderRegistry
+            VmProviderRegistry vmProviderRegistry,
+            RetentionService retentionService
     ) {
         this.backupJobService = backupJobService;
         this.messageSource = messageSource;
         this.vmProviderRegistry = vmProviderRegistry;
+        this.retentionService = retentionService;
     }
 
     @PostMapping("/backup")
     String backup(
             @RequestParam(required = false) List<String> vmIds,
             @RequestParam(required = false) String comment,
-            RedirectAttributes redirectAttributes
+            RedirectAttributes redirectAttributes,
+            @RequestParam(defaultValue = "false") boolean retentionConfirmed
     ) {
         try {
             if (vmIds == null || vmIds.isEmpty()) {
@@ -80,7 +85,22 @@ public class BackupStartController {
                 }
             }
 
-            backupJobService.start(selectedVms, comment);
+            List<LocalVm> retentionCleanupVms =
+                    retentionService.findVmsRequiringRetentionCleanup(selectedVms);
+
+            if (!retentionCleanupVms.isEmpty() && !retentionConfirmed) {
+                throw new IllegalStateException(
+                        "Retention cleanup confirmation is required."
+                );
+            }
+
+            backupJobService.start(
+                    selectedVms,
+                    comment,
+                    retentionConfirmed
+                            ? retentionCleanupVms
+                            : List.of()
+            );
 
             redirectAttributes.addFlashAttribute(
                     FLASH_MESSAGE,

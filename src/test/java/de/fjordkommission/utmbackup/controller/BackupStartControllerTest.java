@@ -5,6 +5,7 @@ import de.fjordkommission.utmbackup.model.VmStatus;
 import de.fjordkommission.utmbackup.provider.VmProvider;
 import de.fjordkommission.utmbackup.provider.VmProviderRegistry;
 import de.fjordkommission.utmbackup.service.BackupJobService;
+import de.fjordkommission.utmbackup.service.RetentionService;
 import org.junit.jupiter.api.Test;
 import org.springframework.context.MessageSource;
 import org.springframework.web.servlet.mvc.support.RedirectAttributesModelMap;
@@ -28,6 +29,9 @@ class BackupStartControllerTest {
     private final VmProviderRegistry vmProviderRegistry =
             mock(VmProviderRegistry.class);
 
+    private final RetentionService retentionService =
+            mock(RetentionService.class);
+
     private final VmProvider provider =
             mock(VmProvider.class);
 
@@ -35,7 +39,8 @@ class BackupStartControllerTest {
             new BackupStartController(
                     backupJobService,
                     messageSource,
-                    vmProviderRegistry
+                    vmProviderRegistry,
+                    retentionService
             );
 
     private final LocalVm vm = new LocalVm(
@@ -52,7 +57,8 @@ class BackupStartControllerTest {
         String result = controller.backup(
                 null,
                 null,
-                redirectAttributes
+                redirectAttributes,
+                false
         );
 
         assertEquals("redirect:/", result);
@@ -62,6 +68,7 @@ class BackupStartControllerTest {
         );
 
         verifyNoInteractions(backupJobService);
+        verifyNoInteractions(retentionService);
     }
 
     @Test
@@ -76,7 +83,8 @@ class BackupStartControllerTest {
         String result = controller.backup(
                 List.of("missing-vm"),
                 null,
-                redirectAttributes
+                redirectAttributes,
+                false
         );
 
         assertEquals("redirect:/", result);
@@ -86,6 +94,7 @@ class BackupStartControllerTest {
         );
 
         verifyNoInteractions(backupJobService);
+        verifyNoInteractions(retentionService);
     }
 
     @Test
@@ -102,7 +111,8 @@ class BackupStartControllerTest {
         String result = controller.backup(
                 List.of("test-vm"),
                 null,
-                redirectAttributes
+                redirectAttributes,
+                false
         );
 
         assertEquals("redirect:/", result);
@@ -112,20 +122,17 @@ class BackupStartControllerTest {
         );
 
         verifyNoInteractions(backupJobService);
+        verifyNoInteractions(retentionService);
     }
 
     @Test
-    void startsBackupForStoppedVm() {
-        when(vmProviderRegistry.current()).thenReturn(provider);
-        when(provider.findAll()).thenReturn(List.of(vm));
-        when(provider.findStatuses()).thenReturn(
-                Map.of("Test VM", VmStatus.STOPPED)
-        );
-        when(messageSource.getMessage(
-                eq("backup.started"),
-                any(Object[].class),
-                any()
-        )).thenReturn("Backup started.");
+    void startsBackupWithoutRetentionCleanupWhenNotRequired() {
+        prepareStoppedVm();
+
+        when(retentionService.findVmsRequiringRetentionCleanup(List.of(vm)))
+                .thenReturn(List.of());
+
+        prepareStartedMessage();
 
         RedirectAttributesModelMap redirectAttributes =
                 new RedirectAttributesModelMap();
@@ -133,7 +140,8 @@ class BackupStartControllerTest {
         String result = controller.backup(
                 List.of("test-vm"),
                 "Test comment",
-                redirectAttributes
+                redirectAttributes,
+                false
         );
 
         assertEquals("redirect:/", result);
@@ -144,7 +152,110 @@ class BackupStartControllerTest {
 
         verify(backupJobService).start(
                 List.of(vm),
-                "Test comment"
+                "Test comment",
+                List.of()
         );
+    }
+
+    @Test
+    void rejectsBackupWhenRetentionCleanupRequiresConfirmation() {
+        prepareStoppedVm();
+
+        when(retentionService.findVmsRequiringRetentionCleanup(List.of(vm)))
+                .thenReturn(List.of(vm));
+
+        RedirectAttributesModelMap redirectAttributes =
+                new RedirectAttributesModelMap();
+
+        String result = controller.backup(
+                List.of("test-vm"),
+                "Test comment",
+                redirectAttributes,
+                false
+        );
+
+        assertEquals("redirect:/", result);
+        assertEquals(
+                "Retention cleanup confirmation is required.",
+                redirectAttributes.getFlashAttributes().get("error")
+        );
+
+        verifyNoInteractions(backupJobService);
+    }
+
+    @Test
+    void startsBackupWithRetentionCleanupWhenConfirmed() {
+        prepareStoppedVm();
+
+        when(retentionService.findVmsRequiringRetentionCleanup(List.of(vm)))
+                .thenReturn(List.of(vm));
+
+        prepareStartedMessage();
+
+        RedirectAttributesModelMap redirectAttributes =
+                new RedirectAttributesModelMap();
+
+        String result = controller.backup(
+                List.of("test-vm"),
+                "Test comment",
+                redirectAttributes,
+                true
+        );
+
+        assertEquals("redirect:/", result);
+        assertEquals(
+                "Backup started.",
+                redirectAttributes.getFlashAttributes().get("message")
+        );
+
+        verify(backupJobService).start(
+                List.of(vm),
+                "Test comment",
+                List.of(vm)
+        );
+    }
+
+    @Test
+    void confirmedRetentionDoesNotScheduleCleanupWhenNoneIsRequired() {
+        prepareStoppedVm();
+
+        when(retentionService.findVmsRequiringRetentionCleanup(List.of(vm)))
+                .thenReturn(List.of());
+
+        prepareStartedMessage();
+
+        RedirectAttributesModelMap redirectAttributes =
+                new RedirectAttributesModelMap();
+
+        String result = controller.backup(
+                List.of("test-vm"),
+                "Test comment",
+                redirectAttributes,
+                true
+        );
+
+        assertEquals("redirect:/", result);
+
+        verify(backupJobService).start(
+                List.of(vm),
+                "Test comment",
+                List.of()
+        );
+    }
+
+    private void prepareStoppedVm() {
+        when(vmProviderRegistry.current()).thenReturn(provider);
+        when(provider.findAll()).thenReturn(List.of(vm));
+        when(provider.findStatuses()).thenReturn(
+                Map.of("Test VM", VmStatus.STOPPED)
+        );
+    }
+
+    private void prepareStartedMessage() {
+        when(messageSource.getMessage(
+                eq("backup.started"),
+                any(Object[].class),
+                any()
+        )).thenReturn("Backup started.");
     }
 }

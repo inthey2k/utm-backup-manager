@@ -972,6 +972,29 @@ code { overflow-wrap: anywhere; }
     opacity: .8;
 }
 
+/* ---------- Retention Confirmation dialog ---------- */
+.retention-confirmation-dialog {
+    padding: 20px;
+}
+
+.retention-confirmation-dialog > p {
+    margin: 0 0 16px;
+    line-height: 1.45;
+}
+
+.retention-confirmation-dialog ul {
+    margin: 0 0 20px;
+    padding-left: 24px;
+}
+
+.retention-confirmation-dialog li {
+    margin: 4px 0;
+}
+
+.retention-confirmation-dialog .dialog-actions {
+    margin-top: 20px;
+}
+
 /* ---------- Delete dialog ---------- */
 
 .delete-warning {
