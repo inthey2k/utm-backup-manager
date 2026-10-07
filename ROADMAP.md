@@ -24,8 +24,8 @@ Priorities and version assignments may change as the project evolves.
 ## 1.3.0 – Automatic retention cleanup (✅ Released)
 
 -  For a complete list of changes see published GitHub release notes:
-
-[Release notes for v1.3.0](https://github.com/inthey2k/utm-backup-manager/releases#release-v1.3.0)
+    
+    [Release notes for v1.3.0](https://github.com/inthey2k/utm-backup-manager/releases#release-v1.3.0)
 
 
 ## 1.4.0 – Cleanup and operational visibility
