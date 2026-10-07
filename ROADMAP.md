@@ -23,14 +23,10 @@ Priorities and version assignments may change as the project evolves.
 
 ## 1.3.0 – Automatic retention cleanup (✅ Released)
 
-- Automatic retention cleanup after successful backup runs
-- Confirmation dialog before retention cleanup
-- Stable backups remain protected from automatic deletion
-- Cleanup runs independently from the backup job
-- Cleanup status model for background retention cleanup
-- Automatic cleanup of abandoned `.incomplete-*` directories
-- Extended automated tests
-- Improved release workflow and release notes handling
+-  For a complete list of changes see published GitHub release notes:
+
+[Release notes for v1.3.0](https://github.com/inthey2k/utm-backup-manager/releases#release-v1.3.0)
+
 
 ## 1.4.0 – Cleanup and operational visibility
 
