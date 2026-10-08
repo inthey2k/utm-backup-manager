@@ -49,7 +49,7 @@ if [[ "$CONFIRM" != "y" && "$CONFIRM" != "Y" ]]; then
 fi
 
 if [[ -n "$(git status --porcelain)" ]]; then
-    echo "Working tree is not clean."
+    echo "Working tree is not clean. Please commit your changes first."
     exit 1
 fi
 

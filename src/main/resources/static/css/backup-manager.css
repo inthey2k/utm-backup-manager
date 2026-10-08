@@ -694,6 +694,8 @@ code { overflow-wrap: anywhere; }
 }
 
 .backup-comment {
+    white-space: pre-line;
+    overflow-wrap: anywhere;
     margin: 0 0 7px;
     color: #d6dde8;
     font-size: .76rem;
@@ -881,7 +883,11 @@ code { overflow-wrap: anywhere; }
     gap: 8px;
     margin-top: 14px;
 }
-
+/* ---------- Write note dialog ---------- */
+.backup-comment-context p {
+    white-space: pre-line;
+    overflow-wrap: anywhere;
+}
 
 /* ---------- Backup creation dialog ---------- */
 

@@ -332,7 +332,7 @@ public class BackupScanner {
     }
 
     /**
-     * Reads the backup comment from BACKUP-INFO.txt.
+     * Reads the complete backup comment from BACKUP-INFO.txt.
      */
     private String comment(Path path) {
         if (!Files.isRegularFile(path)) {
@@ -343,9 +343,8 @@ public class BackupScanner {
             List<String> lines = Files.readAllLines(path);
 
             for (int i = 0; i < lines.size(); i++) {
-                if (lines.get(i).trim().equals("Comment:")
-                        && i + 1 < lines.size()) {
-                    return lines.get(i + 1).trim();
+                if (lines.get(i).trim().equals("Comment:")) {
+                    return String.join("\n", lines.subList(i + 1, lines.size())).trim();
                 }
             }
         } catch (IOException ignored) {
@@ -354,6 +353,5 @@ public class BackupScanner {
 
         return "";
     }
-
 
 }

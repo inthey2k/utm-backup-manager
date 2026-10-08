@@ -60,3 +60,4 @@ Priorities and version assignments may change as the project evolves.
 - Improved backup history and statistics
 - More detailed job history
 - Further automation around backup maintenance
+- Investigate platform-specific sparse file preservation during VM backup to minimize file sizes
