@@ -1,6 +1,9 @@
 package de.fjordkommission.utmbackup.service;
 
 import java.time.Instant;
+import java.time.Duration;
+
+import static java.util.Objects.isNull;
 
 /**
  * Immutable snapshot of the most recently started backup job.
@@ -26,5 +29,15 @@ public record BackupJob(
         }
 
         return (int) Math.min(100, copiedBytes * 100 / totalBytes);
+    }
+
+    /**
+     * Returns the total job running time once the job has finished.
+     */
+    public Duration duration() {
+        if (isNull(finishedAt)) {
+            return Duration.ZERO;
+        }
+        return Duration.between(startedAt, finishedAt);
     }
 }

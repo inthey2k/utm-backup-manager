@@ -61,7 +61,11 @@ public class RetentionCleanupJobService {
                         () -> runCleanup(selectedVms, startedAt)
                 );
             } catch (RuntimeException e) {
-                currentJob = null;
+                updateJob(
+                        startedAt,
+                        RetentionCleanupJobStatus.FAILED,
+                        errorMessage(e)
+                );
                 throw e;
             }
         }

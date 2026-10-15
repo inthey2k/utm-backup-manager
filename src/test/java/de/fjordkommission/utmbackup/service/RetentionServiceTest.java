@@ -251,6 +251,62 @@ class RetentionServiceTest {
         );
     }
 
+    @Test
+    void findsBackupsPendingDeletion() {
+        LocalVm localVm = localVm("vm-1", "VM 1");
+
+        VmBackup oldest = normalBackup("backup-1", 1);
+        VmBackup second = normalBackup("backup-2", 2);
+        VmBackup third = normalBackup("backup-3", 3);
+        VmBackup newest = normalBackup("backup-4", 4);
+
+        VmOverview vm = vmOverview(
+                "vm-1",
+                oldest,
+                second,
+                third,
+                newest
+        );
+
+        when(scanner.scan()).thenReturn(overview(vm));
+
+        Set<String> result =
+                retentionService.findBackupsPendingDeletion(
+                        List.of(localVm)
+                );
+
+        assertEquals(
+                Set.of("backup-1", "backup-2"),
+                result
+        );
+    }
+
+    @Test
+    void pendingDeletionNeverIncludesStableBackups() {
+        LocalVm localVm = localVm("vm-1", "VM 1");
+
+        VmOverview vm = vmOverview(
+                "vm-1",
+                normalBackup("backup-1", 1),
+                stableBackup("stable-1", 2),
+                normalBackup("backup-2", 3),
+                normalBackup("backup-3", 4),
+                normalBackup("backup-4", 5)
+        );
+
+        when(scanner.scan()).thenReturn(overview(vm));
+
+        Set<String> result =
+                retentionService.findBackupsPendingDeletion(
+                        List.of(localVm)
+                );
+
+        assertEquals(
+                Set.of("backup-1", "backup-2"),
+                result
+        );
+    }
+
     private LocalVm localVm(String id, String name) {
         return new LocalVm(
                 id,

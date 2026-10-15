@@ -6,6 +6,7 @@ import de.fjordkommission.utmbackup.model.VmOverview;
 import org.springframework.stereotype.Service;
 
 import java.util.Comparator;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -42,6 +43,40 @@ public class RetentionService {
         return selectedVms.stream()
                 .filter(vm -> affectedVmIds.contains(vm.id()))
                 .toList();
+    }
+
+    /**
+     * Determine VMs, which would be cleaned up after the current backup job
+     * because they are beyond the retention limit
+     */
+    public Set<String> findBackupsPendingDeletion(List<LocalVm> vms) {
+        var overview = scanner.scan();
+        int retentionLimit = overview.retentionLimit();
+
+        Set<String> vmIds = vms.stream()
+                .map(LocalVm::id)
+                .collect(Collectors.toSet());
+
+        Set<String> backupIds = new HashSet<>();
+
+        overview.vms().stream()
+                .filter(vm -> vmIds.contains(vm.id()))
+                .forEach(vm -> {
+                    List<VmBackup> normalBackups = vm.backups().stream()
+                            .filter(backup -> !backup.stable())
+                            .sorted(Comparator.comparing(VmBackup::backupTime))
+                            .toList();
+
+                    int excessAfterBackup =
+                            normalBackups.size() + 1 - retentionLimit;
+
+                    normalBackups.stream()
+                            .limit(Math.max(0, excessAfterBackup))
+                            .map(VmBackup::id)
+                            .forEach(backupIds::add);
+                });
+
+        return Set.copyOf(backupIds);
     }
 
     /**

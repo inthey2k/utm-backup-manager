@@ -10,6 +10,7 @@ import org.springframework.web.bind.annotation.RestController;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
+import java.util.Set;
 
 @RestController
 public class BackupJobController {
@@ -25,7 +26,8 @@ public class BackupJobController {
         return backupJobService.currentJob()
                 .map(job -> BackupJobResponse.from(
                         job,
-                        backupJobService.currentVmNames()
+                        backupJobService.currentVmNames(),
+                        backupJobService.currentRetentionPendingDeletionIds()
                 ))
                 .orElseGet(BackupJobResponse::idle);
     }
@@ -46,12 +48,16 @@ public class BackupJobController {
             int currentVmNumber,
             int vmCount,
             List<String> vmNames,
-            long elapsedSeconds
+            Instant startedAt,
+            Instant finishedAt,
+            long elapsedSeconds,
+            long durationSeconds,
+            Set<String> retentionPendingDeletionIds
     ) {
         static BackupJobResponse from(
                 BackupJob job,
-                List<String> vmNames
-        ) {
+                List<String> vmNames,
+                Set<String> retentionPendingDeletionIds) {
             return new BackupJobResponse(
                     job.status().name(),
                     job.backupDirectoryName(),
@@ -63,6 +69,8 @@ public class BackupJobController {
                     job.currentVmNumber(),
                     job.vmCount(),
                     vmNames,
+                    job.startedAt(),
+                    job.finishedAt(),
                     Math.max(
                             0,
                             Duration.between(
@@ -71,7 +79,13 @@ public class BackupJobController {
                                             ? job.finishedAt()
                                             : Instant.now()
                             ).getSeconds()
-                    )
+                    ),
+                    (job.finishedAt() != null
+                            ? job.duration().getSeconds()
+                            : 0
+                    ),
+                    retentionPendingDeletionIds
+
 
             );
         }
@@ -87,7 +101,11 @@ public class BackupJobController {
                     0,
                     0,
                     List.of(),
-                    0
+                    null,
+                    null,
+                    0,
+                    0,
+                    Set.of()
             );
         }
     }

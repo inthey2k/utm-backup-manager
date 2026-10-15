@@ -8,6 +8,7 @@ import org.springframework.stereotype.Service;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.concurrent.Executor;
 import java.util.concurrent.atomic.AtomicBoolean;
 
@@ -25,21 +26,25 @@ public class BackupJobService {
     private final AtomicBoolean cancellationRequested = new AtomicBoolean(false);
     private final Object jobLock = new Object();
     private final RetentionCleanupJobService retentionCleanupJobService;
+    private final RetentionService retentionService;
 
     private volatile BackupJob currentJob;
     private volatile List<String> currentVmNames = List.of();
+    // List of the VMs to be marked as pending deletion after backup job
+    private volatile Set<String> currentRetentionPendingDeletionIds = Set.of();
 
     public BackupJobService(
             CreateBackupService createBackupService,
             RetentionCleanupJobService retentionCleanupJobService,
+            RetentionService retentionService,
             @Qualifier(BackupJobConfiguration.BACKUP_TASK_EXECUTOR)
             Executor backupTaskExecutor
     ) {
         this.createBackupService = createBackupService;
         this.retentionCleanupJobService = retentionCleanupJobService;
+        this.retentionService = retentionService;
         this.backupTaskExecutor = backupTaskExecutor;
     }
-
     /**
      * Starts a backup job and returns immediately after the task was accepted.
      *
@@ -55,6 +60,10 @@ public class BackupJobService {
     ) {
         List<LocalVm> selectedVms = List.copyOf(vms);
         List<LocalVm> cleanupVms = List.copyOf(retentionCleanupVms);
+
+        Set<String> pendingDeletionIds = cleanupVms.isEmpty()
+                ? Set.of()
+                : Set.copyOf(retentionService.findBackupsPendingDeletion(cleanupVms));
 
         currentVmNames = selectedVms.stream()
                 .map(LocalVm::name)
@@ -82,7 +91,7 @@ public class BackupJobService {
                     0,
                     selectedVms.size()
             );
-
+            currentRetentionPendingDeletionIds = pendingDeletionIds;
             currentJob = runningJob;
 
             try {
@@ -96,6 +105,7 @@ public class BackupJobService {
                 );
             } catch (RuntimeException e) {
                 currentJob = null;
+                currentRetentionPendingDeletionIds = Set.of();
                 throw e;
             }
         }
@@ -131,6 +141,13 @@ public class BackupJobService {
      */
     public List<String> currentVmNames() {
         return currentVmNames;
+    }
+
+    /**
+     * Returns backups expected to be deleted after the current job succeeds.
+     */
+    public Set<String> currentRetentionPendingDeletionIds() {
+        return currentRetentionPendingDeletionIds;
     }
 
     private void runBackup(
@@ -179,6 +196,7 @@ public class BackupJobService {
                 vmCount,
                 vmCount
         );
+        currentRetentionPendingDeletionIds = Set.of();
     }
 
     private void cancelJob(Instant startedAt, int vmCount) {
@@ -196,6 +214,7 @@ public class BackupJobService {
                 currentVmNumber(latest),
                 vmCount
         );
+        currentRetentionPendingDeletionIds = Set.of();
     }
 
     private void failJob(
@@ -217,6 +236,7 @@ public class BackupJobService {
                 currentVmNumber(latest),
                 vmCount
         );
+        currentRetentionPendingDeletionIds = Set.of();
     }
     private long copiedBytes(BackupJob job) {
         return job != null ? job.copiedBytes() : 0;

@@ -235,7 +235,7 @@ code { overflow-wrap: anywhere; }
 }
 
 
-.create-backup-button { align-self: center; }
+.create-backup-buttoncreate-backup-button { align-self: center; }
 
 /* ---------- Configuration dialog ---------- */
 
@@ -316,6 +316,7 @@ code { overflow-wrap: anywhere; }
     gap: 12px;
     transition: opacity .25s ease;
 }
+.flash-message.hidden { display: none; }
 
 .flash-message.hiding { opacity: 0; }
 
@@ -336,6 +337,29 @@ code { overflow-wrap: anywhere; }
     opacity: 1;
 }
 
+/** white text in completion message **/
+.backup-completion-details {
+    color: var(--text);
+    line-height: 2rem;
+}
+
+/** cleanup status after backup job **/
+.cleanup-status {
+    margin-top: 8px;
+    font-size: .85rem;
+}
+.cleanup-status.hidden {
+    display: none;
+}
+.cleanup-status-running {
+    color: var(--text-muted);
+}
+.cleanup-status-completed {
+    color: var(--success);
+}
+.cleanup-status-failed {
+    color: var(--danger);
+}
 
 /* ---------- Backup progress ---------- */
 
@@ -714,6 +738,31 @@ code { overflow-wrap: anywhere; }
     -webkit-line-clamp: 2;
 }
 
+/* ---------- Deletion candidates during backup ---------- */
+.retention-pending-deletion.hidden {
+    display: none;
+}
+
+.card.retention-pending-deletion-card {
+    border-color: var(--danger);
+    box-shadow: inset 3px 0 0 var(--danger);
+}
+
+.retention-pending-deletion {
+    display: inline-block;
+    margin-bottom: 4px;
+    padding: 2px 5px;
+    border: 1px solid var(--danger);
+    border-radius: 4px;
+    color: var(--danger);
+    font-size: .68rem;
+    font-weight: 700;
+    letter-spacing: .05em;
+}
+
+.card.retention-pending-deletion-card .retention-candidate {
+    display: none;
+}
 
 /* ---------- Retention markers ---------- */
 

@@ -7,6 +7,7 @@ import java.nio.file.Path;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Set;
 import java.util.concurrent.Executor;
 import java.util.concurrent.atomic.AtomicReference;
 
@@ -20,19 +21,19 @@ class BackupJobServiceTest {
             "Test VM",
             List.of(Path.of("Test.utm"))
     );
+    private final RetentionCleanupJobService retentionCleanupJobService =
+            mock(RetentionCleanupJobService.class);
+
+    private final RetentionService retentionService =
+            mock(RetentionService.class);
 
     @Test
     void startsBackupWithoutRunningItOnCallingThread() {
         CreateBackupService createBackupService = mock(CreateBackupService.class);
         CapturingExecutor executor = new CapturingExecutor();
-        RetentionCleanupJobService cleanupJobService =
-                mock(RetentionCleanupJobService.class);
 
-        BackupJobService service = new BackupJobService(
-                createBackupService,
-                cleanupJobService,
-                executor
-        );
+        BackupJobService service =
+                createService(createBackupService, executor);
 
         List<LocalVm> vms = List.of(vm);
         BackupJob job = service.start(vms, "Before update");
@@ -74,14 +75,10 @@ class BackupJobServiceTest {
     void rejectsSecondBackupWhileFirstJobIsRunning() {
         CreateBackupService createBackupService = mock(CreateBackupService.class);
         CapturingExecutor executor = new CapturingExecutor();
-        RetentionCleanupJobService cleanupJobService =
-                mock(RetentionCleanupJobService.class);
 
-        BackupJobService service = new BackupJobService(
-                createBackupService,
-                cleanupJobService,
-                executor
-        );
+
+        BackupJobService service =
+                createService(createBackupService, executor);
 
         List<LocalVm> vms = List.of(vm);
         service.start(vms, null);
@@ -98,14 +95,9 @@ class BackupJobServiceTest {
     void updatesRunningJobFromCopyProgress() {
         CreateBackupService createBackupService = mock(CreateBackupService.class);
         CapturingExecutor executor = new CapturingExecutor();
-        RetentionCleanupJobService cleanupJobService =
-                mock(RetentionCleanupJobService.class);
 
-        BackupJobService service = new BackupJobService(
-                createBackupService,
-                cleanupJobService,
-                executor
-        );
+        BackupJobService service =
+                createService(createBackupService, executor);
 
         CreateBackupService.Result result = new CreateBackupService.Result(
                 "2026-09-30_1430",
@@ -159,14 +151,9 @@ class BackupJobServiceTest {
     void marksSuccessfulBackupAsCompleted() {
         CreateBackupService createBackupService = mock(CreateBackupService.class);
         CapturingExecutor executor = new CapturingExecutor();
-        RetentionCleanupJobService cleanupJobService =
-                mock(RetentionCleanupJobService.class);
 
-        BackupJobService service = new BackupJobService(
-                createBackupService,
-                cleanupJobService,
-                executor
-        );
+        BackupJobService service =
+                createService(createBackupService, executor);
 
         CreateBackupService.Result result = new CreateBackupService.Result(
                 "2026-09-30_1430",
@@ -196,14 +183,9 @@ class BackupJobServiceTest {
     void marksFailedBackupAsFailed() {
         CreateBackupService createBackupService = mock(CreateBackupService.class);
         CapturingExecutor executor = new CapturingExecutor();
-        RetentionCleanupJobService cleanupJobService =
-                mock(RetentionCleanupJobService.class);
 
-        BackupJobService service = new BackupJobService(
-                createBackupService,
-                cleanupJobService,
-                executor
-        );
+        BackupJobService service =
+                createService(createBackupService, executor);
 
         List<LocalVm> vms = List.of(vm);
         when(createBackupService.create(
@@ -231,14 +213,9 @@ class BackupJobServiceTest {
 
         CapturingExecutor executor = new CapturingExecutor();
 
-        RetentionCleanupJobService cleanupJobService =
-                mock(RetentionCleanupJobService.class);
+        BackupJobService service =
+                createService(createBackupService, executor);
 
-        BackupJobService service = new BackupJobService(
-                createBackupService,
-                cleanupJobService,
-                executor
-        );
         List<LocalVm> vms = List.of(vm);
         doAnswer(invocation -> {
             CreateBackupService.CancellationCheck cancellationCheck =
@@ -278,14 +255,9 @@ class BackupJobServiceTest {
     void rejectsCancellationWhenNoBackupIsRunning() {
         CreateBackupService createBackupService = mock(CreateBackupService.class);
         CapturingExecutor executor = new CapturingExecutor();
-        RetentionCleanupJobService cleanupJobService =
-                mock(RetentionCleanupJobService.class);
 
-        BackupJobService service = new BackupJobService(
-                createBackupService,
-                cleanupJobService,
-                executor
-        );
+        BackupJobService service =
+                createService(createBackupService, executor);
 
         assertThrows(
                 IllegalStateException.class,
@@ -297,15 +269,11 @@ class BackupJobServiceTest {
     void startsRetentionCleanupAfterSuccessfulBackup() {
         CreateBackupService createBackupService =
                 mock(CreateBackupService.class);
-        RetentionCleanupJobService cleanupJobService =
-                mock(RetentionCleanupJobService.class);
+
         CapturingExecutor executor = new CapturingExecutor();
 
-        BackupJobService service = new BackupJobService(
-                createBackupService,
-                cleanupJobService,
-                executor
-        );
+        BackupJobService service =
+                createService(createBackupService, executor);
 
         CreateBackupService.Result result =
                 new CreateBackupService.Result(
@@ -334,22 +302,18 @@ class BackupJobServiceTest {
                 service.currentJob().orElseThrow().status()
         );
 
-        verify(cleanupJobService).start(List.of(vm));
+        verify(retentionCleanupJobService).start(List.of(vm));
     }
 
     @Test
     void doesNotStartRetentionCleanupAfterFailedBackup() {
         CreateBackupService createBackupService =
                 mock(CreateBackupService.class);
-        RetentionCleanupJobService cleanupJobService =
-                mock(RetentionCleanupJobService.class);
+
         CapturingExecutor executor = new CapturingExecutor();
 
-        BackupJobService service = new BackupJobService(
-                createBackupService,
-                cleanupJobService,
-                executor
-        );
+        BackupJobService service =
+                createService(createBackupService, executor);
 
         when(createBackupService.create(
                 eq(List.of(vm)),
@@ -371,8 +335,212 @@ class BackupJobServiceTest {
                 service.currentJob().orElseThrow().status()
         );
 
-        verifyNoInteractions(cleanupJobService);
+        verifyNoInteractions(retentionCleanupJobService);
     }
+
+    @Test
+    void exposesPendingDeletionIdsWhileBackupIsRunning() {
+        CreateBackupService createBackupService =
+                mock(CreateBackupService.class);
+
+        CapturingExecutor executor = new CapturingExecutor();
+
+        BackupJobService service =
+                createService(createBackupService, executor);
+
+        when(retentionService.findBackupsPendingDeletion(List.of(vm)))
+                .thenReturn(Set.of("backup-1", "backup-2"));
+
+        service.start(
+                List.of(vm),
+                null,
+                List.of(vm)
+        );
+
+        assertEquals(
+                Set.of("backup-1", "backup-2"),
+                service.currentRetentionPendingDeletionIds()
+        );
+    }
+
+    @Test
+    void clearsPendingDeletionIdsAfterSuccessfulBackup() {
+        CreateBackupService createBackupService =
+                mock(CreateBackupService.class);
+
+        CapturingExecutor executor = new CapturingExecutor();
+
+        BackupJobService service =
+                createService(createBackupService, executor);
+
+        when(retentionService.findBackupsPendingDeletion(List.of(vm)))
+                .thenReturn(Set.of("backup-1"));
+
+        CreateBackupService.Result result =
+                new CreateBackupService.Result(
+                        "2026-10-15_1800",
+                        Path.of("backups/2026-10-15_1800"),
+                        LocalDateTime.of(2026, 10, 15, 18, 0)
+                );
+
+        when(createBackupService.create(
+                eq(List.of(vm)),
+                isNull(),
+                any(),
+                any()
+        )).thenReturn(result);
+
+        service.start(
+                List.of(vm),
+                null,
+                List.of(vm)
+        );
+
+        assertEquals(
+                Set.of("backup-1"),
+                service.currentRetentionPendingDeletionIds()
+        );
+
+        executor.runCapturedTask();
+
+        assertEquals(
+                Set.of(),
+                service.currentRetentionPendingDeletionIds()
+        );
+    }
+
+    @Test
+    void clearsPendingDeletionIdsAfterFailedBackup() {
+        CreateBackupService createBackupService =
+                mock(CreateBackupService.class);
+
+        CapturingExecutor executor = new CapturingExecutor();
+
+        BackupJobService service =
+                createService(createBackupService, executor);
+
+        when(retentionService.findBackupsPendingDeletion(List.of(vm)))
+                .thenReturn(Set.of("backup-1"));
+
+        when(createBackupService.create(
+                eq(List.of(vm)),
+                isNull(),
+                any(),
+                any()
+        )).thenThrow(new IllegalStateException("Backup failed"));
+
+        service.start(
+                List.of(vm),
+                null,
+                List.of(vm)
+        );
+
+        executor.runCapturedTask();
+
+        assertEquals(
+                Set.of(),
+                service.currentRetentionPendingDeletionIds()
+        );
+    }
+
+    @Test
+    void cleanupStartFailureDoesNotChangeSuccessfulBackupResult() {
+        CreateBackupService createBackupService =
+                mock(CreateBackupService.class);
+
+        CapturingExecutor executor = new CapturingExecutor();
+
+        BackupJobService service =
+                createService(createBackupService, executor);
+
+        CreateBackupService.Result result =
+                new CreateBackupService.Result(
+                        "2026-10-15_1800",
+                        Path.of("backups/2026-10-15_1800"),
+                        LocalDateTime.of(2026, 10, 15, 18, 0)
+                );
+
+        when(createBackupService.create(
+                eq(List.of(vm)),
+                isNull(),
+                any(),
+                any()
+        )).thenReturn(result);
+
+        doThrow(new IllegalStateException("Cleanup could not be started"))
+                .when(retentionCleanupJobService)
+                .start(List.of(vm));
+
+        service.start(
+                List.of(vm),
+                null,
+                List.of(vm)
+        );
+
+        executor.runCapturedTask();
+
+        BackupJob job = service.currentJob().orElseThrow();
+
+        assertEquals(BackupJobStatus.COMPLETED, job.status());
+        assertNull(job.errorMessage());
+
+        verify(retentionCleanupJobService).start(List.of(vm));
+    }
+
+    @Test
+    void clearsPendingDeletionIdsAfterCancelledBackup() {
+        CreateBackupService createBackupService =
+                mock(CreateBackupService.class);
+
+        CapturingExecutor executor = new CapturingExecutor();
+
+        BackupJobService service =
+                createService(createBackupService, executor);
+
+        when(retentionService.findBackupsPendingDeletion(List.of(vm)))
+                .thenReturn(Set.of("backup-1"));
+
+        doAnswer(invocation -> {
+            CreateBackupService.CancellationCheck cancellationCheck =
+                    invocation.getArgument(3);
+
+            assertTrue(cancellationCheck.isCancellationRequested());
+
+            throw new BackupCancelledException();
+        }).when(createBackupService).create(
+                eq(List.of(vm)),
+                isNull(),
+                any(CreateBackupService.ProgressListener.class),
+                any(CreateBackupService.CancellationCheck.class)
+        );
+
+        service.start(
+                List.of(vm),
+                null,
+                List.of(vm)
+        );
+
+        assertEquals(
+                Set.of("backup-1"),
+                service.currentRetentionPendingDeletionIds()
+        );
+
+        service.cancel();
+        executor.runCapturedTask();
+
+        assertEquals(
+                BackupJobStatus.CANCELLED,
+                service.currentJob().orElseThrow().status()
+        );
+
+        assertEquals(
+                Set.of(),
+                service.currentRetentionPendingDeletionIds()
+        );
+
+        verifyNoInteractions(retentionCleanupJobService);
+    }
+
     /**
      * Stores a submitted task so tests can control exactly when it starts.
      */
@@ -396,5 +564,21 @@ class BackupJobServiceTest {
             assertNotNull(captured, "No backup task was captured");
             captured.run();
         }
+
+    }
+
+    /**
+     * Little helper to avoid creating the BackupJobService in EACH test
+     */
+    private BackupJobService createService(
+            CreateBackupService createBackupService,
+            Executor executor
+    ) {
+        return new BackupJobService(
+                createBackupService,
+                retentionCleanupJobService,
+                retentionService,
+                executor
+        );
     }
 }
