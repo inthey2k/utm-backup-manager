@@ -8,6 +8,10 @@ target/
 # macOS
 .DS_Store
 
+# Start/stop scripts
+start.sh
+stop.sh
+
 # IntelliJ inspection exports
 .descriptions.xml
 .xml
@@ -15,6 +19,9 @@ inspect-code-result.tar.gz
 
 # Logs
 *.log
+
+# Processes
+*.pid
 
 # Local databases
 *.db
