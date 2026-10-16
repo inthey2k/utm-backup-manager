@@ -39,3 +39,7 @@ inspect-code-result.tar.gz
 
 # Application backup leftovers
 .incomplete-*
+
+# Claude Code reviews
+/docs/reviews
+
