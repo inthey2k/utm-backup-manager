@@ -18,7 +18,7 @@ This prioritization reflects a locally run, user-operated tool. Do not present e
 
 - Use Java 21 and follow the project's established Spring Boot patterns, architecture, naming, and formatting.
 - Keep changes focused and maintainable; avoid unnecessary dependencies or large rewrites.
-- Write source comments, JavaDoc, commit messages, and technical documentation in **English**.
+- Write source comments, JavaDoc, and technical documentation in **English**.
 - Keep comments concise. Describe what a class or method does and explain *why* an implementation choice matters; add inline comments only for non-obvious logic.
 - Preserve existing behavior unless the task explicitly calls for a change.
 - Add or update focused regression tests for bug fixes and tests for new behavior where practical.
@@ -28,8 +28,11 @@ This prioritization reflects a locally run, user-operated tool. Do not present e
 ## Working safely
 
 - You operate on the **original Git working tree** shared from the macOS host. Edits are immediately visible to the developer in IntelliJ; this is not a disposable copy.
-- Inspect `git status` before editing. Preserve existing user changes and untracked files; never discard, overwrite, or clean them without explicit approval.
-- Do not create commits, push branches, create releases or tags, or invoke deployment/release scripts without explicit authorization.
+- The project owner handles all Git operations. Do not run Git commands, create branches or worktrees, stage, commit, push, reset, or revert unless explicitly requested.
+- Edit the existing working tree directly; do not require a separate Git worktree.
+- Preserve existing user changes and untracked files; never discard, overwrite, or clean them without explicit approval.
+- Leave all changes uncommitted for review in IntelliJ IDEA, and summarize created, modified, or deleted files when finished.
+- Do not create releases or tags or invoke deployment/release scripts without explicit authorization.
 - Do not change files outside this repository without permission.
 - Do not delete or modify real VM backups, backup metadata, or UTM VM files unless explicitly instructed. Prefer mocks, fixtures, and temporary test directories.
 - Do not expose credentials or private configuration values in code, logs, documentation, or commits.
