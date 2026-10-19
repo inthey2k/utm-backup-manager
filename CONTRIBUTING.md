@@ -37,6 +37,8 @@ in English.
 
 New functionality should include appropriate tests where practical.
 
+For more detailed instructions on how to create a new hypervisor interface, please refer to [this document](docs/hypervisor-provider-integration-guide.md) 
+
 ## Pull requests
 
 A pull request should:
