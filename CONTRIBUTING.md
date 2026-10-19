@@ -23,7 +23,7 @@ submitted directly as pull requests.
 Run the complete test suite before submitting changes:
 
 ```bash
-mvn clean test
+mvn clean verify
 ```
 
 All tests should pass.
@@ -32,12 +32,13 @@ All tests should pass.
 
 Please keep changes focused and avoid unrelated refactoring.
 
-Code, comments, commit messages, and documentation should preferably be written
-in English.
+Code, comments, JavaDoc, commit messages, and technical 
+documentation must be written in English.
 
 New functionality should include appropriate tests where practical.
 
-For more detailed instructions on how to create a new hypervisor interface, please refer to [this document](docs/hypervisor-provider-integration-guide.md) 
+For more detailed instructions on how to create a new hypervisor interface, 
+please refer to the [Hypervisor Integration Guide](docs/hypervisor-provider-integration-guide.md) 
 
 ## Pull requests
 
@@ -47,7 +48,9 @@ A pull request should:
 - explain why the change is useful
 - mention any relevant issue
 - keep the scope as small as reasonably possible
-- pass the existing test suite
+- add or update tests for changed behavior where practical
+- update affected documentation
+- pass `mvn clean verify`
 
 Please do not include machine-specific configuration, local filesystem paths,
 credentials, or personal data.
@@ -59,6 +62,9 @@ Local configuration belongs in `application.properties`.
 Do not commit `application.properties`.
 
 Use `application.properties.example` as the template for configuration changes.
+
+> **Important:** When adding or changing configuration properties, also update
+`application.properties.example` accordingly.
 
 ## Licensing
 
