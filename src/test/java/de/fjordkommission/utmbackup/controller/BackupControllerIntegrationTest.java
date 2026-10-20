@@ -141,7 +141,7 @@ class BackupControllerIntegrationTest extends AbstractIntegrationTest {
     @Test
     void startsBackupForStoppedVmAndReportsStatus() throws Exception {
         mockMvc.perform(post("/backup")
-                        .param("vmIds", "test-linux-vm")
+                        .param("vmIds", "utm:test-linux-vm")
                         .param("comment", "Integration test backup"))
                 .andExpect(status().is3xxRedirection())
                 .andExpect(view().name("redirect:/"))

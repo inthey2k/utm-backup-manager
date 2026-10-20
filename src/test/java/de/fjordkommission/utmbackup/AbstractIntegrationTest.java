@@ -15,7 +15,7 @@ public abstract class AbstractIntegrationTest {
 
     @DynamicPropertySource
     static void registerTestPaths(DynamicPropertyRegistry registry) {
-        registry.add("vm.provider", () -> "test");
+        registry.add("vm.providers", () -> "utm");
         registry.add("backup.root", TEST_BACKUP_ROOT::toString);
         registry.add(
                 "backup.metadata-db",

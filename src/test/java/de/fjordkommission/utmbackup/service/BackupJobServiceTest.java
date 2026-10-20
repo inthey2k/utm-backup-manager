@@ -1,6 +1,7 @@
 package de.fjordkommission.utmbackup.service;
 
 import de.fjordkommission.utmbackup.model.LocalVm;
+import de.fjordkommission.utmbackup.model.VmId;
 import org.junit.jupiter.api.Test;
 
 import java.nio.file.Path;
@@ -21,6 +22,7 @@ class BackupJobServiceTest {
             "Test VM",
             List.of(Path.of("Test.utm"))
     );
+    private final VmId vmId = new VmId("utm", "test-vm");
     private final RetentionCleanupJobService retentionCleanupJobService =
             mock(RetentionCleanupJobService.class);
 
@@ -292,7 +294,7 @@ class BackupJobServiceTest {
         service.start(
                 List.of(vm),
                 null,
-                List.of(vm)
+                List.of(vmId)
         );
 
         executor.runCapturedTask();
@@ -302,7 +304,7 @@ class BackupJobServiceTest {
                 service.currentJob().orElseThrow().status()
         );
 
-        verify(retentionCleanupJobService).start(List.of(vm));
+        verify(retentionCleanupJobService).start(List.of(vmId));
     }
 
     @Test
@@ -325,7 +327,7 @@ class BackupJobServiceTest {
         service.start(
                 List.of(vm),
                 null,
-                List.of(vm)
+                List.of(vmId)
         );
 
         executor.runCapturedTask();
@@ -348,13 +350,13 @@ class BackupJobServiceTest {
         BackupJobService service =
                 createService(createBackupService, executor);
 
-        when(retentionService.findBackupsPendingDeletion(List.of(vm)))
+        when(retentionService.findBackupsPendingDeletion(List.of(vmId)))
                 .thenReturn(Set.of("backup-1", "backup-2"));
 
         service.start(
                 List.of(vm),
                 null,
-                List.of(vm)
+                List.of(vmId)
         );
 
         assertEquals(
@@ -373,7 +375,7 @@ class BackupJobServiceTest {
         BackupJobService service =
                 createService(createBackupService, executor);
 
-        when(retentionService.findBackupsPendingDeletion(List.of(vm)))
+        when(retentionService.findBackupsPendingDeletion(List.of(vmId)))
                 .thenReturn(Set.of("backup-1"));
 
         CreateBackupService.Result result =
@@ -393,7 +395,7 @@ class BackupJobServiceTest {
         service.start(
                 List.of(vm),
                 null,
-                List.of(vm)
+                List.of(vmId)
         );
 
         assertEquals(
@@ -419,7 +421,7 @@ class BackupJobServiceTest {
         BackupJobService service =
                 createService(createBackupService, executor);
 
-        when(retentionService.findBackupsPendingDeletion(List.of(vm)))
+        when(retentionService.findBackupsPendingDeletion(List.of(vmId)))
                 .thenReturn(Set.of("backup-1"));
 
         when(createBackupService.create(
@@ -432,7 +434,7 @@ class BackupJobServiceTest {
         service.start(
                 List.of(vm),
                 null,
-                List.of(vm)
+                List.of(vmId)
         );
 
         executor.runCapturedTask();
@@ -469,12 +471,12 @@ class BackupJobServiceTest {
 
         doThrow(new IllegalStateException("Cleanup could not be started"))
                 .when(retentionCleanupJobService)
-                .start(List.of(vm));
+                .start(List.of(vmId));
 
         service.start(
                 List.of(vm),
                 null,
-                List.of(vm)
+                List.of(vmId)
         );
 
         executor.runCapturedTask();
@@ -484,7 +486,7 @@ class BackupJobServiceTest {
         assertEquals(BackupJobStatus.COMPLETED, job.status());
         assertNull(job.errorMessage());
 
-        verify(retentionCleanupJobService).start(List.of(vm));
+        verify(retentionCleanupJobService).start(List.of(vmId));
     }
 
     @Test
@@ -497,7 +499,7 @@ class BackupJobServiceTest {
         BackupJobService service =
                 createService(createBackupService, executor);
 
-        when(retentionService.findBackupsPendingDeletion(List.of(vm)))
+        when(retentionService.findBackupsPendingDeletion(List.of(vmId)))
                 .thenReturn(Set.of("backup-1"));
 
         doAnswer(invocation -> {
@@ -517,7 +519,7 @@ class BackupJobServiceTest {
         service.start(
                 List.of(vm),
                 null,
-                List.of(vm)
+                List.of(vmId)
         );
 
         assertEquals(

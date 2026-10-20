@@ -6,8 +6,14 @@ server.address=127.0.0.1
 server.port=8085
 server.servlet.session.tracking-modes=cookie
 
-# Virtual machine provider
-vm.provider=utm
+# Enabled VM providers, comma-separated, in the order they are listed.
+# Supported providers: utm
+# Resolution order: vm.providers, then the deprecated vm.provider, then utm.
+vm.providers=utm
+
+# Deprecated single-provider property from earlier versions. It is only used when
+# vm.providers is absent. Use vm.providers instead.
+#vm.provider=utm
 
 # Directory containing the local UTM VM packages
 vm.utm.directory=/path/to/your/local/vms

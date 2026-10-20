@@ -1,11 +1,10 @@
 package de.fjordkommission.utmbackup.service;
 
-import de.fjordkommission.utmbackup.model.LocalVm;
+import de.fjordkommission.utmbackup.model.VmId;
 import de.fjordkommission.utmbackup.model.RetentionCleanupJob;
 import de.fjordkommission.utmbackup.model.RetentionCleanupJobStatus;
 import org.junit.jupiter.api.Test;
 
-import java.nio.file.Path;
 import java.util.List;
 import java.util.concurrent.Executor;
 import java.util.concurrent.atomic.AtomicReference;
@@ -15,11 +14,7 @@ import static org.mockito.Mockito.*;
 
 class RetentionCleanupJobServiceTest {
 
-    private final LocalVm vm = new LocalVm(
-            "test-vm",
-            "Test VM",
-            List.of(Path.of("Test.utm"))
-    );
+    private final VmId vmId = new VmId("utm", "test-vm");
 
     @Test
     void startsCleanupWithoutRunningItOnCallingThread() {
@@ -32,7 +27,7 @@ class RetentionCleanupJobServiceTest {
                         executor
                 );
 
-        service.start(List.of(vm));
+        service.start(List.of(vmId));
 
         RetentionCleanupJob job =
                 service.currentJob().orElseThrow();
@@ -61,7 +56,7 @@ class RetentionCleanupJobServiceTest {
                         executor
                 );
 
-        service.start(List.of(vm));
+        service.start(List.of(vmId));
         executor.runCapturedTask();
 
         RetentionCleanupJob job =
@@ -76,7 +71,7 @@ class RetentionCleanupJobServiceTest {
         assertNull(job.errorMessage());
 
         verify(retentionService)
-                .deleteBackupsExceedingRetention(List.of(vm));
+                .deleteBackupsExceedingRetention(List.of(vmId));
     }
 
     @Test
@@ -86,7 +81,7 @@ class RetentionCleanupJobServiceTest {
 
         doThrow(new IllegalStateException("Cleanup failed"))
                 .when(retentionService)
-                .deleteBackupsExceedingRetention(List.of(vm));
+                .deleteBackupsExceedingRetention(List.of(vmId));
 
         RetentionCleanupJobService service =
                 new RetentionCleanupJobService(
@@ -94,7 +89,7 @@ class RetentionCleanupJobServiceTest {
                         executor
                 );
 
-        service.start(List.of(vm));
+        service.start(List.of(vmId));
         executor.runCapturedTask();
 
         RetentionCleanupJob job =

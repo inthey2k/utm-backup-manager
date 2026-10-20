@@ -86,17 +86,25 @@ de.fjordkommission.utmbackup.provider.utm.UtmVmProvider
 
 `VmProviderRegistry` receives all Spring beans that implement `VmProvider`.
 
-The active provider is selected through:
+The enabled providers are selected through:
 
 ```properties
-vm.provider=<provider-id>
+vm.providers=<provider-id>[,<provider-id>...]
 ```
 
 For example:
 
 ```properties
-vm.provider=utm
+vm.providers=utm
 ```
+
+Resolution order (implemented in `EnabledVmProviders`):
+
+1. `vm.providers`, a comma-separated list in the order given. An empty value counts as absent.
+2. `vm.provider`, the deprecated single-provider property. It is used only when `vm.providers` is absent, and it logs a warning at startup.
+3. `utm`, the default when neither property is present.
+
+Provider ids are trimmed and lower-cased before validation, so `UTM` is accepted as `utm`. Valid ids use only lower-case letters, digits and hyphens. Blank entries and duplicate ids are rejected at startup.
 
 Provider IDs are normalized to lower case by the registry.
 
@@ -136,7 +144,7 @@ Each returned VM must contain three meaningful values.
 
 ## `id`
 
-The ID is the stable technical identity of the VM.
+The ID is the stable technical identity of the VM, unique within its provider. The application combines it with the provider id into the canonical `VmId` (`providerId:localId`). The provider supplies only the local part.
 
 It is used to associate:
 
@@ -159,7 +167,7 @@ Do **not** use a temporary process ID or another value that changes between runs
 
 The name is the human-readable display name.
 
-Runtime status lookup currently uses the VM name as the key in the status map, so `findAll()` and `findStatuses()` must agree on the exact name.
+The name is not used for identity or for status lookup. `findStatuses()` is keyed by `id`.
 
 ## `backupSources`
 
@@ -244,18 +252,18 @@ Signature:
 Map<String, VmStatus> findStatuses();
 ```
 
-The map currently uses **VM display names as keys**.
+The map is keyed by the provider-local **`LocalVm.id()`**, never by the display name. Display names are for presentation only and must not be used as technical keys.
 
 Example:
 
 ```java
 return Map.of(
-        "Development VM", VmStatus.STOPPED,
-        "Test Server", VmStatus.RUNNING
+        "vm-123", VmStatus.STOPPED,
+        "vm-456", VmStatus.RUNNING
 );
 ```
 
-Missing entries are treated by the application as `UNKNOWN`.
+Missing entries are treated by the application as `UNKNOWN`. If a runtime state cannot be matched to exactly one local VM (for example because two VMs share a name in the hypervisor's output), report `UNKNOWN` for that VM instead of throwing or guessing.
 
 Where the hypervisor supports it, retrieve the state of multiple VMs in one operation rather than starting one external process for every VM.
 
@@ -410,35 +418,24 @@ Do not expose:
 
 # 9. Provider-specific configuration
 
-Provider selection is configured under:
+Provider selection is configured under `vm.providers` (see section 2). Each provider's settings live in its own namespace, for example `vm.utm.*`.
 
-```properties
-vm.provider=<provider-id>
-```
-
-UTM-specific configuration currently lives in `VmProperties`.
-
-A new provider will normally need a provider-specific configuration record added there.
+UTM-specific configuration currently lives in `VmProperties.Utm`. A new provider normally adds its own `@ConfigurationProperties` record under its own prefix, and should not add fields to `VmProperties`.
 
 Example:
 
 ```java
-@ConfigurationProperties("vm")
-public record VmProperties(
-        @DefaultValue("utm") String provider,
-        Utm utm,
-        Libvirt libvirt
+@ConfigurationProperties("vm.libvirt")
+public record LibvirtProperties(
+        String uri,
+        Path cli
 ) {
-
-    public record Libvirt(
-            String uri,
-            Path cli
-    ) {
-    }
 }
 ```
 
 The exact structure is provider-specific.
+
+A provider implementation must not require its settings when it is disabled. Annotate it with `@ConditionalOnVmProvider` so it is only created when enabled, as shown in section 11. This is what allows a QEMU-only installation to start without any `vm.utm.*` values.
 
 Also update:
 
@@ -449,7 +446,7 @@ application.properties.example
 Example:
 
 ```properties
-vm.provider=libvirt
+vm.providers=libvirt
 vm.libvirt.uri=qemu:///system
 vm.libvirt.cli=/usr/bin/virsh
 ```
@@ -498,6 +495,7 @@ import java.util.Map;
 
 @Component
 @Profile("!test")
+@ConditionalOnVmProvider("example")
 public class ExampleVmProvider implements VmProvider {
 
     @Override
@@ -627,17 +625,18 @@ Unexpected CLI output, timeouts, parse failures or unavailable APIs should norma
 
 Normally no manual registry change is required.
 
-Annotate the implementation as a Spring component:
+Annotate the implementation as a Spring component, with its id in the activation annotation:
 
 ```java
 @Component
 @Profile("!test")
+@ConditionalOnVmProvider("example")
 ```
 
 Then configure:
 
 ```properties
-vm.provider=example
+vm.providers=example
 ```
 
 `VmProviderRegistry` will select the provider whose `providerId()` matches the configured value.
@@ -847,11 +846,11 @@ Before opening a pull request for a new provider, verify:
 
 - [ ] the provider has a unique stable `providerId()`
 - [ ] the provider is registered as a Spring component
-- [ ] `vm.provider=<id>` activates it
+- [ ] `vm.providers=<id>` activates it, and the provider starts without its settings when disabled
 - [ ] `findAll()` returns stable VM IDs
 - [ ] all required restore sources are present in `backupSources`
 - [ ] `findStatuses()` never reports uncertain state as `STOPPED`
-- [ ] display names used by `findAll()` and `findStatuses()` match
+- [ ] `findStatuses()` keys are the `id` values returned by `findAll()`
 - [ ] provider configuration is documented
 - [ ] `application.properties.example` is updated
 - [ ] message keys are added for displayed configuration values
@@ -869,6 +868,7 @@ A new hypervisor provider normally does **not** need to replace or duplicate:
 
 ```text
 BackupScanner
+VmInventory
 CreateBackupService
 BackupJobService
 RetentionService
@@ -881,7 +881,7 @@ VmStateRepository
 SettingsRepository
 ```
 
-These components operate on the generic `LocalVm` model and the provider abstraction.
+These components operate on the generic `LocalVm` model, the canonical `VmId`, and the provider abstraction. Only `VmInventory` calls provider methods. Other services receive the aggregated inventory.
 
 If a new provider appears to require changes throughout these services, first check whether the provider contract can be extended cleanly instead.
 
@@ -896,14 +896,17 @@ The main runtime flow is:
 ```text
 application.properties
         |
-        | vm.provider=<id>
+        | vm.providers=<id> (or deprecated vm.provider, else utm)
         v
-VmProviderRegistry
+VmProviderRegistry  (enabledProviders, in configured order)
+        |
+        v
+VmInventory  (one findAll() and one findStatuses() per provider and build)
         |
         v
 VmProvider
    |          |
-   |          +--> findStatuses()
+   |          +--> findStatuses()      keyed by local id
    |
    +--> findAll()
             |

@@ -4,13 +4,21 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.boot.context.properties.bind.DefaultValue;
 
 import java.nio.file.Path;
+import java.util.List;
 
 /**
- * Configuration of the active virtualization provider.
+ * Configuration of the VM providers.
+ *
+ * {@code providers} holds {@code vm.providers}, and {@code provider} holds the
+ * deprecated {@code vm.provider}. Both are null when absent. The effective list is
+ * resolved by {@link de.fjordkommission.utmbackup.provider.EnabledVmProviders}.
+ * Provider-specific settings stay in their own namespace, for example
+ * {@code vm.utm.*}.
  */
 @ConfigurationProperties("vm")
 public record VmProperties(
-        @DefaultValue("utm") String provider,
+        List<String> providers,
+        String provider,
         Utm utm
 ) {
 

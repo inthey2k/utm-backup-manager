@@ -19,14 +19,19 @@ import java.util.Map;
 @Profile("test")
 public class TestVmProvider implements VmProvider {
 
+    /**
+     * Uses the UTM id on purpose: format-1 backup folders belong to "utm", so the
+     * fixtures keep attaching to this provider. UtmVmProvider is never created
+     * under the test profile.
+     */
     @Override
     public String providerId() {
-        return "test";
+        return "utm";
     }
 
     @Override
     public String displayName() {
-        return "Test";
+        return "UTM (test)";
     }
 
     @Override
@@ -76,9 +81,9 @@ public class TestVmProvider implements VmProvider {
     @Override
     public Map<String, VmStatus> findStatuses() {
         return Map.of(
-                "Test Linux VM", VmStatus.STOPPED,
-                "Deletable Test VM", VmStatus.STOPPED,
-                "Second Deletable Test VM", VmStatus.STOPPED
+                "test-linux-vm", VmStatus.STOPPED,
+                "deletable-test-vm", VmStatus.STOPPED,
+                "second-deletable-test-vm", VmStatus.STOPPED
         );
     }
     @Override

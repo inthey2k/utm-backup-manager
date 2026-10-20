@@ -2,6 +2,7 @@ package de.fjordkommission.utmbackup.service;
 
 import de.fjordkommission.utmbackup.config.BackupJobConfiguration;
 import de.fjordkommission.utmbackup.model.LocalVm;
+import de.fjordkommission.utmbackup.model.VmId;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Service;
 
@@ -56,10 +57,10 @@ public class BackupJobService {
     public BackupJob start(
             List<LocalVm> vms,
             String comment,
-            List<LocalVm> retentionCleanupVms
+            List<VmId> retentionCleanupVms
     ) {
         List<LocalVm> selectedVms = List.copyOf(vms);
-        List<LocalVm> cleanupVms = List.copyOf(retentionCleanupVms);
+        List<VmId> cleanupVms = List.copyOf(retentionCleanupVms);
 
         Set<String> pendingDeletionIds = cleanupVms.isEmpty()
                 ? Set.of()
@@ -153,7 +154,7 @@ public class BackupJobService {
     private void runBackup(
             List<LocalVm> vms,
             String comment,
-            List<LocalVm> retentionCleanupVms,
+            List<VmId> retentionCleanupVms,
             Instant startedAt
     ) {
         try {
@@ -281,7 +282,7 @@ public class BackupJobService {
         );
     }
 
-    private void startRetentionCleanup(List<LocalVm> retentionCleanupVms) {
+    private void startRetentionCleanup(List<VmId> retentionCleanupVms) {
         if (retentionCleanupVms.isEmpty()) {
             return;
         }

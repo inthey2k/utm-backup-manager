@@ -45,9 +45,12 @@ public interface VmProvider {
     /**
      * Returns the runtime states of the locally available VMs.
      *
-     * The map uses VM names as keys. Missing entries are treated as UNKNOWN.
-     * Providers should retrieve multiple states in a single operation where
-     * supported by the underlying hypervisor.
+     * The map is keyed by the provider-local {@link LocalVm#id()}, never by the
+     * display name. Missing entries are treated as UNKNOWN. A provider must
+     * report UNKNOWN, or omit the VM, whenever its state cannot be matched to
+     * exactly one local VM. Providers should retrieve multiple states in a single
+     * operation where supported by the underlying hypervisor, and must not throw
+     * because of ambiguous or unexpected runtime data.
      */
     Map<String, VmStatus> findStatuses();
 

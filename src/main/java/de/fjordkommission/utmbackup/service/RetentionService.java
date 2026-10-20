@@ -1,10 +1,11 @@
 package de.fjordkommission.utmbackup.service;
 
-import de.fjordkommission.utmbackup.model.LocalVm;
 import de.fjordkommission.utmbackup.model.VmBackup;
+import de.fjordkommission.utmbackup.model.VmId;
 import de.fjordkommission.utmbackup.model.VmOverview;
 import org.springframework.stereotype.Service;
 
+import java.util.Collection;
 import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
@@ -29,19 +30,19 @@ public class RetentionService {
      * Returns selected VMs for which another normal backup would
      * require a retention cleanup.
      */
-    public List<LocalVm> findVmsRequiringRetentionCleanup(
-            List<LocalVm> selectedVms
+    public List<VmId> findVmsRequiringRetentionCleanup(
+            Collection<VmId> selectedVms
     ) {
         var overview = scanner.scan();
         int retentionLimit = overview.retentionLimit();
 
-        Set<String> affectedVmIds = overview.vms().stream()
+        Set<VmId> affectedVmIds = overview.vms().stream()
                 .filter(vm -> normalBackupCount(vm) >= retentionLimit)
                 .map(VmOverview::id)
                 .collect(Collectors.toSet());
 
         return selectedVms.stream()
-                .filter(vm -> affectedVmIds.contains(vm.id()))
+                .filter(affectedVmIds::contains)
                 .toList();
     }
 
@@ -49,13 +50,9 @@ public class RetentionService {
      * Determine VMs, which would be cleaned up after the current backup job
      * because they are beyond the retention limit
      */
-    public Set<String> findBackupsPendingDeletion(List<LocalVm> vms) {
+    public Set<String> findBackupsPendingDeletion(Collection<VmId> vmIds) {
         var overview = scanner.scan();
         int retentionLimit = overview.retentionLimit();
-
-        Set<String> vmIds = vms.stream()
-                .map(LocalVm::id)
-                .collect(Collectors.toSet());
 
         Set<String> backupIds = new HashSet<>();
 
@@ -83,13 +80,9 @@ public class RetentionService {
      * Deletes the oldest normal backups until the retention limit
      * is satisfied for the supplied VMs.
      */
-    public void deleteBackupsExceedingRetention(List<LocalVm> vms) {
+    public void deleteBackupsExceedingRetention(Collection<VmId> vmIds) {
         var overview = scanner.scan();
         int retentionLimit = overview.retentionLimit();
-
-        Set<String> vmIds = vms.stream()
-                .map(LocalVm::id)
-                .collect(Collectors.toSet());
 
         for (VmOverview vm : overview.vms()) {
             if (!vmIds.contains(vm.id())) {

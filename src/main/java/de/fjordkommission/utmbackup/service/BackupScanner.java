@@ -2,10 +2,13 @@ package de.fjordkommission.utmbackup.service;
 
 import de.fjordkommission.utmbackup.config.BackupProperties;
 import de.fjordkommission.utmbackup.model.*;
-import de.fjordkommission.utmbackup.provider.VmProvider;
-import de.fjordkommission.utmbackup.provider.VmProviderRegistry;
 import de.fjordkommission.utmbackup.repository.SettingsRepository;
 import de.fjordkommission.utmbackup.repository.StableRepository;
+import de.fjordkommission.utmbackup.storage.BackupFormat;
+import de.fjordkommission.utmbackup.storage.BackupManifest;
+import de.fjordkommission.utmbackup.storage.BackupManifestReader;
+import de.fjordkommission.utmbackup.storage.BackupManifestResult;
+import de.fjordkommission.utmbackup.storage.LegacyBackupTime;
 import org.springframework.stereotype.Service;
 
 import java.io.IOException;
@@ -13,41 +16,40 @@ import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.time.*;
-import java.time.format.DateTimeFormatter;
+import java.time.LocalDateTime;
 import java.util.*;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 import java.util.stream.Stream;
 
 /**
  * Browses the folder on the backup drive for VM backup files in order
  * to display them in the overview page.
+ *
+ * Local VMs come from {@link VmInventory}, so all enabled providers appear.
+ * Format-1 backups are associated with their UTM VM through
+ * {@link LegacyBackupLayout}. Their backup ids are unchanged.
  */
 @Service
 public class BackupScanner {
 
-    private static final Pattern BACKUP_DIRECTORY =
-            Pattern.compile("^(\\d{4}-\\d{2}-\\d{2})(?:_(\\d{4}))?.*$");
-
     private final Path root;
     private final StableRepository repo;
     private final SettingsRepository settings;
-    private final VmProviderRegistry vmProviderRegistry;
+    private final VmInventory vmInventory;
     private final VmChangeStatusService vmChangeStatusService;
+    private final BackupManifestReader manifestReader = new BackupManifestReader();
 
 
     public BackupScanner(
             BackupProperties backupProperties,
             StableRepository repo,
             SettingsRepository settings,
-            VmProviderRegistry vmProviderRegistry,
+            VmInventory vmInventory,
             VmChangeStatusService vmChangeStatusService
     ) {
         this.root = backupProperties.root();
         this.repo = repo;
         this.settings = settings;
-        this.vmProviderRegistry = vmProviderRegistry;
+        this.vmInventory = vmInventory;
         this.vmChangeStatusService = vmChangeStatusService;
     }
     public Path root() {
@@ -55,7 +57,8 @@ public class BackupScanner {
     }
 
     /**
-     * Scans local VMs and existing backups and groups them by VM.
+     * Scans local VMs from all enabled providers and existing backups, and
+     * groups them by canonical VM identity.
      *
      * Local VMs without backups and backup-only VMs are both included so
      * neither newly created VMs nor historical backups disappear from the UI.
@@ -64,45 +67,41 @@ public class BackupScanner {
         int retentionLimit = settings.getRetentionLimit();
 
         Map<String, StableRepository.Meta> metadata = repo.findAll();
-        Map<String, List<VmBackup>> backupsByVm =
-                new TreeMap<>(String.CASE_INSENSITIVE_ORDER);
+        Map<VmId, List<VmBackup>> backupsByVm = new HashMap<>();
+        List<BackupBatchIssue> batchIssues = new ArrayList<>();
 
         if (!Files.isDirectory(root)) {
             throw new BackupRootUnavailableException(root);
         }
 
-        scanBackupDirectories(backupsByVm, metadata);
+        scanBackupDirectories(backupsByVm, metadata, batchIssues);
 
-        VmProvider vmProvider = vmProviderRegistry.current();
-        List<LocalVm> localVms = vmProvider.findAll();
-        Map<String, VmStatus> statuses = vmProvider.findStatuses();
+        VmInventory.Inventory inventory = vmInventory.build();
 
-        Map<String, LocalVm> localVmsById =
-                new TreeMap<>(String.CASE_INSENSITIVE_ORDER);
-
-        localVms.forEach(vm ->
-                localVmsById.put(vm.id(), vm)
-        );
+        Map<VmId, ManagedVm> localVmsById = new HashMap<>();
+        inventory.vms().forEach(vm -> localVmsById.put(vm.id(), vm));
 
         // Include backup-only VMs so historical backups remain manageable.
-        Set<String> vmIds =
-                new TreeSet<>(String.CASE_INSENSITIVE_ORDER);
-
+        Set<VmId> vmIds = new TreeSet<>(overviewOrder(inventory));
         vmIds.addAll(localVmsById.keySet());
         vmIds.addAll(backupsByVm.keySet());
 
-        Set<String> retentionExceeded = new HashSet<>();
+        Set<VmId> retentionExceeded = new HashSet<>();
         Set<String> retentionCandidatesForDeletion = new HashSet<>();
         List<VmOverview> vms = new ArrayList<>();
 
         // Build combined list of local VMs and backup-only VMs
-        for (String vmId : vmIds) {
+        for (VmId vmId : vmIds) {
 
-            LocalVm localVm = localVmsById.get(vmId);
+            ManagedVm localVm = localVmsById.get(vmId);
 
             String vmName = localVm != null
                     ? localVm.name()
-                    : vmId;
+                    : vmId.localId();
+
+            String providerName = localVm != null
+                    ? localVm.providerName()
+                    : inventory.providerName(vmId.providerId()).orElse(vmId.providerId());
 
             List<VmBackup> backups =
                     new ArrayList<>(
@@ -134,21 +133,17 @@ public class BackupScanner {
             }
 
             VmStatus status = localVm != null
-                    ? statuses.getOrDefault(vmName, VmStatus.UNKNOWN)
+                    ? localVm.status()
                     : VmStatus.UNKNOWN;
 
-            VmChangeStatus changeStatus = status == VmStatus.STOPPED
-                    ? vmChangeStatusService.determine(
-                    vmId,
-                    localVm,
-                    !backups.isEmpty()
-            )
-                    : VmChangeStatus.UNKNOWN;
+            VmChangeStatus changeStatus = changeStatus(vmId, localVm, backups);
+
             vms.add(
                     new VmOverview(
                             vmId,
+                            providerName,
                             vmName,
-                            localVm,
+                            localVm != null ? localVm.localVm() : null,
                             List.copyOf(backups),
                             status,
                             changeStatus
@@ -160,7 +155,9 @@ public class BackupScanner {
                 List.copyOf(vms),
                 Set.copyOf(retentionExceeded),
                 Set.copyOf(retentionCandidatesForDeletion),
-                retentionLimit
+                retentionLimit,
+                inventory.providers(),
+                List.copyOf(batchIssues)
         );
     }
 
@@ -178,11 +175,61 @@ public class BackupScanner {
     }
 
     /**
-     * Reads all dated backup directories and groups their VM packages by name.
+     * Change tracking for the legacy UTM keys is unchanged. Other providers do not
+     * write {@code vm_state} yet, so their state is UNKNOWN, or NEVER_BACKED_UP
+     * when they have no backups.
+     *
+     * A backup-only VM has no local VM and therefore no state to compare, so it is
+     * UNKNOWN. Only a local VM reported as STOPPED is compared.
+     */
+    private VmChangeStatus changeStatus(
+            VmId vmId,
+            ManagedVm localVm,
+            List<VmBackup> backups
+    ) {
+        if (localVm == null || localVm.status() != VmStatus.STOPPED) {
+            return VmChangeStatus.UNKNOWN;
+        }
+
+        if (LegacyBackupLayout.usesLegacyStateKeys(vmId.providerId())) {
+            return vmChangeStatusService.determine(
+                    vmId.localId(),
+                    localVm.localVm(),
+                    !backups.isEmpty()
+            );
+        }
+
+        return backups.isEmpty()
+                ? VmChangeStatus.NEVER_BACKED_UP
+                : VmChangeStatus.UNKNOWN;
+    }
+
+    /**
+     * Orders VMs by provider in configured order, then by name. Unknown providers
+     * come last, ordered by id.
+     */
+    private static Comparator<VmId> overviewOrder(VmInventory.Inventory inventory) {
+        List<String> providerOrder = inventory.providers().stream()
+                .map(ProviderSnapshot::providerId)
+                .toList();
+
+        return Comparator
+                .comparingInt((VmId id) -> {
+                    int rank = providerOrder.indexOf(id.providerId());
+                    return rank < 0 ? Integer.MAX_VALUE : rank;
+                })
+                .thenComparing(VmId::providerId)
+                .thenComparing(VmId::localId, String.CASE_INSENSITIVE_ORDER)
+                .thenComparing(VmId::localId);
+    }
+
+    /**
+     * Reads all dated backup directories and groups their VM packages by identity.
      */
     private void scanBackupDirectories(
-            Map<String, List<VmBackup>> backupsByVm,
-            Map<String, StableRepository.Meta> metadata
+            Map<VmId, List<VmBackup>> backupsByVm,
+            Map<String, StableRepository.Meta> metadata,
+            List<BackupBatchIssue> batchIssues
     ) {
         try (Stream<Path> directories = Files.list(root)) {
             directories
@@ -194,7 +241,8 @@ public class BackupScanner {
                             scanBackupDirectory(
                                     directory,
                                     backupsByVm,
-                                    metadata
+                                    metadata,
+                                    batchIssues
                             )
                     );
 
@@ -209,13 +257,14 @@ public class BackupScanner {
     /**
      * Reads the VM backup containers contained in a single backup directory.
      *
-     * Each direct subdirectory below "VMs" represents one VM and is identified
-     * by its provider-defined technical ID.
+     * Each direct subdirectory below "VMs" is a format-1 VM folder and is
+     * attributed to its UTM identity.
      */
     private void scanBackupDirectory(
             Path directory,
-            Map<String, List<VmBackup>> backupsByVm,
-            Map<String, StableRepository.Meta> metadata
+            Map<VmId, List<VmBackup>> backupsByVm,
+            Map<String, StableRepository.Meta> metadata,
+            List<BackupBatchIssue> batchIssues
     ) {
         Path vmDirectory = directory.resolve("VMs");
 
@@ -225,22 +274,30 @@ public class BackupScanner {
 
         String directoryName = directory.getFileName().toString();
 
+        Optional<BackupManifest> manifest = legacyManifest(
+                directoryName,
+                manifestReader.read(directory),
+                batchIssues
+        );
+
+        if (manifest.isEmpty()) {
+            return;
+        }
+
         boolean legacyStable = directoryName
                 .toLowerCase(Locale.ROOT)
                 .contains("_stable");
 
-        String comment = comment(
-                directory.resolve("BACKUP-INFO.txt")
-        );
+        String comment = manifest.get().comment();
 
-        LocalDateTime backupTime = time(directory);
+        LocalDateTime backupTime = LegacyBackupTime.resolve(directory);
 
         try (Stream<Path> vmPaths = Files.list(vmDirectory)) {
             vmPaths
                     .filter(Files::isDirectory)
                     .forEach(path -> {
-                        String vmId = path.getFileName().toString();
-                        String id = id(directoryName, vmId);
+                        String vmFolder = path.getFileName().toString();
+                        String id = id(directoryName, vmFolder);
 
                         StableRepository.Meta storedMetadata =
                                 metadata.get(id);
@@ -261,7 +318,7 @@ public class BackupScanner {
                         VmBackup backup = new VmBackup(
                                 id,
                                 directoryName,
-                                vmId,
+                                vmFolder,
                                 path,
                                 backupTime,
                                 comment,
@@ -271,7 +328,7 @@ public class BackupScanner {
 
                         backupsByVm
                                 .computeIfAbsent(
-                                        vmId,
+                                        LegacyBackupLayout.vmIdForFolder(vmFolder),
                                         ignored -> new ArrayList<>()
                                 )
                                 .add(backup);
@@ -282,76 +339,47 @@ public class BackupScanner {
         }
     }
 
-    private String id(String directoryName, String vmId) {
+    private String id(String directoryName, String vmFolder) {
         return Base64.getUrlEncoder()
                 .withoutPadding()
                 .encodeToString(
-                        (directoryName + "\n" + vmId)
+                        (directoryName + "\n" + vmFolder)
                                 .getBytes(StandardCharsets.UTF_8)
                 );
     }
     /**
-     * Determines the backup time from BACKUP-INFO.txt or, as a fallback,
-     * from the backup directory name.
+     * Returns the format-1 manifest of a batch that can be shown. Any other batch is
+     * recorded with its reason and contributes no VMs or backups, so a manifest that
+     * is malformed or from a newer format never leads to guessed identities.
      */
-    private LocalDateTime time(Path directory) {
-        Path info = directory.resolve("BACKUP-INFO.txt");
-
-        if (Files.isRegularFile(info)) {
-            try {
-                return LocalDateTime.ofInstant(
-                        Files.getLastModifiedTime(info).toInstant(),
-                        ZoneId.systemDefault()
-                );
-            } catch (IOException ignored) {
-                // Fall back to the timestamp encoded in the directory name.
+    private static Optional<BackupManifest> legacyManifest(
+            String directoryName,
+            BackupManifestResult result,
+            List<BackupBatchIssue> batchIssues
+    ) {
+        return switch (result) {
+            case BackupManifestResult.Parsed parsed when parsed.manifest().formatVersion() == BackupFormat.LEGACY ->
+                    Optional.of(parsed.manifest());
+            case BackupManifestResult.Parsed parsed -> {
+                batchIssues.add(new BackupBatchIssue(
+                        directoryName,
+                        "Format " + parsed.manifest().formatVersion()
+                                + " backups are not shown by this version yet"
+                ));
+                yield Optional.empty();
             }
-        }
-
-        Matcher matcher =
-                BACKUP_DIRECTORY.matcher(
-                        directory.getFileName().toString()
-                );
-
-        if (matcher.matches()) {
-            LocalDate date = LocalDate.parse(matcher.group(1));
-
-            if (matcher.group(2) != null) {
-                LocalTime time = LocalTime.parse(
-                        matcher.group(2),
-                        DateTimeFormatter.ofPattern("HHmm")
-                );
-
-                return LocalDateTime.of(date, time);
+            case BackupManifestResult.UnsupportedVersion unsupported -> {
+                batchIssues.add(new BackupBatchIssue(
+                        directoryName,
+                        "Format " + unsupported.formatVersion() + " is newer than the supported format "
+                                + BackupFormat.CURRENT
+                ));
+                yield Optional.empty();
             }
-
-            return date.atStartOfDay();
-        }
-
-        return LocalDateTime.MIN;
+            case BackupManifestResult.Invalid invalid -> {
+                batchIssues.add(new BackupBatchIssue(directoryName, invalid.reason()));
+                yield Optional.empty();
+            }
+        };
     }
-
-    /**
-     * Reads the complete backup comment from BACKUP-INFO.txt.
-     */
-    private String comment(Path path) {
-        if (!Files.isRegularFile(path)) {
-            return "";
-        }
-
-        try {
-            List<String> lines = Files.readAllLines(path);
-
-            for (int i = 0; i < lines.size(); i++) {
-                if (lines.get(i).trim().equals("Comment:")) {
-                    return String.join("\n", lines.subList(i + 1, lines.size())).trim();
-                }
-            }
-        } catch (IOException ignored) {
-            // A missing comment must not make an otherwise valid backup unusable.
-        }
-
-        return "";
-    }
-
 }
