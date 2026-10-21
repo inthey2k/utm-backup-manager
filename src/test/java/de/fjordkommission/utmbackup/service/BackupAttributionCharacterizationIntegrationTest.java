@@ -21,15 +21,8 @@ import java.util.List;
 import static org.junit.jupiter.api.Assertions.*;
 
 /**
- * Characterization test for the backup attribution gap.
- *
- * {@link TestVmProvider} exposes the local VM with id {@code test-linux-vm} but
- * its backup source is {@code TestLinux.utm}. The backup is stored in a folder
- * named after the source file, and the scanner identifies backups by that
- * folder. Consequently the backup is not attributed to the local VM.
- *
- * The assertions below describe the CURRENT (incorrect) behaviour so the gap is
- * explicit. They must be inverted when backup identity is fixed.
+ * Regression test: a backup of a local VM whose folder name differs from its id is
+ * attributed to that VM, because format-2 backups carry the canonical identity.
  */
 @SpringBootTest
 @ActiveProfiles("test")
@@ -70,8 +63,13 @@ class BackupAttributionCharacterizationIntegrationTest extends AbstractIntegrati
         Files.writeString(source.resolve("config.plist"), "attribution test");
     }
 
+    /**
+     * Formerly a characterization of the attribution gap. Format-2 backups record the
+     * canonical VmId in the manifest, so the backup now belongs to the local VM and no
+     * separate backup-only entry appears.
+     */
     @Test
-    void backupOfTestProviderVmIsListedUnderSourceFolderNotLocalVm() {
+    void backupOfTestProviderVmIsAttributedToTheLocalVm() {
         LocalVm localVm = vmInventory.build().vms().stream()
                 .filter(vm -> vm.id().equals(new VmId("utm", LOCAL_VM_ID)))
                 .findFirst()
@@ -82,20 +80,14 @@ class BackupAttributionCharacterizationIntegrationTest extends AbstractIntegrati
 
         BackupOverview overview = scanner.scan();
 
-        // Current behaviour: the local VM shows no backups ...
         VmOverview local = findVmByName(overview, LOCAL_VM_NAME);
         assertTrue(local.local());
         assertEquals(new VmId("utm", LOCAL_VM_ID), local.id());
         assertEquals(VmStatus.STOPPED, local.status());
-        assertEquals(0, local.backupCount());
+        assertEquals(1, local.backupCount());
 
-        // ... while the backup appears as a separate backup-only entry whose
-        // identity is the source folder name.
-        VmOverview backupOnly = findVmByName(overview, SOURCE_FOLDER);
-        assertFalse(backupOnly.local());
-        assertEquals(new VmId("utm", SOURCE_FOLDER), backupOnly.id());
-        assertEquals(VmStatus.UNKNOWN, backupOnly.status());
-        assertEquals(1, backupOnly.backupCount());
+        assertTrue(overview.vms().stream().noneMatch(vm -> vm.name().equals(SOURCE_FOLDER)),
+                "no backup-only entry for the source folder");
     }
 
     private static VmOverview findVmByName(BackupOverview overview, String name) {

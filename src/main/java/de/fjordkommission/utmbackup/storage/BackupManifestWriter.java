@@ -1,5 +1,10 @@
 package de.fjordkommission.utmbackup.storage;
 
+import java.io.IOException;
+import java.io.UncheckedIOException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.time.format.DateTimeFormatter;
 
 /**
@@ -52,6 +57,27 @@ public final class BackupManifestWriter {
         requireRoundTrip(manifest, result);
 
         return result;
+    }
+
+    /**
+     * Writes the manifest as {@code BACKUP-INFO.txt} in the batch directory. The file
+     * is written to a temporary file and moved over the target, so a reader sees the
+     * old manifest or the complete new one, never a partial file.
+     */
+    public void writeFile(Path batchDirectory, BackupManifest manifest) {
+        String text = write(manifest);
+        Path target = batchDirectory.resolve(BackupManifestReader.FILE_NAME);
+        Path temporary = null;
+
+        try {
+            temporary = Files.createTempFile(batchDirectory, ".BACKUP-INFO-", ".tmp");
+            Files.writeString(temporary, text, StandardCharsets.UTF_8);
+            AtomicFiles.replace(temporary, target);
+        } catch (IOException e) {
+            throw new UncheckedIOException("Manifest could not be written: " + target, e);
+        } finally {
+            AtomicFiles.deleteQuietly(temporary);
+        }
     }
 
     private void requireRoundTrip(BackupManifest manifest, String text) {

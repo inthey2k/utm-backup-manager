@@ -3,6 +3,7 @@ package de.fjordkommission.utmbackup.service;
 import de.fjordkommission.utmbackup.config.BackupProperties;
 import de.fjordkommission.utmbackup.model.LocalVm;
 import de.fjordkommission.utmbackup.storage.BackupStorageGuard;
+import org.springframework.boot.info.BuildProperties;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -42,7 +43,7 @@ class CreateBackupServiceTest {
         CreateBackupService.Result result = service.create(vm);
 
         Path backupDirectory = result.backupDirectory();
-        Path copiedVm = backupDirectory.resolve("VMs/TestLinux.utm");
+        Path copiedVm = backupDirectory.resolve("VMs/utm__test-linux-vm/TestLinux.utm");
 
         assertTrue(Files.isDirectory(backupDirectory));
         assertTrue(Files.isDirectory(copiedVm));
@@ -61,7 +62,7 @@ class CreateBackupServiceTest {
 
         String info = Files.readString(backupInfo);
 
-        assertTrue(info.contains("VMs:"));
+        assertTrue(info.contains("Format-Version: 2"));
         assertTrue(info.contains("test-linux-vm"));
         assertTrue(info.contains("Comment:"));
         assertFalse(
@@ -115,7 +116,8 @@ class CreateBackupServiceTest {
         CreateBackupService service = new CreateBackupService(
                 properties,
                 vmChangeStatusService,
-                mock(BackupStorageGuard.class)
+                mock(BackupStorageGuard.class),
+                mock(BuildProperties.class)
         );
 
         LocalVm firstVm = new LocalVm(
@@ -140,14 +142,14 @@ class CreateBackupServiceTest {
         assertEquals(
                 "first",
                 Files.readString(
-                        backupDirectory.resolve("VMs/First.utm/config.plist")
+                        backupDirectory.resolve("VMs/utm__first-vm/First.utm/config.plist")
                 )
         );
 
         assertEquals(
                 "second",
                 Files.readString(
-                        backupDirectory.resolve("VMs/Second.utm/config.plist")
+                        backupDirectory.resolve("VMs/utm__second-vm/Second.utm/config.plist")
                 )
         );
 
@@ -288,7 +290,8 @@ class CreateBackupServiceTest {
         CreateBackupService service = new CreateBackupService(
                 properties,
                 vmChangeStatusService,
-                mock(BackupStorageGuard.class)
+                mock(BackupStorageGuard.class),
+                mock(BuildProperties.class)
         );
 
         LocalVm existingVm = new LocalVm(
@@ -430,7 +433,8 @@ class CreateBackupServiceTest {
         CreateBackupService service = new CreateBackupService(
                 properties,
                 vmChangeStatusService,
-                mock(BackupStorageGuard.class)
+                mock(BackupStorageGuard.class),
+                mock(BuildProperties.class)
         );
 
         LocalVm vm = new LocalVm(
@@ -465,7 +469,8 @@ class CreateBackupServiceTest {
         CreateBackupService service = new CreateBackupService(
                 properties,
                 vmChangeStatusService,
-                mock(BackupStorageGuard.class)
+                mock(BackupStorageGuard.class),
+                mock(BuildProperties.class)
         );
 
         LocalVm vm = new LocalVm(
@@ -572,7 +577,8 @@ class CreateBackupServiceTest {
         return new CreateBackupService(
                 properties,
                 vmChangeStatusService,
-                mock(BackupStorageGuard.class)
+                mock(BackupStorageGuard.class),
+                mock(BuildProperties.class)
         );
     }
 }

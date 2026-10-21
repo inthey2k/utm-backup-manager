@@ -69,15 +69,17 @@ class BackupScannerManifestTest {
     }
 
     @Test
-    void formatTwoBatchIsNotShownAndIsReportedInsteadOfBeingReadAsUtmFolders() throws IOException {
+    void formatTwoBatchIsShownFromItsManifestNotFromItsFolderNames() throws IOException {
         createBatch("2026-10-20_1200", formatTwoManifest("utm__ArchLinux-02.27"), "utm__ArchLinux-02.27");
         createBatch("2026-09-01_1200", "Comment:\nok\n", LEGACY_FOLDER);
 
         BackupOverview overview = scanner().scan();
 
-        assertTrue(overview.vms().stream().noneMatch(vm -> vm.id().localId().equals("utm__ArchLinux-02.27")));
+        VmOverview archLinux = find(overview, new VmId("utm", "ArchLinux 02.27.utm"));
+        assertEquals(1, archLinux.backupCount());
+        assertEquals("two-format batch", archLinux.backups().getFirst().comment());
         assertEquals(1, find(overview, new VmId("utm", LEGACY_FOLDER)).backupCount());
-        assertIssue(overview, "2026-10-20_1200", "Format 2 backups are not shown");
+        assertTrue(overview.batchIssues().isEmpty());
     }
 
     @Test

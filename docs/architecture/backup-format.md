@@ -4,11 +4,9 @@ This document describes the on-disk manifest of a backup batch, `BACKUP-INFO.txt
 in format 1 (1.4.x) and format 2 (provider-aware). It is the contract that the
 storage layer reads and writes.
 
-Status: format 1 is read and scanned in production. Format 2 is implemented for
-parsing and writing, and is tested in isolation. Production backups are still
-written in the format 1 layout. The overview does not yet show format 2 batches.
-The backup-root marker and the write guard described below are in place. Normal
-backup creation still writes format 1 and does not create the marker.
+Status: format 1 is read and scanned, and remains readable unchanged. Production
+backup creation writes **format 2** with the provider-aware container layout
+described below. Existing format-1 batches are never rewritten or migrated.
 
 ## Versions
 
@@ -217,8 +215,8 @@ a marker that is unreadable is never ignored.
   Existing error paths show this message without further changes.
 - Legacy Stable migration during a scan is skipped on a read-only medium. The Stable flag
   still applies for that scan.
-- The marker is written only by the root-metadata writer. Production code does not
-  call it yet, so normal backup creation never creates the marker.
+- The marker is created or updated only by the guard's `ensureFormatTwoMarker`, and
+  only after a format-2 batch is complete (see *Write ordering*).
 - The writer writes to a temporary file in the same directory and moves it over the
   target. It never replaces a marker that declares a newer format or that cannot be
   read, and it never repairs one.
@@ -229,8 +227,112 @@ An application version older than this specification does not know the marker. I
 cannot be prevented from writing to a medium that declares a newer format. Protection
 applies from the version that ships this guard onwards.
 
+## Production format-2 layout
+
+Every new batch is written in this layout:
+
+```text
+<batch>/
+├── BACKUP-INFO.txt                 format-2 manifest
+└── VMs/
+    ├── utm__ArchLinux-02-27-utm-6a667c24/
+    │   └── ArchLinux 02.27.utm/    the UTM package, copied unchanged
+    └── utm__test-linux-vm/
+        └── TestLinux.utm/
+```
+
+- Each direct child of `VMs/` is exactly one logical VM, its **container**. Its
+  sources are copied inside it under their own file names.
+- The container name is only a filesystem name. It is never parsed. Identity comes
+  from the manifest entry whose `Directory` names the container.
+- Container name rule: `<providerId>__<local id>`, where every character outside
+  `[A-Za-z0-9_-]` becomes `-` and the local-id part is truncated to 64 characters.
+  Dots are replaced too, so a name can never be `.`, `..` or contain a separator.
+  If the name was changed, or differs from another container only in case (macOS),
+  a hash of the canonical id is appended: `-` plus eight hex digits of its SHA-256.
+  Names are assigned in canonical-id order, so the result is deterministic.
+- The container name of a plain local id is unchanged, for example
+  `utm__test-linux-vm`.
+
+## Format-2 backup IDs
+
+A backup id is the key of its Stable and note metadata in SQLite, so it is fixed
+once used.
+
+| Format | Scheme | Example input |
+|---|---|---|
+| 1 (unchanged) | `base64url(batch + "\n" + folder)` | `2026-09-01_1200` + `Linux.utm` |
+| 2 | `base64url("format-2\n" + batch + "\n" + canonicalVmId)` | `2026-10-20_1200` + `utm:ArchLinux 02.27.utm` |
+
+- The format-2 scheme uses the canonical id, so the same local id under two
+  providers gets two ids. It never uses a display name.
+- The `format-2` tag keeps the schemes disjoint: a format-1 batch name always starts
+  with a year.
+- Format-1 ids are byte-for-byte identical to 1.4.x (golden tests).
+
+## Manifest and write ordering
+
+Production creation of one batch (`CreateBackupService.create`) runs in this order.
+Each step only starts after the previous one succeeded.
+
+1. **Compatibility check.** The guard refuses a newer, invalid or inconsistent
+   medium before anything is created.
+2. **Input validation.** VM ids unique, sources present, and file names unique within
+   each VM. The manifest is built and checked by the manifest writer, which re-parses
+   its text. Unsafe names or directories are refused here, before any file exists.
+3. **Incomplete batch.** `.incomplete-<batch>/VMs/` is created. Names starting with
+   `.` are never scanned.
+4. **VM data.** Each VM's sources are copied into its container.
+5. **Manifest.** `BACKUP-INFO.txt` is written last among the content, atomically
+   (temporary file, then move). It refers only to data that is already complete.
+6. **Root marker.** Created, or updated to format 2, through the guard. This happens
+   only once the batch is complete, and before it is published.
+7. **Publish.** The incomplete directory is moved to its final name.
+8. **Change-tracking acknowledgement** (UTM VMs only, legacy `vm_state` keys).
+
+Failure model:
+
+- A failure in steps 1–6 removes the incomplete directory, and the marker is never
+  written, so no half-written batch is shown and no marker is created for it.
+- A copy failure leaves no manifest entry for data that was not written: the manifest
+  is written only in step 5.
+- If the publish move (step 7) fails after the marker was written, the medium declares
+  format 2 without a format-2 batch. This is consistent: the medium is supported and
+  nothing is shown for the failed backup.
+- Only `.incomplete-` directories are cleaned up, and only by the creator.
+
+The marker is updated, not rewritten, when it already declares format 2 and was last
+written by the same application version. Creation fields are kept when the marker is
+rewritten.
+
+## Delete and retention for format 2
+
+- Deleting one format-2 VM:
+  1. the manifest is rewritten without that entry (atomic),
+  2. only that VM's container is removed,
+  3. if no entry remains, the batch directory is removed too.
+  A crash between steps 1 and 2 leaves orphaned data that is never shown. It never
+  leaves a manifest entry that points at deleted data.
+- The Stable check and the guard run before any of this. Stable backups cannot be
+  deleted, as before.
+- Retention works on canonical ids and on the same per-VM backup list. It deletes
+  the oldest non-Stable backups of the selected VMs through the same delete path, so
+  other VMs of the same batch and other providers are untouched.
+- Format-1 deletion and retention are unchanged.
+
+## Mixed-format media
+
+- Each batch is read according to its own manifest. A supported marker does not make
+  every batch format 2, and a format-2 batch does not make legacy batches migrate.
+- The scanner shows both kinds in one overview. Format-2 backups attach to a local VM
+  through the manifest's canonical id, and a format-2 VM without a local VM appears as
+  a backup-only entry with the manifest name.
+- Legacy batches are never rewritten, moved, or renamed.
+
 ## Not yet defined here
 
-- The scanning of format 2 VM containers into backups.
-- The write path that produces format 2 batches in production.
-- Stable and note state for format 2 batches.
+- Stable and note state for format 2 batches. Still stored in SQLite, keyed by the
+  format-2 backup id.
+- Enabling backups of VMs from providers other than UTM. Format 2 can store them;
+  the restriction is still in the backup-start controller until change tracking and
+  the provider implementation are ready.

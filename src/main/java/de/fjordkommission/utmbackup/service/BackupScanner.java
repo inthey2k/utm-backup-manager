@@ -7,6 +7,7 @@ import de.fjordkommission.utmbackup.repository.StableRepository;
 import de.fjordkommission.utmbackup.storage.BackupFormat;
 import de.fjordkommission.utmbackup.storage.BackupManifest;
 import de.fjordkommission.utmbackup.storage.BackupManifestReader;
+import de.fjordkommission.utmbackup.storage.BackupIdentity;
 import de.fjordkommission.utmbackup.storage.BackupManifestResult;
 import de.fjordkommission.utmbackup.storage.BackupStorageGuard;
 import de.fjordkommission.utmbackup.storage.BackupStorageReadOnlyException;
@@ -15,10 +16,10 @@ import org.springframework.stereotype.Service;
 
 import java.io.IOException;
 import java.io.UncheckedIOException;
-import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.*;
 import java.util.stream.Stream;
 
@@ -98,10 +99,6 @@ public class BackupScanner {
 
             ManagedVm localVm = localVmsById.get(vmId);
 
-            String vmName = localVm != null
-                    ? localVm.name()
-                    : vmId.localId();
-
             String providerName = localVm != null
                     ? localVm.providerName()
                     : inventory.providerName(vmId.providerId()).orElse(vmId.providerId());
@@ -117,6 +114,10 @@ public class BackupScanner {
             backups.sort(
                     Comparator.comparing(VmBackup::backupTime).reversed()
             );
+
+            // A backup-only VM takes its name from its newest backup: the manifest name for
+            // format 2, or the folder name for format 1, which equals the local id.
+            String vmName = displayName(localVm, vmId, backups);
 
             long normalCount = backups.stream()
                     .filter(backup -> !backup.stable())
@@ -206,6 +207,19 @@ public class BackupScanner {
     }
 
     /**
+     * The display name of a VM: the local VM's name, or for a backup-only VM the name
+     * of its newest backup. Format 2 stores the manifest name; format 1 stores the
+     * folder name, which equals the local id.
+     */
+    private static String displayName(ManagedVm localVm, VmId vmId, List<VmBackup> newestFirst) {
+        if (localVm != null) {
+            return localVm.name();
+        }
+
+        return newestFirst.isEmpty() ? vmId.localId() : newestFirst.getFirst().vmName();
+    }
+
+    /**
      * Orders VMs by provider in configured order, then by name. Unknown providers
      * come last, ordered by id.
      */
@@ -274,9 +288,17 @@ public class BackupScanner {
 
         String directoryName = directory.getFileName().toString();
 
+        BackupManifestResult manifestResult = manifestReader.read(directory);
+
+        if (manifestResult instanceof BackupManifestResult.Parsed(BackupManifest parsed)
+                && parsed.formatVersion() == BackupFormat.PROVIDER_AWARE) {
+            scanFormatTwoBatch(directory, vmDirectory, parsed, metadata, backupsByVm, batchIssues);
+            return;
+        }
+
         Optional<BackupManifest> manifest = legacyManifest(
                 directoryName,
-                manifestReader.read(directory),
+                manifestResult,
                 batchIssues
         );
 
@@ -354,12 +376,67 @@ public class BackupScanner {
     }
 
     private String id(String directoryName, String vmFolder) {
-        return Base64.getUrlEncoder()
-                .withoutPadding()
-                .encodeToString(
-                        (directoryName + "\n" + vmFolder)
-                                .getBytes(StandardCharsets.UTF_8)
-                );
+        return BackupIdentity.legacyId(directoryName, vmFolder);
+    }
+
+    /**
+     * Shows the VMs of a format-2 batch. Each manifest entry gives the identity and
+     * the container directory. The directory name is never parsed for identity, and
+     * containers that the manifest does not list are ignored, so an incomplete copy
+     * cannot appear as a backup.
+     */
+    private void scanFormatTwoBatch(
+            Path directory,
+            Path vmDirectory,
+            BackupManifest manifest,
+            Map<String, StableRepository.Meta> metadata,
+            Map<VmId, List<VmBackup>> backupsByVm,
+            List<BackupBatchIssue> batchIssues
+    ) {
+        String batchName = directory.getFileName().toString();
+
+        LocalDateTime backupTime = manifest.backupTime().orElseThrow()
+                .atZoneSameInstant(ZoneId.systemDefault())
+                .toLocalDateTime();
+
+        for (BackupManifest.VmEntry entry : manifest.vms()) {
+            Path container = vmDirectory.resolve(entry.directory());
+
+            if (Files.isDirectory(container)) {
+                addFormatTwoBackup(batchName, entry, container, backupTime, manifest.comment(), metadata, backupsByVm);
+            } else {
+                batchIssues.add(new BackupBatchIssue(
+                        batchName,
+                        "VM " + entry.id() + " has no container directory " + entry.directory()
+                ));
+            }
+        }
+    }
+
+    private void addFormatTwoBackup(
+            String batchName,
+            BackupManifest.VmEntry entry,
+            Path container,
+            LocalDateTime backupTime,
+            String comment,
+            Map<String, StableRepository.Meta> metadata,
+            Map<VmId, List<VmBackup>> backupsByVm
+    ) {
+        String id = BackupIdentity.formatTwoId(batchName, entry.id());
+        StableRepository.Meta storedMetadata = metadata.get(id);
+
+        VmBackup backup = new VmBackup(
+                id,
+                batchName,
+                entry.name(),
+                container,
+                backupTime,
+                comment,
+                storedMetadata != null && storedMetadata.stable(),
+                storedMetadata != null ? storedMetadata.note() : null
+        );
+
+        backupsByVm.computeIfAbsent(entry.id(), ignored -> new ArrayList<>()).add(backup);
     }
     /**
      * Returns the format-1 manifest of a batch that can be shown. Any other batch is
@@ -378,7 +455,7 @@ public class BackupScanner {
             case BackupManifestResult.Parsed(BackupManifest manifest) -> {
                 batchIssues.add(new BackupBatchIssue(
                         directoryName,
-                        "Format " + manifest.formatVersion() + " backups are not shown by this version yet"
+                        "Format " + manifest.formatVersion() + " backups are not supported by this code path"
                 ));
                 yield Optional.empty();
             }

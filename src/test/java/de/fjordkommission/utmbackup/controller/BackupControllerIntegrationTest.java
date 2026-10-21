@@ -168,7 +168,7 @@ class BackupControllerIntegrationTest extends AbstractIntegrationTest {
                     "integration test configuration",
                     Files.readString(
                             createdBackup.resolve(
-                                    "VMs/TestLinux.utm/config.plist"
+                                    "VMs/utm__test-linux-vm/TestLinux.utm/config.plist"
                             )
                     )
             );
@@ -177,7 +177,7 @@ class BackupControllerIntegrationTest extends AbstractIntegrationTest {
                     "integration test disk",
                     Files.readString(
                             createdBackup.resolve(
-                                    "VMs/TestLinux.utm/Data/disk.img"
+                                    "VMs/utm__test-linux-vm/TestLinux.utm/Data/disk.img"
                             )
                     )
             );

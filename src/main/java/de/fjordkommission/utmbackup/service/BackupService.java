@@ -1,6 +1,11 @@
 package de.fjordkommission.utmbackup.service;
 
 import de.fjordkommission.utmbackup.model.VmBackup;
+import de.fjordkommission.utmbackup.storage.BackupFormat;
+import de.fjordkommission.utmbackup.storage.BackupManifest;
+import de.fjordkommission.utmbackup.storage.BackupManifestReader;
+import de.fjordkommission.utmbackup.storage.BackupManifestResult;
+import de.fjordkommission.utmbackup.storage.BackupManifestWriter;
 import de.fjordkommission.utmbackup.repository.StableRepository;
 import de.fjordkommission.utmbackup.storage.BackupStorageGuard;
 import org.springframework.stereotype.Service;
@@ -8,6 +13,7 @@ import org.springframework.stereotype.Service;
 import java.io.IOException;
 import java.nio.file.*;
 import java.nio.file.attribute.BasicFileAttributes;
+import java.util.List;
 
 @Service
 public class BackupService {
@@ -15,6 +21,8 @@ public class BackupService {
  private final BackupScanner scanner;
  private final StableRepository repo;
  private final BackupStorageGuard storageGuard;
+ private final BackupManifestReader manifestReader = new BackupManifestReader();
+ private final BackupManifestWriter manifestWriter = new BackupManifestWriter();
 
  public BackupService(BackupScanner scanner, StableRepository repo, BackupStorageGuard storageGuard) {
   this.scanner = scanner;
@@ -67,6 +75,14 @@ public class BackupService {
    );
   }
 
+  BackupManifestResult manifestResult = manifestReader.read(batchDirectory);
+
+  if (manifestResult instanceof BackupManifestResult.Parsed(BackupManifest manifest)
+          && manifest.formatVersion() == BackupFormat.PROVIDER_AWARE) {
+   deleteFormatTwoVm(id, path, batchDirectory, manifest);
+   return;
+  }
+
   try {
    deleteRecursively(path);
 
@@ -79,6 +95,49 @@ public class BackupService {
   } catch (IOException e) {
    throw new IllegalStateException(
            "Backup could not be deleted: " + path,
+           e
+   );
+  }
+ }
+
+ /**
+  * Removes one VM of a format-2 batch. The manifest is rewritten first, without the
+  * entry, so a crash can leave orphaned data but never a manifest entry for deleted
+  * data. Then only this VM's container is removed. The batch is removed when no VM
+  * is left.
+  */
+ private void deleteFormatTwoVm(String id, Path container, Path batchDirectory, BackupManifest manifest) {
+  String directory = container.getFileName().toString();
+
+  List<BackupManifest.VmEntry> remaining = manifest.vms().stream()
+          .filter(entry -> !entry.directory().equals(directory))
+          .toList();
+
+  if (remaining.size() == manifest.vms().size()) {
+   throw new IllegalStateException(
+           "The batch manifest does not list this VM. Deletion aborted."
+   );
+  }
+
+  try {
+   manifestWriter.writeFile(batchDirectory, new BackupManifest(
+           BackupFormat.PROVIDER_AWARE,
+           manifest.backupTime(),
+           manifest.comment(),
+           remaining
+   ));
+
+   deleteRecursively(container);
+
+   if (remaining.isEmpty()) {
+    deleteRecursively(batchDirectory);
+   }
+
+   repo.delete(id);
+
+  } catch (IOException e) {
+   throw new IllegalStateException(
+           "Backup could not be deleted: " + container,
            e
    );
   }
