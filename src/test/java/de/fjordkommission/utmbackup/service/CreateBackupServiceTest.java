@@ -2,6 +2,7 @@ package de.fjordkommission.utmbackup.service;
 
 import de.fjordkommission.utmbackup.config.BackupProperties;
 import de.fjordkommission.utmbackup.model.LocalVm;
+import de.fjordkommission.utmbackup.storage.BackupStorageGuard;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -113,7 +114,8 @@ class CreateBackupServiceTest {
 
         CreateBackupService service = new CreateBackupService(
                 properties,
-                vmChangeStatusService
+                vmChangeStatusService,
+                mock(BackupStorageGuard.class)
         );
 
         LocalVm firstVm = new LocalVm(
@@ -285,7 +287,8 @@ class CreateBackupServiceTest {
 
         CreateBackupService service = new CreateBackupService(
                 properties,
-                vmChangeStatusService
+                vmChangeStatusService,
+                mock(BackupStorageGuard.class)
         );
 
         LocalVm existingVm = new LocalVm(
@@ -426,7 +429,8 @@ class CreateBackupServiceTest {
 
         CreateBackupService service = new CreateBackupService(
                 properties,
-                vmChangeStatusService
+                vmChangeStatusService,
+                mock(BackupStorageGuard.class)
         );
 
         LocalVm vm = new LocalVm(
@@ -460,7 +464,8 @@ class CreateBackupServiceTest {
 
         CreateBackupService service = new CreateBackupService(
                 properties,
-                vmChangeStatusService
+                vmChangeStatusService,
+                mock(BackupStorageGuard.class)
         );
 
         LocalVm vm = new LocalVm(
@@ -566,7 +571,8 @@ class CreateBackupServiceTest {
 
         return new CreateBackupService(
                 properties,
-                vmChangeStatusService
+                vmChangeStatusService,
+                mock(BackupStorageGuard.class)
         );
     }
 }

@@ -2,6 +2,7 @@ package de.fjordkommission.utmbackup.service;
 
 import de.fjordkommission.utmbackup.model.LocalVm;
 import de.fjordkommission.utmbackup.model.VmId;
+import de.fjordkommission.utmbackup.storage.BackupStorageGuard;
 import org.junit.jupiter.api.Test;
 
 import java.nio.file.Path;
@@ -580,6 +581,7 @@ class BackupJobServiceTest {
                 createBackupService,
                 retentionCleanupJobService,
                 retentionService,
+                mock(BackupStorageGuard.class),
                 executor
         );
     }

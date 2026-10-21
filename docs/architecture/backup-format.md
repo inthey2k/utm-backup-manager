@@ -7,6 +7,8 @@ storage layer reads and writes.
 Status: format 1 is read and scanned in production. Format 2 is implemented for
 parsing and writing, and is tested in isolation. Production backups are still
 written in the format 1 layout. The overview does not yet show format 2 batches.
+The backup-root marker and the write guard described below are in place. Normal
+backup creation still writes format 1 and does not create the marker.
 
 ## Versions
 
@@ -127,10 +129,108 @@ cannot be read is invalid, because its format cannot be known. Bytes that are no
 valid UTF-8 are replaced rather than rejected, since 1.4.x tolerated them and the
 format markers are ASCII.
 
+## Backup-root marker
+
+The backup root may contain `UTM-BACKUP-MANAGER-INFO.properties`. It describes the
+storage format of the whole medium. It is optional for legacy media.
+
+```properties
+format.version=2
+application.name=UTM Backup Manager
+created.at=2026-10-21T12:00:00+02:00
+created.by.version=1.5.0
+last.written.by.version=1.5.0
+```
+
+Syntax:
+
+- UTF-8, with or without BOM, LF or CRLF line endings. Bytes that are not valid
+  UTF-8 are rejected, because the file is machine-read.
+- `key=value`, the value is trimmed. Lines starting with `#` and blank lines are
+  ignored. A line without `=` is malformed.
+- `format.version` (required) must be a positive integer. A value higher than the
+  supported version is reported as newer, whatever else the file contains.
+- `created.at` (required) must be an ISO-8601 date-time with an offset.
+- `application.name`, `created.by.version` and `last.written.by.version` are
+  informational. They may be absent. They are never used for compatibility.
+- Unknown properties are ignored. A known property that appears twice is invalid.
+
+### Format version and application version
+
+- `format.version` is the **storage compatibility contract**. It is the only field
+  that decides whether a medium may be written.
+- The application version fields only record who created or last wrote the marker,
+  for diagnostics. A later application release may still write the same format.
+- The marker describes the highest format written to the medium. It does not change
+  how an individual batch is read. A batch is read from its own
+  `BACKUP-INFO.txt`, as described above.
+
+## Compatibility states
+
+Every mutating operation consults one central guard, which evaluates the medium on
+each call. The decision rules live in one place.
+
+| State | When | Writable |
+|---|---|---|
+| `LEGACY` | no marker and no batch declares a format other than 1 | yes, as in 1.4.x |
+| `SUPPORTED` | marker present with a supported `format.version` (1 or 2) | yes |
+| `READ_ONLY_NEWER_FORMAT` | marker declares a format newer than 2 | no |
+| `READ_ONLY_INVALID_METADATA` | marker present but cannot be interpreted safely | no |
+| `READ_ONLY_INCONSISTENT` | no marker, but at least one batch uses format 2, declares a newer format, or has a manifest that cannot be read | no |
+| `UNAVAILABLE` | the backup directory does not exist | no |
+
+Decision order:
+
+1. The backup directory missing: `UNAVAILABLE`.
+2. Marker absent: `LEGACY` if every batch manifest is readable format 1, otherwise
+   `READ_ONLY_INCONSISTENT`. A format-2 batch is never treated as legacy because the
+   marker is missing.
+3. Marker present and supported: `SUPPORTED`.
+4. Marker present and newer: `READ_ONLY_NEWER_FORMAT`.
+5. Marker present but invalid: `READ_ONLY_INVALID_METADATA`. It is never silently
+   treated as absent.
+
+A marker that is absent because nothing was ever written is therefore safe, while
+a marker that is unreadable is never ignored.
+
+## Legacy and mixed media
+
+- **Legacy medium** (1.4.x backups only): no marker, all batches format 1. Behaviour
+  is unchanged. Backups can be created, deleted, marked Stable, annotated and cleaned
+  up by retention. No marker is created by any of these operations.
+- **Mixed medium**: legacy batches and format-2 batches can coexist. Legacy batches are
+  never migrated or rewritten. Each batch is read by its own manifest. A medium with a
+  supported marker is writable even when it contains format-2 batches.
+- **Marker missing but format-2 batch present**: read-only, reported with the batch
+  name. The scanner still reads each batch format independently, so the batch is not
+  shown as legacy.
+
+## Read-only safety rules
+
+- Read operations (overview, configuration, size, status) are never blocked by the
+  compatibility state.
+- Mutating operations are refused before their first change: backup creation,
+  deletion, retention cleanup, Stable changes, note changes, and root-marker writes.
+  No file is created, moved or removed, and no SQLite row is changed.
+- A refused operation fails with the domain reason, for example
+  `Backup storage is read-only: the medium uses storage format 3, which is newer than the supported format 2`.
+  Existing error paths show this message without further changes.
+- Legacy Stable migration during a scan is skipped on a read-only medium. The Stable flag
+  still applies for that scan.
+- The marker is written only by the root-metadata writer. Production code does not
+  call it yet, so normal backup creation never creates the marker.
+- The writer writes to a temporary file in the same directory and moves it over the
+  target. It never replaces a marker that declares a newer format or that cannot be
+  read, and it never repairs one.
+
+## Limits
+
+An application version older than this specification does not know the marker. It
+cannot be prevented from writing to a medium that declares a newer format. Protection
+applies from the version that ships this guard onwards.
+
 ## Not yet defined here
 
-- Root metadata (`UTM-BACKUP-MANAGER-INFO.properties`) and the read-only storage
-  guard.
 - The scanning of format 2 VM containers into backups.
 - The write path that produces format 2 batches in production.
 - Stable and note state for format 2 batches.

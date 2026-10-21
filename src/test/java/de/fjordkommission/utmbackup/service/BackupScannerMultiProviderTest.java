@@ -12,6 +12,7 @@ import de.fjordkommission.utmbackup.provider.FakeVmProvider;
 import de.fjordkommission.utmbackup.provider.VmProviderRegistry;
 import de.fjordkommission.utmbackup.repository.SettingsRepository;
 import de.fjordkommission.utmbackup.repository.StableRepository;
+import de.fjordkommission.utmbackup.storage.BackupStorageGuard;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -151,7 +152,8 @@ class BackupScannerMultiProviderTest {
                 mock(StableRepository.class),
                 settings,
                 new VmInventory(registry),
-                changeStatusService
+                changeStatusService,
+                mock(BackupStorageGuard.class)
         );
     }
 

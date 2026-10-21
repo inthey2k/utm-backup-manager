@@ -3,6 +3,7 @@ package de.fjordkommission.utmbackup.service;
 import de.fjordkommission.utmbackup.model.VmBackup;
 import de.fjordkommission.utmbackup.model.VmId;
 import de.fjordkommission.utmbackup.model.VmOverview;
+import de.fjordkommission.utmbackup.storage.BackupStorageGuard;
 import org.springframework.stereotype.Service;
 
 import java.util.Collection;
@@ -17,13 +18,16 @@ public class RetentionService {
 
     private final BackupScanner scanner;
     private final BackupService backupService;
+    private final BackupStorageGuard storageGuard;
 
     public RetentionService(
             BackupScanner scanner,
-            BackupService backupService
+            BackupService backupService,
+            BackupStorageGuard storageGuard
     ) {
         this.scanner = scanner;
         this.backupService = backupService;
+        this.storageGuard = storageGuard;
     }
 
     /**
@@ -81,6 +85,8 @@ public class RetentionService {
      * is satisfied for the supplied VMs.
      */
     public void deleteBackupsExceedingRetention(Collection<VmId> vmIds) {
+        storageGuard.assertWritable();
+
         var overview = scanner.scan();
         int retentionLimit = overview.retentionLimit();
 

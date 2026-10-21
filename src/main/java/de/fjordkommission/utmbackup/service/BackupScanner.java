@@ -8,6 +8,8 @@ import de.fjordkommission.utmbackup.storage.BackupFormat;
 import de.fjordkommission.utmbackup.storage.BackupManifest;
 import de.fjordkommission.utmbackup.storage.BackupManifestReader;
 import de.fjordkommission.utmbackup.storage.BackupManifestResult;
+import de.fjordkommission.utmbackup.storage.BackupStorageGuard;
+import de.fjordkommission.utmbackup.storage.BackupStorageReadOnlyException;
 import de.fjordkommission.utmbackup.storage.LegacyBackupTime;
 import org.springframework.stereotype.Service;
 
@@ -35,6 +37,7 @@ public class BackupScanner {
     private final SettingsRepository settings;
     private final VmInventory vmInventory;
     private final VmChangeStatusService vmChangeStatusService;
+    private final BackupStorageGuard storageGuard;
     private final BackupManifestReader manifestReader = new BackupManifestReader();
 
 
@@ -43,13 +46,15 @@ public class BackupScanner {
             StableRepository repo,
             SettingsRepository settings,
             VmInventory vmInventory,
-            VmChangeStatusService vmChangeStatusService
+            VmChangeStatusService vmChangeStatusService,
+            BackupStorageGuard storageGuard
     ) {
         this.root = backupProperties.root();
         this.repo = repo;
         this.settings = settings;
         this.vmInventory = vmInventory;
         this.vmChangeStatusService = vmChangeStatusService;
+        this.storageGuard = storageGuard;
     }
     public Path root() {
         return root;
@@ -307,7 +312,7 @@ public class BackupScanner {
 
                         // Preserve Stable information from legacy _stable directories.
                         if (legacyStable && storedMetadata == null) {
-                            repo.save(id, true, null);
+                            persistLegacyStable(id);
                         }
 
                         VmBackup backup = new VmBackup(
@@ -331,6 +336,20 @@ public class BackupScanner {
 
         } catch (IOException e) {
             throw new UncheckedIOException(e);
+        }
+    }
+
+    /**
+     * Stores the Stable state of a legacy _stable directory. This is a migration that
+     * happens while scanning, so on a read-only medium it is skipped rather than
+     * failing the scan. The Stable flag still applies for this scan.
+     */
+    private void persistLegacyStable(String id) {
+        try {
+            storageGuard.assertWritable();
+            repo.save(id, true, null);
+        } catch (BackupStorageReadOnlyException ignored) {
+            // Read-only medium: the scan keeps working and the migration is retried later.
         }
     }
 

@@ -2,6 +2,7 @@ package de.fjordkommission.utmbackup.service;
 
 import de.fjordkommission.utmbackup.config.BackupProperties;
 import de.fjordkommission.utmbackup.model.LocalVm;
+import de.fjordkommission.utmbackup.storage.BackupStorageGuard;
 import org.springframework.stereotype.Service;
 
 import java.io.InputStream;
@@ -45,13 +46,16 @@ public class CreateBackupService {
     private static final CancellationCheck NEVER_CANCELLED = () -> false;
     private final Path backupRoot;
     private final VmChangeStatusService vmChangeStatusService;
+    private final BackupStorageGuard storageGuard;
 
     public CreateBackupService(
             BackupProperties properties,
-            VmChangeStatusService vmChangeStatusService
+            VmChangeStatusService vmChangeStatusService,
+            BackupStorageGuard storageGuard
     ) {
         this.backupRoot = properties.root();
         this.vmChangeStatusService = vmChangeStatusService;
+        this.storageGuard = storageGuard;
     }
 
     /** Uses a null value for the comment string */
@@ -90,6 +94,7 @@ public class CreateBackupService {
             ProgressListener progressListener,
             CancellationCheck cancellationCheck
     ) {
+        storageGuard.assertWritable();
         validateVms(vms);
         validateBackupRoot();
 
@@ -229,7 +234,6 @@ public class CreateBackupService {
 
     /**
      * Ensures that the configured backup storage is currently available.
-     *
      * The backup root must already exist. It must never be created implicitly,
      * because it may represent a temporarily unavailable external drive or
      * network mount.

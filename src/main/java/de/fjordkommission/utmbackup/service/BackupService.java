@@ -2,6 +2,7 @@ package de.fjordkommission.utmbackup.service;
 
 import de.fjordkommission.utmbackup.model.VmBackup;
 import de.fjordkommission.utmbackup.repository.StableRepository;
+import de.fjordkommission.utmbackup.storage.BackupStorageGuard;
 import org.springframework.stereotype.Service;
 
 import java.io.IOException;
@@ -13,23 +14,28 @@ public class BackupService {
 
  private final BackupScanner scanner;
  private final StableRepository repo;
+ private final BackupStorageGuard storageGuard;
 
- public BackupService(BackupScanner scanner, StableRepository repo) {
+ public BackupService(BackupScanner scanner, StableRepository repo, BackupStorageGuard storageGuard) {
   this.scanner = scanner;
   this.repo = repo;
+  this.storageGuard = storageGuard;
  }
 
  public void stable(String id, boolean value) {
+  storageGuard.assertWritable();
   VmBackup backup = require(id);
   repo.saveStable(backup.id(), value);
  }
 
  public void note(String id, String note) {
+  storageGuard.assertWritable();
   VmBackup backup = require(id);
   repo.saveNote(backup.id(), note);
  }
 
  public void delete(String id) {
+  storageGuard.assertWritable();
   VmBackup backup = require(id);
 
   if (backup.stable()) {

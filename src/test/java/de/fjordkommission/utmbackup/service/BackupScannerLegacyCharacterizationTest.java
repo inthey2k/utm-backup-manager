@@ -12,6 +12,7 @@ import de.fjordkommission.utmbackup.provider.VmProvider;
 import de.fjordkommission.utmbackup.provider.VmProviderRegistry;
 import de.fjordkommission.utmbackup.repository.SettingsRepository;
 import de.fjordkommission.utmbackup.repository.StableRepository;
+import de.fjordkommission.utmbackup.storage.BackupStorageGuard;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -38,7 +39,6 @@ import static org.mockito.Mockito.*;
 /**
  * Characterization tests for the format-1 (legacy) backup layout as implemented
  * in 1.4.x: {@code <batch>/VMs/<folder>/} with a {@code BACKUP-INFO.txt} manifest.
- *
  * The backup id expectations are persisted in SQLite (stable flags, notes), so
  * they must never change. Tests whose names contain "characterizes" document
  * current behaviour that is expected to be revisited later; they are not a
@@ -115,7 +115,8 @@ class BackupScannerLegacyCharacterizationTest {
                 stableRepository,
                 settings,
                 new VmInventory(registry),
-                changeStatusService
+                changeStatusService,
+                mock(BackupStorageGuard.class)
         );
     }
 

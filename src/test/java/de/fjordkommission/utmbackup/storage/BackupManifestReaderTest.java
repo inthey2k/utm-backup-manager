@@ -50,14 +50,13 @@ class BackupManifestReaderTest {
     @Test
     void invalidUtf8BytesAreReplacedAndLegacyCommentStillParses() throws IOException {
         Path batch = Files.createDirectories(tempDir.resolve("2026-09-01_1200"));
-        byte[] latin1Comment = "Comment:\nCafé\n".getBytes(StandardCharsets.ISO_8859_1);
-        Files.write(batch.resolve(BackupManifestReader.FILE_NAME), latin1Comment);
+        Files.writeString(batch.resolve(BackupManifestReader.FILE_NAME), "Comment:\nCafé\n", StandardCharsets.ISO_8859_1);
 
         BackupManifestResult result = reader.read(batch);
 
         BackupManifest manifest = ((BackupManifestResult.Parsed) result).manifest();
         assertEquals(BackupFormat.LEGACY, manifest.formatVersion());
-        assertEquals("Caf�", manifest.comment());
+        assertEquals("Caf\uFFFD", manifest.comment());
     }
 
     @Test
