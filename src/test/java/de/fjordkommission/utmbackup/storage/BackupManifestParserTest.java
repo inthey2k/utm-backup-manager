@@ -3,12 +3,15 @@ package de.fjordkommission.utmbackup.storage;
 import de.fjordkommission.utmbackup.model.VmId;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.junit.jupiter.params.provider.ValueSource;
 
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Optional;
+import java.util.stream.Stream;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -60,18 +63,47 @@ class BackupManifestParserTest {
         assertEquals(Optional.empty(), manifest.backupTime());
     }
 
-    @Test
-    void legacyFileWithoutVmsSectionKeepsComment() {
-        BackupManifest manifest = parsed("""
-                Backup created by VM Backup Manager
-                Time: 2026-09-01T12:00:00
+    static Stream<Arguments> legacyCommentCases() {
+        return Stream.of(
+                Arguments.of("""
+                        Backup created by VM Backup Manager
+                        Time: 2026-09-01T12:00:00
 
-                Comment:
-                No VMs section here
-                """);
+                        Comment:
+                        No VMs section here
+                        """, "No VMs section here"),
+                Arguments.of("""
+                        Backup created by VM Backup Manager
+                        Comment:
+                        VM:
+                        VMs:
+                        VM-ID: looks like a field but is comment text
+                        """, "VM:\nVMs:\nVM-ID: looks like a field but is comment text"),
+                Arguments.of("""
+                        Backup created by VM Backup Manager
+                        Comment:
+                        Format-Version: 2
+                        """, "Format-Version: 2"),
+                Arguments.of("Test backup metadata", ""),
+                Arguments.of("""
+                        Backup created by VM Backup Manager
+                        Comment:
+                          first line
+                        second line
+
+                        """, "first line\nsecond line"),
+                Arguments.of("Format-Version: 1\nComment:\nold style\n", "old style")
+        );
+    }
+
+    /** Legacy comment extraction, including comments that look like manifest syntax. */
+    @ParameterizedTest
+    @MethodSource("legacyCommentCases")
+    void legacyCommentIsExtractedAsInVersion140(String text, String expectedComment) {
+        BackupManifest manifest = parsed(text);
 
         assertEquals(BackupFormat.LEGACY, manifest.formatVersion());
-        assertEquals("No VMs section here", manifest.comment());
+        assertEquals(expectedComment, manifest.comment());
     }
 
     @Test
@@ -90,61 +122,6 @@ class BackupManifestParserTest {
         assertEquals(BackupFormat.LEGACY, manifest.formatVersion());
         assertTrue(manifest.vms().isEmpty());
         assertEquals("Legacy comment", manifest.comment());
-    }
-
-    @Test
-    void legacyCommentMayContainVmMarkersAndVmsLines() {
-        BackupManifest manifest = parsed("""
-                Backup created by VM Backup Manager
-                Comment:
-                VM:
-                VMs:
-                VM-ID: looks like a field but is comment text
-                """);
-
-        assertEquals(BackupFormat.LEGACY, manifest.formatVersion());
-        assertEquals("VM:\nVMs:\nVM-ID: looks like a field but is comment text", manifest.comment());
-    }
-
-    @Test
-    void formatVersionOnlyInsideCommentDoesNotMakeFormatTwo() {
-        BackupManifest manifest = parsed("""
-                Backup created by VM Backup Manager
-                Comment:
-                Format-Version: 2
-                """);
-
-        assertEquals(BackupFormat.LEGACY, manifest.formatVersion());
-        assertEquals("Format-Version: 2", manifest.comment());
-    }
-
-    @Test
-    void legacyFileWithoutCommentMarkerHasEmptyComment() {
-        BackupManifest manifest = parsed("Test backup metadata");
-
-        assertEquals(BackupFormat.LEGACY, manifest.formatVersion());
-        assertEquals("", manifest.comment());
-    }
-
-    @Test
-    void legacyMultiLineCommentIsTrimmedAtTheOuterEdgesOnly() {
-        BackupManifest manifest = parsed("""
-                Backup created by VM Backup Manager
-                Comment:
-                  first line
-                second line
-
-                """);
-
-        assertEquals("first line\nsecond line", manifest.comment());
-    }
-
-    @Test
-    void explicitFormatVersionOneIsLegacy() {
-        BackupManifest manifest = parsed("Format-Version: 1\nComment:\nold style\n");
-
-        assertEquals(BackupFormat.LEGACY, manifest.formatVersion());
-        assertEquals("old style", manifest.comment());
     }
 
     // ------------------------------------------------------------------
@@ -245,7 +222,7 @@ class BackupManifestParserTest {
 
     @Test
     void utf8ByteOrderMarkIsIgnored() {
-        assertEquals(parsed(FORMAT_TWO), parsed("﻿" + FORMAT_TWO));
+        assertEquals(parsed(FORMAT_TWO), parsed("\uFEFF" + FORMAT_TWO));
     }
 
     @Test
@@ -255,7 +232,7 @@ class BackupManifestParserTest {
 
     @Test
     void formatVersionOneBecomesLegacyEvenWithBomAndCrlf() {
-        BackupManifest manifest = parsed("﻿Comment:\r\nold\r\n");
+        BackupManifest manifest = parsed("\uFEFFComment:\r\nold\r\n");
 
         assertEquals(BackupFormat.LEGACY, manifest.formatVersion());
         assertEquals("old", manifest.comment());

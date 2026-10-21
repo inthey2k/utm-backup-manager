@@ -14,7 +14,6 @@ import java.util.Set;
 /**
  * The metadata of one backup batch, as read from or written to its
  * {@code BACKUP-INFO.txt}.
- *
  * Format 1 has no provider-aware VM entries and no explicit time: its time is the
  * file-system time, so {@link #backupTime()} is empty. Format 2 always carries an
  * offset-aware time and one entry per VM.
@@ -36,18 +35,25 @@ public record BackupManifest(
         Objects.requireNonNull(comment, "comment");
         vms = List.copyOf(vms);
 
-        if (formatVersion == BackupFormat.LEGACY) {
-            if (backupTime.isPresent() || !vms.isEmpty()) {
-                throw new IllegalArgumentException("Format 1 manifests carry no time or VM entries");
-            }
-        } else if (formatVersion == BackupFormat.PROVIDER_AWARE) {
-            if (backupTime.isEmpty()) {
-                throw new IllegalArgumentException("Format 2 manifests require an offset-aware time");
-            }
-            requireUniqueVms(vms);
-        } else {
-            throw new IllegalArgumentException("Unsupported batch format: " + formatVersion);
+        switch (formatVersion) {
+            case BackupFormat.LEGACY -> requireLegacyShape(backupTime, vms);
+            case BackupFormat.PROVIDER_AWARE -> requireProviderAwareShape(backupTime, vms);
+            default -> throw new IllegalArgumentException("Unsupported batch format: " + formatVersion);
         }
+    }
+
+    private static void requireLegacyShape(Optional<OffsetDateTime> backupTime, List<VmEntry> vms) {
+        if (backupTime.isPresent() || !vms.isEmpty()) {
+            throw new IllegalArgumentException("Format 1 manifests carry no time or VM entries");
+        }
+    }
+
+    private static void requireProviderAwareShape(Optional<OffsetDateTime> backupTime, List<VmEntry> vms) {
+        if (backupTime.isEmpty()) {
+            throw new IllegalArgumentException("Format 2 manifests require an offset-aware time");
+        }
+
+        requireUniqueVms(vms);
     }
 
     /**

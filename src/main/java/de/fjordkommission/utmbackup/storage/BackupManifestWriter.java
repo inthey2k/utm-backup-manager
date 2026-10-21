@@ -4,7 +4,6 @@ import java.time.format.DateTimeFormatter;
 
 /**
  * Writes format-2 {@code BACKUP-INFO.txt} text.
- *
  * The output is parsed again before it is returned. If the parser would not read
  * back the same VM entries and time, the write is refused. This keeps unsafe
  * names, directories or times from ever reaching a backup batch.
@@ -70,8 +69,8 @@ public final class BackupManifestWriter {
     private static String describe(BackupManifestResult result) {
         return switch (result) {
             case BackupManifestResult.Parsed ignored -> "different content";
-            case BackupManifestResult.UnsupportedVersion unsupported -> "unsupported version " + unsupported.formatVersion();
-            case BackupManifestResult.Invalid invalid -> invalid.reason();
+            case BackupManifestResult.UnsupportedVersion(int formatVersion) -> "unsupported version " + formatVersion;
+            case BackupManifestResult.Invalid(String reason) -> reason;
         };
     }
 }

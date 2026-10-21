@@ -23,7 +23,6 @@ import java.util.stream.Stream;
 /**
  * Browses the folder on the backup drive for VM backup files in order
  * to display them in the overview page.
- *
  * Local VMs come from {@link VmInventory}, so all enabled providers appear.
  * Format-1 backups are associated with their UTM VM through
  * {@link LegacyBackupLayout}. Their backup ids are unchanged.
@@ -59,7 +58,6 @@ public class BackupScanner {
     /**
      * Scans local VMs from all enabled providers and existing backups, and
      * groups them by canonical VM identity.
-     *
      * Local VMs without backups and backup-only VMs are both included so
      * neither newly created VMs nor historical backups disappear from the UI.
      */
@@ -163,7 +161,6 @@ public class BackupScanner {
 
     /**
      * Finds a backup by its generated ID.
-     *
      * The lookup uses the VM-oriented overview so there is only one scanning
      * path for both the UI and backup operations.
      */
@@ -178,7 +175,6 @@ public class BackupScanner {
      * Change tracking for the legacy UTM keys is unchanged. Other providers do not
      * write {@code vm_state} yet, so their state is UNKNOWN, or NEVER_BACKED_UP
      * when they have no backups.
-     *
      * A backup-only VM has no local VM and therefore no state to compare, so it is
      * UNKNOWN. Only a local VM reported as STOPPED is compared.
      */
@@ -256,7 +252,6 @@ public class BackupScanner {
 
     /**
      * Reads the VM backup containers contained in a single backup directory.
-     *
      * Each direct subdirectory below "VMs" is a format-1 VM folder and is
      * attributed to its UTM identity.
      */
@@ -358,26 +353,25 @@ public class BackupScanner {
             List<BackupBatchIssue> batchIssues
     ) {
         return switch (result) {
-            case BackupManifestResult.Parsed parsed when parsed.manifest().formatVersion() == BackupFormat.LEGACY ->
-                    Optional.of(parsed.manifest());
-            case BackupManifestResult.Parsed parsed -> {
+            case BackupManifestResult.Parsed(BackupManifest manifest)
+                    when manifest.formatVersion() == BackupFormat.LEGACY ->
+                    Optional.of(manifest);
+            case BackupManifestResult.Parsed(BackupManifest manifest) -> {
                 batchIssues.add(new BackupBatchIssue(
                         directoryName,
-                        "Format " + parsed.manifest().formatVersion()
-                                + " backups are not shown by this version yet"
+                        "Format " + manifest.formatVersion() + " backups are not shown by this version yet"
                 ));
                 yield Optional.empty();
             }
-            case BackupManifestResult.UnsupportedVersion unsupported -> {
+            case BackupManifestResult.UnsupportedVersion(int formatVersion) -> {
                 batchIssues.add(new BackupBatchIssue(
                         directoryName,
-                        "Format " + unsupported.formatVersion() + " is newer than the supported format "
-                                + BackupFormat.CURRENT
+                        "Format " + formatVersion + " is newer than the supported format " + BackupFormat.CURRENT
                 ));
                 yield Optional.empty();
             }
-            case BackupManifestResult.Invalid invalid -> {
-                batchIssues.add(new BackupBatchIssue(directoryName, invalid.reason()));
+            case BackupManifestResult.Invalid(String reason) -> {
+                batchIssues.add(new BackupBatchIssue(directoryName, reason));
                 yield Optional.empty();
             }
         };

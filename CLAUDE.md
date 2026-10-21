@@ -70,6 +70,15 @@ passed.
 - For substantial architectural changes or potentially destructive operations, explain the proposed approach and get approval before implementation.
 - Never silently loosen safeguards around stable backups, retention, deletion, or backup integrity.
 
+## Quality gate
+
+After completing a substantial implementation phase, check the configured
+static-analysis/quality gate in addition to `mvn clean verify`.
+
+A phase is not complete while it introduces new unresolved quality issues,
+unless those issues have been reviewed and explicitly documented as accepted
+follow-up work.
+
 ## Reviews and analysis reports
 
 For **substantial completed analyses** (such as architecture reviews, code-quality assessments, security reviews, or focused technical investigations):

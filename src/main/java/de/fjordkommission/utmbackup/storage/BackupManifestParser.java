@@ -39,7 +39,7 @@ public final class BackupManifestParser {
     static final String DIRECTORY = "Directory";
 
     private static final Set<String> VM_FIELDS = Set.of(PROVIDER, VM_ID, NAME, DIRECTORY);
-    private static final Pattern DIGITS = Pattern.compile("[0-9]{1,9}");
+    private static final Pattern DIGITS = Pattern.compile("\\d{1,9}");
 
     /**
      * Parses manifest text. The text may start with a UTF-8 byte-order mark and may
@@ -89,65 +89,33 @@ public final class BackupManifestParser {
     }
 
     private BackupManifestResult parseProviderAware(List<String> header, String comment) {
-        List<String> times = new ArrayList<>();
-        List<Map<String, String>> blocks = new ArrayList<>();
-        Map<String, String> currentBlock = null;
+        BlockReader reader = new BlockReader();
 
         for (String rawLine : header) {
-            String line = rawLine.trim();
+            String error = reader.accept(rawLine.trim());
 
-            if (line.isEmpty()) {
-                // A blank line ends the current VM block.
-                currentBlock = null;
-                continue;
-            }
-
-            if (line.equals(VM_MARKER)) {
-                currentBlock = new LinkedHashMap<>();
-                blocks.add(currentBlock);
-                continue;
-            }
-
-            Optional<Field> field = Field.of(line);
-
-            if (field.isEmpty()) {
-                continue;
-            }
-
-            if (currentBlock != null) {
-                if (!VM_FIELDS.contains(field.get().key())) {
-                    // Unknown fields inside a VM block are tolerated for forward compatibility.
-                    continue;
-                }
-
-                if (currentBlock.putIfAbsent(field.get().key(), field.get().value()) != null) {
-                    return new BackupManifestResult.Invalid(
-                            "VM block repeats " + field.get().key() + ": " + field.get().value()
-                    );
-                }
-            } else {
-                if (field.get().key().equals(TIME)) {
-                    times.add(field.get().value());
-                } else if (VM_FIELDS.contains(field.get().key())) {
-                    return new BackupManifestResult.Invalid(
-                            field.get().key() + " appears outside a VM block"
-                    );
-                }
-                // Other top-level fields, including free text and "VMs:", are ignored.
+            if (error != null) {
+                return new BackupManifestResult.Invalid(error);
             }
         }
 
+        return buildProviderAware(reader.times(), reader.blocks(), comment);
+    }
+
+    private BackupManifestResult buildProviderAware(
+            List<String> times,
+            List<Map<String, String>> blocks,
+            String comment
+    ) {
         if (times.size() != 1) {
             return new BackupManifestResult.Invalid(
                     times.isEmpty() ? "Time is missing" : "Time appears more than once"
             );
         }
 
-        OffsetDateTime time;
+        Optional<OffsetDateTime> time = parseTime(times.getFirst());
 
-        try {
-            time = OffsetDateTime.parse(times.getFirst(), DateTimeFormatter.ISO_OFFSET_DATE_TIME);
-        } catch (DateTimeParseException e) {
+        if (time.isEmpty()) {
             return new BackupManifestResult.Invalid(
                     "Time must be an ISO date-time with offset: " + times.getFirst()
             );
@@ -166,12 +134,88 @@ public final class BackupManifestParser {
         try {
             return new BackupManifestResult.Parsed(new BackupManifest(
                     BackupFormat.PROVIDER_AWARE,
-                    Optional.of(time),
+                    time,
                     comment,
                     vms
             ));
         } catch (IllegalArgumentException e) {
             return new BackupManifestResult.Invalid(e.getMessage());
+        }
+    }
+
+    private static Optional<OffsetDateTime> parseTime(String text) {
+        try {
+            return Optional.of(OffsetDateTime.parse(text, DateTimeFormatter.ISO_OFFSET_DATE_TIME));
+        } catch (DateTimeParseException e) {
+            return Optional.empty();
+        }
+    }
+
+    /**
+     * Classifies the lines of a format-2 manifest one at a time, collecting the
+     * top-level times and the VM blocks. A line either contributes or is rejected
+     * with a reason, so no caller can read a half-validated manifest.
+     */
+    private static final class BlockReader {
+
+        private final List<String> times = new ArrayList<>();
+        private final List<Map<String, String>> blocks = new ArrayList<>();
+        private Map<String, String> currentBlock;
+
+        /** Accepts one trimmed line. Returns an error message, or null when the line is valid. */
+        String accept(String line) {
+            if (line.isEmpty()) {
+                // A blank line ends the current VM block.
+                currentBlock = null;
+                return null;
+            }
+
+            if (line.equals(VM_MARKER)) {
+                currentBlock = new LinkedHashMap<>();
+                blocks.add(currentBlock);
+                return null;
+            }
+
+            return Field.of(line).map(this::acceptField).orElse(null);
+        }
+
+        List<String> times() {
+            return times;
+        }
+
+        List<Map<String, String>> blocks() {
+            return blocks;
+        }
+
+        private String acceptField(Field field) {
+            return currentBlock != null
+                    ? acceptBlockField(field)
+                    : acceptTopLevelField(field);
+        }
+
+        private String acceptBlockField(Field field) {
+            if (!VM_FIELDS.contains(field.key())) {
+                // Unknown fields inside a VM block are tolerated for forward compatibility.
+                return null;
+            }
+
+            if (currentBlock.putIfAbsent(field.key(), field.value()) != null) {
+                return "VM block repeats " + field.key() + ": " + field.value();
+            }
+
+            return null;
+        }
+
+        private String acceptTopLevelField(Field field) {
+            if (field.key().equals(TIME)) {
+                times.add(field.value());
+                return null;
+            }
+
+            // Other top-level fields, including free text and "VMs:", are ignored.
+            return VM_FIELDS.contains(field.key())
+                    ? field.key() + " appears outside a VM block"
+                    : null;
         }
     }
 
@@ -248,7 +292,7 @@ public final class BackupManifestParser {
      * Removes a leading byte-order mark and converts CRLF and CR to LF.
      */
     static String normalize(String text) {
-        String withoutBom = text.startsWith("﻿") ? text.substring(1) : text;
+        String withoutBom = text.startsWith("\uFEFF") ? text.substring(1) : text;
 
         return withoutBom.replace("\r\n", "\n").replace('\r', '\n');
     }
