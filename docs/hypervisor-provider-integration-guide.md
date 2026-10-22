@@ -6,7 +6,7 @@ This document is intended for project contributors who want to add support for a
 
 It describes the provider extension point, the responsibilities of a provider implementation, the configuration and test work that is typically required, and the quality checks expected before submitting a contribution.
 
-The guide is based on the provider architecture in UTM Backup Manager 1.4.0.
+The guide is based on the provider architecture in UTM Backup Manager 1.5.0.
 
 ---
 
@@ -360,7 +360,7 @@ The provider should therefore initiate the hypervisor-specific shutdown operatio
 
 The backup manager is responsible for any future waiting or timeout behavior.
 
-In version 1.4.0 this hook exists in the provider API, although the current UTM provider still throws `UnsupportedOperationException` because automatic shutdown has not yet been implemented.
+In version 1.5.0 this hook exists in the provider API, although the current UTM and QEMU providers still throw `UnsupportedOperationException` because automatic shutdown has not yet been implemented.
 
 ---
 

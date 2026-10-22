@@ -45,7 +45,7 @@ Planned features and upcoming improvements are listed in the
 
 ## Requirements
 
-For version 1.0.0:
+For version 1.5.0:
 
 -   macOS
 -   UTM installed, including the `utmctl` command-line tool
@@ -79,10 +79,14 @@ spring.application.name=utm-backup-manager
 server.address=127.0.0.1
 server.port=8085
 
-vm.provider=utm
+vm.providers=utm
 vm.utm.directory=/path/to/your/local/vms
 vm.utm.package-suffix=.utm
 vm.utm.cli=/path/to/utmctl
+
+# Optional second provider
+# vm.providers=utm,qemu
+# vm.qemu.directory=/path/to/your/qemu/vms
 
 backup.root=/target/path/to/store/your/backups
 backup.metadata-db=${user.home}/.utm-backup-manager/backup-manager.db
@@ -162,20 +166,19 @@ Build the application with:
 mvn clean package
 ```
 
-For version 1.0.0 the executable JAR is expected at:
+For version 1.5.0 the executable JAR is expected at:
 
-``` text
-target/utm-backup-manager-1.0.0.jar
+```text
+target/utm-backup-manager-1.5.0.jar
 ```
+
 You can run the JAR file using:
-```bash
-java -jar target/utm-backup-manager-1.0.0.jar
-```
-from the project folder.
 
-Before publishing the first release, the packaged JAR and its
-external-configuration workflow should be verified from a clean
-checkout.
+```bash
+java -jar target/utm-backup-manager-1.5.0.jar
+```
+
+from the project folder.
 
 ## How backups are stored
 
@@ -233,9 +236,14 @@ batch metadata are removed as well.
 
 ## VM state and change detection
 
+The application only creates backups of VMs reported as `STOPPED`.
+
 The UTM provider uses `utmctl` to determine whether local VMs are
-running or stopped. Version 1.0.0 only creates backups of VMs reported
-as stopped; it does not automatically shut down a running VM.
+running or stopped. The QEMU provider determines runtime state from
+running processes and reports uncertain states as `UNKNOWN`.
+
+`RUNNING` and `UNKNOWN` both prevent backup creation. The application
+does not automatically shut down a running VM.
 
 For stopped VMs, the application can indicate whether the VM has changed
 since its most recent acknowledged backup. This is a practical
@@ -276,7 +284,7 @@ The application follows deliberately conservative rules:
 As with any backup software, important backups should be tested
 independently before relying on them for disaster recovery.
 
-## Known limitations in 1.0.0
+## Known limitations in 1.5.0
 
 -   **Only UTM on macOS and QEMU VMs in a directory are implemented.** The provider
     architecture is extensible, but other virtualization platforms are
@@ -304,14 +312,15 @@ independently before relying on them for disaster recovery.
     cause the application to mark it as "Changed", even if you did not make any 
     changes to it.
 -   **The web interface is intended for local use only.** Authentication and
-    remote multi-user operation are not part of version 1.0.0.
+    remote multi-user operation are not part of version 1.5.0.
 
 ## Technology
 
-UTM Backup Manager 1.0.0 uses Java 21, Spring Boot 4.1.1, Spring MVC,
-Thymeleaf, SQLite and embedded Tomcat. The application uses a provider
-abstraction for virtualization-specific integration; version 1.0.0
-includes the UTM provider.
+UTM Backup Manager 1.5.0 uses Java 21, Spring Boot 4.1.1, Spring MVC,
+Thymeleaf, SQLite and embedded Tomcat.
+
+The application uses a provider abstraction for virtualization-specific
+integration. Version 1.5.0 includes providers for UTM on macOS and QEMU.
 
 ## Screenshots
 ### Backup Overview
@@ -322,7 +331,7 @@ The main page lists all your existing VMs as columns and their backups as 'cards
 ### Create Backup
 When you click the button to create a new backup, the following dialog allows you to select which 
 VMs to backup and write a comment to the backup. E.g. "Before updating the kernel". This comment
-will be stored in the file `BACKUP-INFO.txt and is kept for all VMs included in the backup job.
+will be stored in the file `BACKUP-INFO.txt` and is kept for all VMs included in the backup job.
 Later, you can add individual notes to a single VM backup (see below).
 
 ![UTM Backup Manager - Create new backup](docs/screenshots/02-create-backup.png)
@@ -368,7 +377,7 @@ If you find a problem in the application, feel free to report it at https://jira
 
 ## Project status
 
-Version 1.0.0 is the first public release candidate of the project.
+Version 1.5.0 adds multi-provider support and QEMU integration alongside UTM.
 
 ## License
 

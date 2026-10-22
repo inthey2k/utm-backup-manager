@@ -5,7 +5,7 @@ UTM Backup Manager is under active development.
 The roadmap shows released milestones as well as planned features and larger improvements.
 Priorities and version assignments may change as the project evolves.
 
-## 1.1.0 – Backup workflow improvements (✅ Released)
+## 1.1.0 – Backup workflow improvements (Released)
 
 - Background backup jobs
 - Backup progress display
@@ -15,49 +15,47 @@ Priorities and version assignments may change as the project evolves.
 - Additional automated tests
 > No release notes written for this version
 
-## 1.2.0 – UI, configuration and retention preparation (✅ Released)
+## 1.2.0 – UI, configuration and retention preparation (Released)
 
 - For a complete list of changes see published GitHub release notes:
 
   [Release notes for v1.2.0](https://github.com/inthey2k/utm-backup-manager/releases#release-v1.2.0)
 
-## 1.3.0 – Automatic retention cleanup (✅ Released)
+## 1.3.0 – Automatic retention cleanup (Released)
 
 - For a complete list of changes see published GitHub release notes:
 
   [Release notes for v1.3.0](https://github.com/inthey2k/utm-backup-manager/releases#release-v1.3.0)
 
-## 1.4.0 – Cleanup and operational visibility
+## 1.4.0 – Cleanup and operational visibility (Released)
 
-- Show retention cleanup status in the web UI
-  - running
-  - completed
-  - failed
-- Highlight backups pending deletion during a running backup job
-- Add a warning icon to retention candidates
-- Show a persistent backup completion message
-  - start time
-  - finish time
-  - total duration
-  - manual dismissal only
-- Improve error reporting for background cleanup jobs
-- Improve compatibility with recent Java versions
-  - handle SQLite JDBC native-access requirements
-  - eliminate native-access warnings where possible
-- Review and clean up remaining IntelliJ inspection warnings
-- Further UI polish and usability improvements
-- Extend automated tests where useful
+For a complete list of changes see published GitHub release notes:
 
-## 1.5.0 – Configuration, startup and administration
+[Release notes for v1.4.0](https://github.com/inthey2k/utm-backup-manager/releases#release-v1.4.0)
 
-- Automatically open the system default browser after application startup
-  - open the backup overview page
-  - make browser auto-start configurable for headless or server environments
-- Improve configuration handling
-- Make important runtime settings easier to inspect
-- Improve validation and diagnostics for unavailable backup storage
-- Extend documentation for installation and operation
-- Improve release and upgrade documentation
+
+## 1.5.0 – Multi-provider support and QEMU integration (Released)
+
+- Add support for multiple VM providers in one application instance
+- Add QEMU as a second built-in provider alongside UTM
+- Introduce canonical VM ids in the form `<providerId>:<localId>`
+- Key runtime status by provider-local VM id instead of display name
+- Isolate provider-specific configuration
+  - `UtmProperties` / `UtmProviderConfiguration`
+  - `QemuProperties` / `QemuProviderConfiguration`
+- Keep disabled providers from requiring their configuration
+- Preserve compatibility with historical UTM backups and legacy state
+- Add provider-aware backup layout for new providers
+- Apply the stopped-only backup safety rule globally
+  - `RUNNING` and `UNKNOWN` both block backup creation
+- Add conservative QEMU runtime-state detection based on running processes
+- Handle QEMU paths resolved through symbolic links
+- Group VMs by provider in the overview
+- Add provider-specific horizontal VM carousels with continuous navigation
+- Keep provider rows aligned even when no overflow is present
+- Keep the main page header and backup actions visible while scrolling
+- Extend the hypervisor provider integration documentation
+- Expand automated test coverage for multi-provider and QEMU behavior
 
 ## 1.6.0 – Backup restore
 
@@ -83,10 +81,10 @@ Priorities and version assignments may change as the project evolves.
 
 ## 1.7.0 – Linux support
 
-- Verify operation on Linux
-- Remove remaining macOS-specific assumptions
-- Extend provider abstraction where required
-- Add Linux installation and configuration documentation
+- Verify the complete application workflow on Linux
+- Remove remaining macOS-specific assumptions outside provider implementations
+- Verify QEMU operation on Linux
+- Extend installation and configuration documentation for Linux
 
 ## Later
 
