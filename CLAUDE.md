@@ -72,12 +72,15 @@ passed.
 
 ## Quality gate
 
-After completing a substantial implementation phase, check the configured
-static-analysis/quality gate in addition to `mvn clean verify`.
+At the end of the implementation phase:
 
-A phase is not complete while it introduces new unresolved quality issues,
-unless those issues have been reviewed and explicitly documented as accepted
-follow-up work.
+- run the required local verification
+- do not query SonarQube unless a fresh analysis covering the current code has
+  already been submitted
+- report that Sonar verification is pending if no fresh analysis exists
+
+After the developer submits a new SonarQube analysis, inspect and fix only the
+new issues caused by the current phase.
 
 ## Reviews and analysis reports
 

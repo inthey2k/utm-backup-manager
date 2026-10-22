@@ -2,6 +2,7 @@ package de.fjordkommission.utmbackup.service;
 
 import de.fjordkommission.utmbackup.config.BackupProperties;
 import de.fjordkommission.utmbackup.model.LocalVm;
+import de.fjordkommission.utmbackup.model.VmId;
 import de.fjordkommission.utmbackup.storage.BackupStorageGuard;
 import org.springframework.boot.info.BuildProperties;
 import org.junit.jupiter.api.Test;
@@ -162,12 +163,12 @@ class CreateBackupServiceTest {
         assertTrue(info.contains("Before system updates"));
 
         verify(vmChangeStatusService).acknowledgeBackup(
-                "first-vm",
+                new VmId("utm", "first-vm"),
                 firstVm
         );
 
         verify(vmChangeStatusService).acknowledgeBackup(
-                "second-vm",
+                new VmId("utm", "second-vm"),
                 secondVm
         );
     }
@@ -446,7 +447,7 @@ class CreateBackupServiceTest {
         service.create(vm);
 
         verify(vmChangeStatusService).acknowledgeBackup(
-                "test-linux-vm",
+                new VmId("utm", "test-linux-vm"),
                 vm
         );
     }

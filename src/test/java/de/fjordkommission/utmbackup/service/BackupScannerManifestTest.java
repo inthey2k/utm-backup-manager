@@ -29,7 +29,6 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.junit.jupiter.api.Assumptions.assumeTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
-import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -52,7 +51,7 @@ class BackupScannerManifestTest {
     void setUp() throws IOException {
         root = Files.createDirectories(tempDir.resolve("backups"));
         changeStatusService = mock(VmChangeStatusService.class);
-        when(changeStatusService.determine(anyString(), any(), anyBoolean()))
+        when(changeStatusService.determine(any(VmId.class), any(), anyBoolean()))
                 .thenReturn(VmChangeStatus.UNKNOWN);
     }
 

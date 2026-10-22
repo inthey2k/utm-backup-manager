@@ -212,7 +212,7 @@ class BackupWriteGuardIntegrationTest {
         SettingsRepository settings = mock(SettingsRepository.class);
         when(settings.getRetentionLimit()).thenReturn(3);
         VmChangeStatusService changeStatus = mock(VmChangeStatusService.class);
-        when(changeStatus.determine(anyString(), any(), anyBoolean())).thenReturn(VmChangeStatus.UNKNOWN);
+        when(changeStatus.determine(any(VmId.class), any(), anyBoolean())).thenReturn(VmChangeStatus.UNKNOWN);
 
         return new BackupScanner(
                 new BackupProperties(root, null, null),

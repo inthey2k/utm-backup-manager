@@ -288,7 +288,7 @@ Each step only starts after the previous one succeeded.
 6. **Root marker.** Created, or updated to format 2, through the guard. This happens
    only once the batch is complete, and before it is published.
 7. **Publish.** The incomplete directory is moved to its final name.
-8. **Change-tracking acknowledgement** (UTM VMs only, legacy `vm_state` keys).
+8. **Change-tracking acknowledgement**, keyed by the canonical VmId (see *Change-tracking state*).
 
 Failure model:
 
@@ -329,10 +329,33 @@ rewritten.
   a backup-only entry with the manifest name.
 - Legacy batches are never rewritten, moved, or renamed.
 
+## Change-tracking state
+
+The `vm_state` table stores the acknowledged state of each VM, keyed by the
+canonical VmId serialized as `providerId:localId`, for example `utm:Linux Mint 23.utm`.
+Display names are never keys.
+
+Before Phase 7a, the key was the UTM local id, a folder name such as
+`Linux Mint 23.utm`. A one-time migration runs at startup, before any runtime read or
+the legacy state-file import:
+
+- A key that is already canonical is unchanged. A key is canonical if its prefix is a
+  valid provider id and something follows the colon.
+- A key with a valid provider prefix and nothing after the colon, or a blank key, is
+  malformed. It is kept unchanged and counted in the log.
+- Any other key is a legacy UTM key. It is renamed to `utm:<key>` with its stored
+  time and acknowledgement unchanged.
+- If the canonical key already exists, the canonical value is kept and the legacy row
+  is left in place, so nothing is overwritten or deleted. The conflict is logged.
+
+The migration runs in one transaction with a marker in the `settings` table, and a
+second run changes nothing. Backup files, backup ids and Stable or note state are not
+touched.
+
 ## Not yet defined here
 
 - Stable and note state for format 2 batches. Still stored in SQLite, keyed by the
   format-2 backup id.
 - Enabling backups of VMs from providers other than UTM. Format 2 can store them;
-  the restriction is still in the backup-start controller until change tracking and
-  the provider implementation are ready.
+  the restriction is still in the backup-start controller until the provider
+  implementation is verified.

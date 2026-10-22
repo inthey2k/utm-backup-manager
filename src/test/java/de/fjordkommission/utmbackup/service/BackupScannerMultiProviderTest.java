@@ -26,7 +26,6 @@ import java.util.Map;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
-import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.*;
 
 /**
@@ -45,8 +44,11 @@ class BackupScannerMultiProviderTest {
         root = tempDir.resolve("backups");
         Files.createDirectories(root);
         changeStatusService = mock(VmChangeStatusService.class);
-        when(changeStatusService.determine(anyString(), any(), anyBoolean()))
-                .thenReturn(VmChangeStatus.UNKNOWN);
+        // Same rule as the real service: no backups means NEVER_BACKED_UP without a state lookup.
+        when(changeStatusService.determine(any(VmId.class), any(), anyBoolean()))
+                .thenAnswer(invocation -> invocation.getArgument(2)
+                        ? VmChangeStatus.UNKNOWN
+                        : VmChangeStatus.NEVER_BACKED_UP);
     }
 
     @Test

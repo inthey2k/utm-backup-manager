@@ -86,8 +86,10 @@ real hypervisor, even when a real provider id is configured.
 ### `LocalVm` fields
 
 - **`id`**: a technical identifier that must stay the same across restarts. The
-  backup manager stores it in backup IDs and in the `vm_state` table, so changing
-  it makes existing backups and change-tracking state appear unrelated.
+  backup manager combines it with the provider id into the canonical `VmId`
+  (`providerId:localId`). Change-tracking state in the `vm_state` table is keyed by
+  that canonical id, so changing the local id makes an existing VM's state appear
+  unrelated.
 - **`name`**: the display name, for presentation only. It is not used for identity or status lookup.
 - **`backupSources`**: every file or directory that belongs to the VM. Each source
   is copied into `VMs/<file name>/` of the backup batch. File names must be unique

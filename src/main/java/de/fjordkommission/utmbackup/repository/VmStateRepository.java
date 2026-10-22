@@ -1,6 +1,7 @@
 package de.fjordkommission.utmbackup.repository;
 
 import de.fjordkommission.utmbackup.config.BackupProperties;
+import de.fjordkommission.utmbackup.model.VmId;
 
 import jakarta.annotation.PostConstruct;
 
@@ -36,7 +37,13 @@ public class VmStateRepository {
         return DriverManager.getConnection("jdbc:sqlite:" + db);
     }
 
-    public Optional<State> find(String vmName) {
+    /**
+     * Returns the stored state of a VM. The key is the canonical {@link VmId}, so two
+     * providers with the same local id never share a state.
+     */
+    public Optional<State> find(VmId vmId) {
+        String vmName = vmId.toString();
+
         try (Connection c = connect();
              PreparedStatement p = c.prepareStatement(
                      "SELECT acknowledged_mtime, acknowledgement, updated_at FROM vm_state WHERE vm_name = ?")) {
@@ -53,7 +60,9 @@ public class VmStateRepository {
         }
     }
 
-    public void save(String vmName, long acknowledgedMtime, Acknowledgement acknowledgement) {
+    public void save(VmId vmId, long acknowledgedMtime, Acknowledgement acknowledgement) {
+        String vmName = vmId.toString();
+
         try (Connection c = connect();
              PreparedStatement p = c.prepareStatement(
                      "INSERT INTO vm_state (vm_name, acknowledged_mtime, acknowledgement, updated_at) " +

@@ -92,7 +92,7 @@ class BackupScannerLegacyCharacterizationTest {
         when(settings.getRetentionLimit()).thenReturn(3);
 
         VmChangeStatusService changeStatusService = mock(VmChangeStatusService.class);
-        when(changeStatusService.determine(anyString(), any(), anyBoolean()))
+        when(changeStatusService.determine(any(VmId.class), any(), anyBoolean()))
                 .thenReturn(VmChangeStatus.UNKNOWN);
 
         provider = mock(VmProvider.class);

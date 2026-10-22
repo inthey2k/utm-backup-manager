@@ -36,7 +36,6 @@ import java.util.Optional;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
-import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.*;
 
 /**
@@ -68,7 +67,7 @@ class FormatTwoLifecycleTest {
         FakeVmProvider utm = FakeVmProvider.of("utm", List.of(), Map.of());
         FakeVmProvider qemu = FakeVmProvider.of("qemu", List.of(), Map.of());
         VmChangeStatusService changeStatus = mock(VmChangeStatusService.class);
-        when(changeStatus.determine(anyString(), any(), anyBoolean())).thenReturn(VmChangeStatus.UNKNOWN);
+        when(changeStatus.determine(any(VmId.class), any(), anyBoolean())).thenReturn(VmChangeStatus.UNKNOWN);
 
         scanner = new BackupScanner(
                 new BackupProperties(root, null, null),

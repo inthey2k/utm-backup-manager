@@ -178,11 +178,9 @@ public class BackupScanner {
     }
 
     /**
-     * Change tracking for the legacy UTM keys is unchanged. Other providers do not
-     * write {@code vm_state} yet, so their state is UNKNOWN, or NEVER_BACKED_UP
-     * when they have no backups.
-     * A backup-only VM has no local VM and therefore no state to compare, so it is
-     * UNKNOWN. Only a local VM reported as STOPPED is compared.
+     * Change tracking is keyed by the canonical VmId for every provider, so the same
+     * local id under two providers keeps two states. A VM without backups is
+     * NEVER_BACKED_UP without reading the database.
      */
     private VmChangeStatus changeStatus(
             VmId vmId,
@@ -193,17 +191,11 @@ public class BackupScanner {
             return VmChangeStatus.UNKNOWN;
         }
 
-        if (LegacyBackupLayout.usesLegacyStateKeys(vmId.providerId())) {
-            return vmChangeStatusService.determine(
-                    vmId.localId(),
-                    localVm.localVm(),
-                    !backups.isEmpty()
-            );
-        }
-
-        return backups.isEmpty()
-                ? VmChangeStatus.NEVER_BACKED_UP
-                : VmChangeStatus.UNKNOWN;
+        return vmChangeStatusService.determine(
+                vmId,
+                localVm.localVm(),
+                !backups.isEmpty()
+        );
     }
 
     /**

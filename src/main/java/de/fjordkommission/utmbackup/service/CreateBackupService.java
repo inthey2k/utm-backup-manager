@@ -189,7 +189,7 @@ public class CreateBackupService {
             Files.move(incompleteDirectory, backupDirectory);
 
             for (LocalVm vm : vms) {
-                vmChangeStatusService.acknowledgeBackup(vm.id(), vm);
+                vmChangeStatusService.acknowledgeBackup(LegacyBackupLayout.vmIdForFolder(vm.id()), vm);
             }
 
             return new Result(
@@ -524,43 +524,6 @@ public class CreateBackupService {
         }
     }
 
-
-    @SuppressWarnings("NullableProblems")
-    private void cleanupIncompleteDirectory(Path directory) throws IOException {
-
-        if (!Files.exists(directory)) {
-            return;
-        }
-
-        try {
-            Files.walkFileTree(directory, new SimpleFileVisitor<>() {
-
-                @Override
-                public FileVisitResult visitFile(
-                        Path file,
-                        BasicFileAttributes attributes
-                ) throws IOException {
-                    Files.delete(file);
-                    return FileVisitResult.CONTINUE;
-                }
-
-                @Override
-                public FileVisitResult postVisitDirectory(
-                        Path dir,
-                        IOException exception
-                ) throws IOException {
-                    if (exception != null) {
-                        throw exception;
-                    }
-
-                    Files.delete(dir);
-                    return FileVisitResult.CONTINUE;
-                }
-            });
-        } catch (IOException ignored) {
-            // Preserve the original backup failure.
-        }
-    }
 
     @SuppressWarnings("NullableProblems")
     private void deleteDirectory(Path directory) {

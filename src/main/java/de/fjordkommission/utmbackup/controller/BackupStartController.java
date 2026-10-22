@@ -42,7 +42,6 @@ public class BackupStartController {
 
     /**
      * Starts a backup for the selected canonical VM ids ({@code providerId:localId}).
-     *
      * Backup writing still uses the legacy UTM layout, so a batch may contain
      * only UTM VMs. A non-UTM selection is rejected before anything is written.
      */
@@ -67,7 +66,8 @@ public class BackupStartController {
                     .toList();
 
             for (ManagedVm vm : selectedVms) {
-                if (!LegacyBackupLayout.usesLegacyStateKeys(vm.providerId())) {
+                // Backup writing is still limited to UTM. Its layout and change tracking are verified only for UTM.
+                if (!LegacyBackupLayout.PROVIDER_ID.equals(vm.providerId())) {
                     throw new IllegalStateException(
                             "Backups of " + vm.providerName() + " VMs are not supported yet. "
                                     + "Select only VMs of the UTM provider."

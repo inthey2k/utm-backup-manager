@@ -35,7 +35,6 @@ import java.util.Optional;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
-import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.*;
 
 /**
@@ -67,7 +66,7 @@ class FormatTwoScanningTest {
         SettingsRepository settings = mock(SettingsRepository.class);
         when(settings.getRetentionLimit()).thenReturn(3);
         VmChangeStatusService changeStatus = mock(VmChangeStatusService.class);
-        when(changeStatus.determine(anyString(), any(), anyBoolean())).thenReturn(VmChangeStatus.UNKNOWN);
+        when(changeStatus.determine(any(VmId.class), any(), anyBoolean())).thenReturn(VmChangeStatus.UNKNOWN);
 
         return new BackupScanner(
                 new BackupProperties(root, null, null),
