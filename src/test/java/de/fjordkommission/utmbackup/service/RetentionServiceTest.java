@@ -1,6 +1,7 @@
 package de.fjordkommission.utmbackup.service;
 
 import de.fjordkommission.utmbackup.model.*;
+import de.fjordkommission.utmbackup.storage.BackupStorageGuard;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -13,12 +14,15 @@ import java.util.List;
 import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 class RetentionServiceTest {
+
+    private static final String PROVIDER = "utm";
 
     @Mock
     private BackupScanner scanner;
@@ -32,13 +36,14 @@ class RetentionServiceTest {
     void setUp() {
         retentionService = new RetentionService(
                 scanner,
-                backupService
+                backupService,
+                mock(BackupStorageGuard.class)
         );
     }
 
     @Test
     void vmBelowRetentionLimitDoesNotRequireCleanup() {
-        LocalVm localVm = localVm("vm-1", "VM 1");
+        VmId vmId = vmId("vm-1");
 
         VmOverview vm = vmOverview(
                 "vm-1",
@@ -49,9 +54,9 @@ class RetentionServiceTest {
         BackupOverview backupOverview = overview(vm);
         when(scanner.scan()).thenReturn(backupOverview);
 
-        List<LocalVm> result =
+        List<VmId> result =
                 retentionService.findVmsRequiringRetentionCleanup(
-                        List.of(localVm)
+                        List.of(vmId)
                 );
 
         assertEquals(List.of(), result);
@@ -59,7 +64,7 @@ class RetentionServiceTest {
 
     @Test
     void vmAtRetentionLimitRequiresCleanup() {
-        LocalVm localVm = localVm("vm-1", "VM 1");
+        VmId vmId = vmId("vm-1");
 
         VmOverview vm = vmOverview(
                 "vm-1",
@@ -71,17 +76,17 @@ class RetentionServiceTest {
         BackupOverview backupOverview = overview(vm);
         when(scanner.scan()).thenReturn(backupOverview);
 
-        List<LocalVm> result =
+        List<VmId> result =
                 retentionService.findVmsRequiringRetentionCleanup(
-                        List.of(localVm)
+                        List.of(vmId)
                 );
 
-        assertEquals(List.of(localVm), result);
+        assertEquals(List.of(vmId), result);
     }
 
     @Test
     void stableBackupsDoNotCountTowardsRetentionLimit() {
-        LocalVm localVm = localVm("vm-1", "VM 1");
+        VmId vmId = vmId("vm-1");
 
         VmOverview vm = vmOverview(
                 "vm-1",
@@ -93,9 +98,9 @@ class RetentionServiceTest {
         BackupOverview backupOverview = overview(vm);
         when(scanner.scan()).thenReturn(backupOverview);
 
-        List<LocalVm> result =
+        List<VmId> result =
                 retentionService.findVmsRequiringRetentionCleanup(
-                        List.of(localVm)
+                        List.of(vmId)
                 );
 
         assertEquals(List.of(), result);
@@ -103,7 +108,7 @@ class RetentionServiceTest {
 
     @Test
     void onlySelectedVmsAreReportedForCleanup() {
-        LocalVm selectedVm = localVm("vm-1", "VM 1");
+        VmId selectedVm = vmId("vm-1");
 
         VmOverview selected = vmOverview(
                 "vm-1",
@@ -120,7 +125,7 @@ class RetentionServiceTest {
         BackupOverview backupOverview = overview(selected, notSelected);
         when(scanner.scan()).thenReturn(backupOverview);
 
-        List<LocalVm> result =
+        List<VmId> result =
                 retentionService.findVmsRequiringRetentionCleanup(
                         List.of(selectedVm)
                 );
@@ -129,8 +134,31 @@ class RetentionServiceTest {
     }
 
     @Test
+    void sameLocalIdInAnotherProviderIsNotAffectedByRetention() {
+        // A qemu VM with the same local id must not inherit utm retention decisions.
+        VmId utmVm = new VmId("utm", "ArchLinux");
+        VmId qemuVm = new VmId("qemu", "ArchLinux");
+
+        VmOverview utmOverview = vmOverview(
+                "utm", "ArchLinux",
+                normalBackup("backup-1", 1),
+                normalBackup("backup-2", 2),
+                normalBackup("backup-3", 3)
+        );
+        VmOverview qemuOverview = vmOverview(
+                "qemu", "ArchLinux"
+        );
+
+        when(scanner.scan()).thenReturn(overview(utmOverview, qemuOverview));
+
+        assertEquals(List.of(utmVm), retentionService.findVmsRequiringRetentionCleanup(
+                List.of(utmVm, qemuVm)
+        ));
+    }
+
+    @Test
     void cleanupDeletesOldestNormalBackup() {
-        LocalVm localVm = localVm("vm-1", "VM 1");
+        VmId vmId = vmId("vm-1");
 
         VmBackup oldest = normalBackup("backup-1", 1);
         VmBackup second = normalBackup("backup-2", 2);
@@ -149,7 +177,7 @@ class RetentionServiceTest {
         when(scanner.scan()).thenReturn(backupOverview);
 
         retentionService.deleteBackupsExceedingRetention(
-                List.of(localVm)
+                List.of(vmId)
         );
 
         verify(backupService).delete("backup-1");
@@ -160,7 +188,7 @@ class RetentionServiceTest {
 
     @Test
     void cleanupDeletesAllNormalBackupsExceedingLimit() {
-        LocalVm localVm = localVm("vm-1", "VM 1");
+        VmId vmId = vmId("vm-1");
 
         VmBackup oldest = normalBackup("backup-1", 1);
         VmBackup second = normalBackup("backup-2", 2);
@@ -183,7 +211,7 @@ class RetentionServiceTest {
         when(scanner.scan()).thenReturn(backupOverview);
 
         retentionService.deleteBackupsExceedingRetention(
-                List.of(localVm)
+                List.of(vmId)
         );
 
         verify(backupService).delete("backup-1");
@@ -197,7 +225,7 @@ class RetentionServiceTest {
 
     @Test
     void cleanupNeverDeletesStableBackups() {
-        LocalVm localVm = localVm("vm-1", "VM 1");
+        VmId vmId = vmId("vm-1");
 
         VmBackup oldestNormal = normalBackup("backup-1", 1);
         VmBackup stable = stableBackup("stable-1", 2);
@@ -218,7 +246,7 @@ class RetentionServiceTest {
         when(scanner.scan()).thenReturn(backupOverview);
 
         retentionService.deleteBackupsExceedingRetention(
-                List.of(localVm)
+                List.of(vmId)
         );
 
         verify(backupService).delete("backup-1");
@@ -230,7 +258,7 @@ class RetentionServiceTest {
 
     @Test
     void cleanupDoesNothingWhenRetentionLimitIsNotExceeded() {
-        LocalVm localVm = localVm("vm-1", "VM 1");
+        VmId vmId = vmId("vm-1");
 
         VmOverview vm = vmOverview(
                 "vm-1",
@@ -243,7 +271,7 @@ class RetentionServiceTest {
         when(scanner.scan()).thenReturn(backupOverview);
 
         retentionService.deleteBackupsExceedingRetention(
-                List.of(localVm)
+                List.of(vmId)
         );
 
         verify(backupService, never()).delete(
@@ -253,7 +281,7 @@ class RetentionServiceTest {
 
     @Test
     void findsBackupsPendingDeletion() {
-        LocalVm localVm = localVm("vm-1", "VM 1");
+        VmId vmId = vmId("vm-1");
 
         VmBackup oldest = normalBackup("backup-1", 1);
         VmBackup second = normalBackup("backup-2", 2);
@@ -272,7 +300,7 @@ class RetentionServiceTest {
 
         Set<String> result =
                 retentionService.findBackupsPendingDeletion(
-                        List.of(localVm)
+                        List.of(vmId)
                 );
 
         assertEquals(
@@ -283,7 +311,7 @@ class RetentionServiceTest {
 
     @Test
     void pendingDeletionNeverIncludesStableBackups() {
-        LocalVm localVm = localVm("vm-1", "VM 1");
+        VmId vmId = vmId("vm-1");
 
         VmOverview vm = vmOverview(
                 "vm-1",
@@ -298,7 +326,7 @@ class RetentionServiceTest {
 
         Set<String> result =
                 retentionService.findBackupsPendingDeletion(
-                        List.of(localVm)
+                        List.of(vmId)
                 );
 
         assertEquals(
@@ -307,23 +335,29 @@ class RetentionServiceTest {
         );
     }
 
-    private LocalVm localVm(String id, String name) {
-        return new LocalVm(
-                id,
-                name,
-                List.of()
-        );
+    private static VmId vmId(String localId) {
+        return new VmId(PROVIDER, localId);
     }
 
     private VmOverview vmOverview(
-            String id,
+            String localId,
             VmBackup... backups
     ) {
-        LocalVm localVm = localVm(id, id);
+        return vmOverview(PROVIDER, localId, backups);
+    }
+
+    private VmOverview vmOverview(
+            String providerId,
+            String localId,
+            VmBackup... backups
+    ) {
+        VmId id = new VmId(providerId, localId);
+        LocalVm localVm = new LocalVm(localId, localId, List.of());
 
         return new VmOverview(
                 id,
-                id,
+                providerId,
+                localId,
                 localVm,
                 List.of(backups),
                 VmStatus.STOPPED,
@@ -363,6 +397,9 @@ class RetentionServiceTest {
                 List.of(vms),
                 Set.of(),
                 Set.of(),
-                3
+                3,
+                List.of(),
+                List.of()
         );
-    }}
+    }
+}

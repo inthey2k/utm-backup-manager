@@ -1,13 +1,10 @@
 package de.fjordkommission.utmbackup.controller;
 
-import de.fjordkommission.utmbackup.model.LocalVm;
+import de.fjordkommission.utmbackup.model.ManagedVm;
+import de.fjordkommission.utmbackup.model.VmId;
 import de.fjordkommission.utmbackup.model.VmStatus;
-import de.fjordkommission.utmbackup.provider.VmProviderRegistry;
 import de.fjordkommission.utmbackup.service.BackupJobService;
-
-import java.util.List;
-import java.util.Map;
-
+import de.fjordkommission.utmbackup.service.VmInventory;
 import de.fjordkommission.utmbackup.service.RetentionService;
 import org.springframework.context.MessageSource;
 import org.springframework.context.i18n.LocaleContextHolder;
@@ -15,6 +12,8 @@ import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
+
+import java.util.List;
 
 @Controller
 public class BackupStartController {
@@ -25,21 +24,26 @@ public class BackupStartController {
 
     private final BackupJobService backupJobService;
     private final MessageSource messageSource;
-    private final VmProviderRegistry vmProviderRegistry;
+    private final VmInventory vmInventory;
     private final RetentionService retentionService;
 
     public BackupStartController(
             BackupJobService backupJobService,
             MessageSource messageSource,
-            VmProviderRegistry vmProviderRegistry,
+            VmInventory vmInventory,
             RetentionService retentionService
     ) {
         this.backupJobService = backupJobService;
         this.messageSource = messageSource;
-        this.vmProviderRegistry = vmProviderRegistry;
+        this.vmInventory = vmInventory;
         this.retentionService = retentionService;
     }
 
+    /**
+     * Starts a backup for the selected canonical VM ids ({@code providerId:localId}).
+     * Only STOPPED VMs are accepted, whatever their provider. The check is repeated
+     * by {@code CreateBackupService}, so the rule does not depend on this controller.
+     */
     @PostMapping("/backup")
     String backup(
             @RequestParam(required = false) List<String> vmIds,
@@ -54,41 +58,32 @@ public class BackupStartController {
                 );
             }
 
-            var provider = vmProviderRegistry.current();
+            VmInventory.Inventory inventory = vmInventory.build();
 
-            List<LocalVm> localVms = provider.findAll();
-            Map<String, VmStatus> statuses = provider.findStatuses();
-
-            List<LocalVm> selectedVms = vmIds.stream()
-                    .map(vmId -> localVms.stream()
-                            .filter(vm -> vm.id().equals(vmId))
-                            .findFirst()
-                            .orElseThrow(() -> new IllegalArgumentException(
-                                    "VM not found: " + vmId
-                            )))
+            List<ManagedVm> selectedVms = vmIds.stream()
+                    .map(vmId -> selectedVm(inventory, vmId))
                     .toList();
 
-            for (LocalVm vm : selectedVms) {
-                VmStatus status = statuses.getOrDefault(
-                        vm.name(),
-                        VmStatus.UNKNOWN
-                );
-
-                if (status != VmStatus.STOPPED) {
+            for (ManagedVm vm : selectedVms) {
+                if (vm.status() != VmStatus.STOPPED) {
                     throw new IllegalStateException(
                             "Backup cannot be created because VM "
                                     + vm.name()
                                     + " is "
-                                    + status
+                                    + vm.status()
                                     + "."
                     );
                 }
             }
 
-            List<LocalVm> retentionCleanupVms =
-                    retentionService.findVmsRequiringRetentionCleanup(selectedVms);
+            List<VmId> selectedIds = selectedVms.stream()
+                    .map(ManagedVm::id)
+                    .toList();
 
-            if (!retentionCleanupVms.isEmpty() && !retentionConfirmed) {
+            List<VmId> retentionCleanupIds =
+                    retentionService.findVmsRequiringRetentionCleanup(selectedIds);
+
+            if (!retentionCleanupIds.isEmpty() && !retentionConfirmed) {
                 throw new IllegalStateException(
                         "Retention cleanup confirmation is required."
                 );
@@ -98,7 +93,7 @@ public class BackupStartController {
                     selectedVms,
                     comment,
                     retentionConfirmed
-                            ? retentionCleanupVms
+                            ? retentionCleanupIds
                             : List.of()
             );
 
@@ -118,5 +113,13 @@ public class BackupStartController {
         }
 
         return REDIRECT_HOME;
+    }
+
+    private static ManagedVm selectedVm(VmInventory.Inventory inventory, String rawId) {
+        return VmId.tryParse(rawId)
+                .flatMap(inventory::find)
+                .orElseThrow(() -> new IllegalArgumentException(
+                        "VM not found: " + rawId
+                ));
     }
 }

@@ -1,7 +1,15 @@
 package de.fjordkommission.utmbackup.service;
 
 import de.fjordkommission.utmbackup.config.BackupProperties;
-import de.fjordkommission.utmbackup.model.LocalVm;
+import de.fjordkommission.utmbackup.model.ManagedVm;
+import de.fjordkommission.utmbackup.model.VmId;
+import de.fjordkommission.utmbackup.model.VmStatus;
+import de.fjordkommission.utmbackup.storage.BackupContainers;
+import de.fjordkommission.utmbackup.storage.BackupFormat;
+import de.fjordkommission.utmbackup.storage.BackupManifest;
+import de.fjordkommission.utmbackup.storage.BackupManifestWriter;
+import de.fjordkommission.utmbackup.storage.BackupStorageGuard;
+import org.springframework.boot.info.BuildProperties;
 import org.springframework.stereotype.Service;
 
 import java.io.InputStream;
@@ -19,6 +27,10 @@ import java.nio.file.attribute.BasicFileAttributes;
 import java.nio.file.attribute.PosixFileAttributeView;
 import java.nio.file.attribute.PosixFileAttributes;
 import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
+import java.util.ArrayList;
+import java.util.Map;
+import java.util.Optional;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.HashSet;
@@ -45,22 +57,31 @@ public class CreateBackupService {
     private static final CancellationCheck NEVER_CANCELLED = () -> false;
     private final Path backupRoot;
     private final VmChangeStatusService vmChangeStatusService;
+    private final BackupStorageGuard storageGuard;
+    private final BackupManifestWriter manifestWriter = new BackupManifestWriter();
+    private final String applicationVersion;
 
     public CreateBackupService(
             BackupProperties properties,
-            VmChangeStatusService vmChangeStatusService
+            VmChangeStatusService vmChangeStatusService,
+            BackupStorageGuard storageGuard,
+            BuildProperties buildProperties
     ) {
         this.backupRoot = properties.root();
         this.vmChangeStatusService = vmChangeStatusService;
+        this.storageGuard = storageGuard;
+        this.applicationVersion = buildProperties == null || buildProperties.getVersion() == null
+                ? "unknown"
+                : buildProperties.getVersion();
     }
 
     /** Uses a null value for the comment string */
-    public Result create(LocalVm vm) {
+    public Result create(ManagedVm vm) {
         return create(List.of(vm), null);
     }
 
     /** Uses the constant value NO_PROGRESS for the ProgressListener **/
-    public Result create(List<LocalVm> vms, String comment) {
+    public Result create(List<ManagedVm> vms, String comment) {
         return create(vms, comment, NO_PROGRESS, NEVER_CANCELLED);
     }
 
@@ -68,7 +89,7 @@ public class CreateBackupService {
      * Uses the constant value NEVER_CANCELLED as Cancellation Check
      */
     public Result create(
-            List<LocalVm> vms,
+            List<ManagedVm> vms,
             String comment,
             ProgressListener progressListener
     ) {
@@ -80,16 +101,19 @@ public class CreateBackupService {
         );
     }
     /**
-     * Creates a backup and reports copy progress to the supplied listener.
-     * The listener is deliberately independent of the web layer and job model,
-     * so this service can still be used without the background-job mechanism.
+     * Creates a format-2 backup of the given VMs and reports copy progress to the
+     * supplied listener. The listener is deliberately independent of the web layer
+     * and job model, so this service can still be used without the background-job
+     * mechanism. Every VM must be STOPPED: a disk that is copied while the VM runs
+     * is not a consistent backup.
      */
     public Result create(
-            List<LocalVm> vms,
+            List<ManagedVm> vms,
             String comment,
             ProgressListener progressListener,
             CancellationCheck cancellationCheck
     ) {
+        storageGuard.assertWritable();
         validateVms(vms);
         validateBackupRoot();
 
@@ -105,8 +129,14 @@ public class CreateBackupService {
             );
         }
 
-        LocalDateTime backupTime = LocalDateTime.now(ZoneId.systemDefault());
-        String directoryName = findAvailableDirectoryName(backupTime);
+        // Everything that can fail on the input is checked before the file system is touched.
+        OffsetDateTime backupTime = OffsetDateTime.now(ZoneId.systemDefault());
+        LocalDateTime localBackupTime = backupTime.atZoneSameInstant(ZoneId.systemDefault()).toLocalDateTime();
+        String directoryName = findAvailableDirectoryName(localBackupTime);
+        Map<VmId, String> containers = BackupContainers.assign(vms.stream()
+                .map(ManagedVm::id)
+                .toList());
+        BackupManifest manifest = buildManifest(vms, containers, comment, backupTime);
 
         Path backupDirectory = backupRoot.resolve(directoryName);
         Path incompleteDirectory = backupRoot.resolve(
@@ -132,13 +162,17 @@ public class CreateBackupService {
             for (int vmIndex = 0; vmIndex < vms.size(); vmIndex++) {
                 checkCancelled(cancellationCheck);
 
-                LocalVm vm = vms.get(vmIndex);
+                ManagedVm vm = vms.get(vmIndex);
                 progress.startVm(vm.name(), vmIndex + 1);
 
-                for (Path source : vm.backupSources()) {
+                // One container per VM: its sources are copied inside it, under their own names.
+                Path container = vmDirectory.resolve(containers.get(vm.id()));
+                Files.createDirectories(container);
+
+                for (Path source : vm.localVm().backupSources()) {
                     copySource(
                             source,
-                            vmDirectory.resolve(source.getFileName()),
+                            container.resolve(source.getFileName()),
                             progress,
                             cancellationCheck
                     );
@@ -147,25 +181,24 @@ public class CreateBackupService {
 
             checkCancelled(cancellationCheck);
 
-            writeBackupInfo(
-                    incompleteDirectory,
-                    vms,
-                    comment,
-                    backupTime
-            );
+            // The manifest is written only after all data it refers to is in place.
+            manifestWriter.writeFile(incompleteDirectory, manifest);
 
             checkCancelled(cancellationCheck);
 
+            // The marker is established only once the batch is complete, and before it is published.
+            storageGuard.ensureFormatTwoMarker(applicationVersion);
+
             Files.move(incompleteDirectory, backupDirectory);
 
-            for (LocalVm vm : vms) {
-                vmChangeStatusService.acknowledgeBackup(vm.id(), vm);
+            for (ManagedVm vm : vms) {
+                vmChangeStatusService.acknowledgeBackup(vm.id(), vm.localVm());
             }
 
             return new Result(
                     directoryName,
                     backupDirectory,
-                    backupTime
+                    localBackupTime
             );
         } catch (BackupCancelledException e) {
             throw e;
@@ -186,17 +219,16 @@ public class CreateBackupService {
         }
     }
 
-    private void validateVms(List<LocalVm> vms) {
+    private void validateVms(List<ManagedVm> vms) {
         if (vms == null || vms.isEmpty()) {
             throw new IllegalArgumentException(
                     "At least one VM must be selected"
             );
         }
 
-        Set<String> ids = new HashSet<>();
-        Set<Path> targets = new HashSet<>();
+        Set<VmId> ids = new HashSet<>();
 
-        for (LocalVm vm : vms) {
+        for (ManagedVm vm : vms) {
             if (vm == null) {
                 throw new IllegalArgumentException(
                         "VM must not be null"
@@ -209,27 +241,43 @@ public class CreateBackupService {
                 );
             }
 
-            if (vm.backupSources().isEmpty()) {
+            validateVmSources(vm);
+        }
+    }
+
+    /**
+     * Checks the state and the sources of one VM. The state is checked here as well
+     * as in the controller, so no caller can copy a VM in use.
+     */
+    private static void validateVmSources(ManagedVm vm) {
+        if (vm.status() != VmStatus.STOPPED) {
+            throw new IllegalArgumentException(
+                    "VM must be stopped before a backup: " + vm.id() + " is " + vm.status()
+            );
+        }
+
+        if (vm.localVm().backupSources().isEmpty()) {
+            throw new IllegalArgumentException(
+                    "VM has no backup sources: " + vm.id()
+            );
+        }
+
+        // Sources share one container, so their file names must be unique within the VM.
+        Set<Path> targets = new HashSet<>();
+
+        for (Path source : vm.localVm().backupSources()) {
+            Path fileName = source.getFileName();
+
+            if (fileName == null || !targets.add(fileName)) {
                 throw new IllegalArgumentException(
-                        "VM has no backup sources: " + vm.id()
+                        "Duplicate backup target in VM " + vm.id() + ": " + fileName
                 );
-            }
-
-            for (Path source : vm.backupSources()) {
-                Path fileName = source.getFileName();
-
-                if (fileName == null || !targets.add(fileName)) {
-                    throw new IllegalArgumentException(
-                            "Duplicate backup target: " + fileName
-                    );
-                }
             }
         }
     }
 
     /**
      * Ensures that the configured backup storage is currently available.
-     *
      * The backup root must already exist. It must never be created implicitly,
      * because it may represent a temporarily unavailable external drive or
      * network mount.
@@ -240,11 +288,11 @@ public class CreateBackupService {
         }
     }
 
-    private long determineTotalBytes(List<LocalVm> vms) throws IOException {
+    private long determineTotalBytes(List<ManagedVm> vms) throws IOException {
         long totalBytes = 0;
 
-        for (LocalVm vm : vms) {
-            for (Path source : vm.backupSources()) {
+        for (ManagedVm vm : vms) {
+            for (Path source : vm.localVm().backupSources()) {
                 totalBytes = Math.addExact(totalBytes, sizeOf(source));
             }
         }
@@ -448,37 +496,38 @@ public class CreateBackupService {
         }
     }
 
-    private void writeBackupInfo(
-            Path backupDirectory,
-            List<LocalVm> vms,
+    /**
+     * Builds the format-2 manifest. Its entries are checked by the manifest itself,
+     * and the writer verifies that the text reads back unchanged, so an unsafe value
+     * is refused before anything is written.
+     */
+    private BackupManifest buildManifest(
+            List<ManagedVm> vms,
+            Map<VmId, String> containers,
             String comment,
-            LocalDateTime backupTime
-    ) throws IOException {
-        StringBuilder content = new StringBuilder();
+            OffsetDateTime backupTime
+    ) {
+        List<BackupManifest.VmEntry> entries = new ArrayList<>();
 
-        content.append("Backup created by VM Backup Manager\n");
-        content.append("Time: ").append(backupTime).append('\n');
-        content.append("VMs:\n");
+        for (ManagedVm vm : vms) {
+            VmId id = vm.id();
+            String name = vm.name() == null || vm.name().isBlank() ? id.localId() : vm.name();
 
-        for (LocalVm vm : vms) {
-            content.append(vm.id()).append('\n');
+            entries.add(new BackupManifest.VmEntry(id, name, containers.get(id)));
         }
 
-        content.append('\n');
-        content.append("Comment:\n");
-
-        if (comment != null && !comment.isBlank()) {
-            content.append(comment.strip());
-        }
-
-        content.append('\n');
-
-        Files.writeString(
-                backupDirectory.resolve("BACKUP-INFO.txt"),
-                content.toString()
+        BackupManifest manifest = new BackupManifest(
+                BackupFormat.PROVIDER_AWARE,
+                Optional.of(backupTime),
+                comment == null ? "" : comment,
+                entries
         );
-    }
 
+        // Fails before any file is created if the manifest would not read back unchanged.
+        manifestWriter.write(manifest);
+
+        return manifest;
+    }
 
     private void cleanupIncompleteDirectories() {
         try (Stream<Path> entries = Files.list(backupRoot)) {
@@ -492,43 +541,6 @@ public class CreateBackupService {
         }
     }
 
-
-    @SuppressWarnings("NullableProblems")
-    private void cleanupIncompleteDirectory(Path directory) throws IOException {
-
-        if (!Files.exists(directory)) {
-            return;
-        }
-
-        try {
-            Files.walkFileTree(directory, new SimpleFileVisitor<>() {
-
-                @Override
-                public FileVisitResult visitFile(
-                        Path file,
-                        BasicFileAttributes attributes
-                ) throws IOException {
-                    Files.delete(file);
-                    return FileVisitResult.CONTINUE;
-                }
-
-                @Override
-                public FileVisitResult postVisitDirectory(
-                        Path dir,
-                        IOException exception
-                ) throws IOException {
-                    if (exception != null) {
-                        throw exception;
-                    }
-
-                    Files.delete(dir);
-                    return FileVisitResult.CONTINUE;
-                }
-            });
-        } catch (IOException ignored) {
-            // Preserve the original backup failure.
-        }
-    }
 
     @SuppressWarnings("NullableProblems")
     private void deleteDirectory(Path directory) {

@@ -1,43 +1,25 @@
 package de.fjordkommission.utmbackup.config;
 
 import org.springframework.boot.context.properties.ConfigurationProperties;
-import org.springframework.boot.context.properties.bind.DefaultValue;
 
-import java.nio.file.Path;
+import java.util.List;
 
 /**
- * Configuration of the active virtualization provider.
+ * Global VM provider selection.
+ * {@code providers} holds {@code vm.providers}, and {@code provider} holds the
+ * deprecated {@code vm.provider}. Both are null when absent. The effective list is
+ * resolved by {@link de.fjordkommission.utmbackup.provider.EnabledVmProviders}.
+ * Each provider binds its own settings, for example {@code vm.utm.*} in
+ * {@link de.fjordkommission.utmbackup.provider.utm.UtmProperties}, so this class
+ * never needs to change when a provider is added.
  */
 @ConfigurationProperties("vm")
 public record VmProperties(
-        @DefaultValue("utm") String provider,
-        Utm utm
+        List<String> providers,
+        String provider
 ) {
 
     public VmProperties {
         provider = provider == null ? null : provider.trim();
-    }
-
-    public record Utm(
-            Path directory,
-            @DefaultValue(".utm") String packageSuffix,
-            Path cli
-    ) {
-
-        public Utm {
-            directory = trim(directory);
-            packageSuffix = packageSuffix == null
-                    ? null
-                    : packageSuffix.trim();
-            cli = trim(cli);
-        }
-
-        private static Path trim(Path path) {
-            if (path == null) {
-                return null;
-            }
-
-            return Path.of(path.toString().trim());
-        }
     }
 }

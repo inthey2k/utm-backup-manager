@@ -3,6 +3,7 @@ package de.fjordkommission.utmbackup.controller;
 import de.fjordkommission.utmbackup.config.ApplicationConfigurationView;
 import de.fjordkommission.utmbackup.repository.SettingsRepository;
 import de.fjordkommission.utmbackup.service.*;
+import de.fjordkommission.utmbackup.storage.BackupStorageGuard;
 
 import org.springframework.boot.info.BuildProperties;
 import org.springframework.context.MessageSource;
@@ -22,6 +23,7 @@ public class BackupController {
     private final MessageSource messageSource;
     private final SettingsRepository settings;
     private final BuildProperties buildProperties;
+    private final BackupStorageGuard storageGuard;
 
     private static final String REDIRECT_HOME = "redirect:/";
     private static final String FLASH_MESSAGE = "message";
@@ -34,7 +36,8 @@ public class BackupController {
             BackupJobService backupJobService,
             ApplicationConfigurationView configurationView,
             MessageSource messageSource,
-            BuildProperties buildProperties
+            BuildProperties buildProperties,
+            BackupStorageGuard storageGuard
     ) {
         this.scanner = scanner;
         this.service = service;
@@ -43,6 +46,7 @@ public class BackupController {
         this.configurationView = configurationView;
         this.messageSource = messageSource;
         this.buildProperties = buildProperties;
+        this.storageGuard = storageGuard;
     }
     @GetMapping("/")
     String index(Model model) {
@@ -51,6 +55,8 @@ public class BackupController {
         model.addAttribute("configuration", configuration);
         model.addAttribute("backupRoot", configuration.backupRoot().toString());
         model.addAttribute("providerName", configuration.providerName());
+        // The guard stays authoritative for every change; the page only reflects its state.
+        model.addAttribute("storageStatus", storageGuard.status());
         model.addAttribute(
                 "backupJobRunning",
                 backupJobService.currentJob()

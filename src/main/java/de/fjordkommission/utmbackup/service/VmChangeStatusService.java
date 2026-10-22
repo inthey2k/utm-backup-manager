@@ -1,6 +1,7 @@
 package de.fjordkommission.utmbackup.service;
 
 import de.fjordkommission.utmbackup.model.LocalVm;
+import de.fjordkommission.utmbackup.model.VmId;
 import de.fjordkommission.utmbackup.model.VmChangeStatus;
 import de.fjordkommission.utmbackup.repository.VmStateRepository;
 import org.springframework.stereotype.Service;
@@ -24,8 +25,12 @@ public class VmChangeStatusService {
         this.repository = repository;
     }
 
+    /**
+     * Compares the VM with its acknowledged state. The state is keyed by the canonical
+     * {@link VmId}.
+     */
     public VmChangeStatus determine(
-            String technicalName,
+            VmId vmId,
             LocalVm vm,
             boolean hasBackup
     ) {
@@ -38,7 +43,7 @@ public class VmChangeStatusService {
         }
 
         Optional<VmStateRepository.State> stored =
-                repository.find(technicalName);
+                repository.find(vmId);
 
         if (stored.isEmpty()) {
             return VmChangeStatus.UNKNOWN;
@@ -58,7 +63,7 @@ public class VmChangeStatusService {
     /**
      * Records the current VM state after a successful backup.
      */
-    public void acknowledgeBackup(String technicalName, LocalVm vm) {
+    public void acknowledgeBackup(VmId vmId, LocalVm vm) {
         if (vm == null || vm.backupSources().isEmpty()) {
             throw new IllegalArgumentException(
                     "VM must have at least one backup source"
@@ -69,13 +74,13 @@ public class VmChangeStatusService {
             long currentMtime = newestModificationTime(vm);
 
             repository.save(
-                    technicalName,
+                    vmId,
                     currentMtime,
                     VmStateRepository.Acknowledgement.BACKED_UP
             );
         } catch (IOException e) {
             throw new IllegalStateException(
-                    "VM state could not be determined for: " + technicalName,
+                    "VM state could not be determined for: " + vmId,
                     e
             );
         }
@@ -99,7 +104,7 @@ public class VmChangeStatusService {
 
     /**
      * Includes both the source itself and all descendants. This matches the
-     * existing UTM backup-state semantics where directory mtimes also count.
+     * existing backup-state semantics where directory mtimes also count.
      */
     private long newestModificationTime(Path source) throws IOException {
         try (Stream<Path> paths = Files.walk(source)) {

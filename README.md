@@ -10,9 +10,9 @@ without a proprietary backup format. VM packages are copied to a
 configurable backup directory, while SQLite is used only for
 supplemental application metadata.
 
-> **Version 1.0.0:** UTM on macOS is currently the only implemented VM
-> provider. The application contains a provider abstraction so
-> additional virtualization platforms can be added in future versions.
+> **Providers:** UTM on macOS and QEMU are implemented. The application
+> contains a provider abstraction so additional virtualization platforms
+> can be added in future versions.
 ## Roadmap
 
 Planned features and upcoming improvements are listed in the
@@ -20,8 +20,8 @@ Planned features and upcoming improvements are listed in the
 
 ## Features
 
--   Detects local UTM virtual machines and shows whether they are
-    running or stopped
+-   Detects local UTM and QEMU virtual machines and shows whether they
+    are running or stopped
 -   Creates backups of one or multiple VMs in a single batch
 -   Only allows backups of stopped VMs
 -   Displays backup progress and allows a running backup job to be
@@ -49,6 +49,7 @@ For version 1.0.0:
 
 -   macOS
 -   UTM installed, including the `utmctl` command-line tool
+-   For QEMU VMs (optional): a directory with one subdirectory per VM
 -   Java 21
 -   Maven when building or running from source
 -   A backup destination with enough free space
@@ -106,6 +107,23 @@ This is the CLI executable of the Virtualization tool you use, with which the ap
 communicates to fetch the list of VMs and request their status.
 
 The paths may of course differ depending on the installation.
+### QEMU (optional)
+
+QEMU VMs are read from a directory that contains one subdirectory per VM.
+Each VM directory must contain a top-level `.qcow2` or `.raw` disk image,
+and its name is the VM id. Enable the provider next to UTM and set the
+directory:
+
+```properties
+vm.providers=utm,qemu
+vm.qemu.directory=/path/to/your/qemu/vms
+```
+
+A QEMU VM is reported as running when a visible process references its
+directory. Only stopped QEMU VMs can be backed up. A missing `vm.qemu.directory`
+is reported in the overview and does not stop UTM. Details and the status
+limitations are in [docs/architecture/vm-provider.md](docs/architecture/vm-provider.md).
+
 #### Notes
 The real `application.properties` intentionally remains outside
 `src/main/resources` and is excluded from Git. This prevents
@@ -224,6 +242,23 @@ since its most recent acknowledged backup. This is a practical
 indication for deciding whether another backup may be useful; it is not
 a cryptographic comparison of complete VM contents.
 
+## Status indicators in the overview
+
+-   Each VM shows a provider badge, such as `UTM`, next to its name.
+-   The header shows whether each enabled provider was queried successfully
+    (`Active`) or not (`Unavailable`). A provider whose VMs cannot be listed,
+    or whose VM states are incomplete, is explained in a warning above the
+    overview. Its existing backups stay visible.
+-   VMs of providers that the backup writer does not support yet are shown,
+    but they cannot be selected for a backup.
+-   If the backup storage is read-only, a warning explains why. Existing
+    backups stay readable, while creating backups and the Stable, note and
+    delete actions are disabled. The application enforces these rules on
+    the server as well.
+-   Batches that could not be shown completely are listed above the
+    overview. Their affected backups are marked `BATCH ISSUE`. A backup whose
+    state file cannot be read is kept protected as Stable.
+
 ## Safety and data integrity
 
 The application follows deliberately conservative rules:
@@ -243,10 +278,14 @@ independently before relying on them for disaster recovery.
 
 ## Known limitations in 1.0.0
 
--   **Currently, UTM on macOS is the only implemented VM provider.** The provider
+-   **Only UTM on macOS and QEMU VMs in a directory are implemented.** The provider
     architecture is extensible, but other virtualization platforms are
     not yet supported. Please see [CONTRIBUTING.md](CONTRIBUTING.md) if you would 
     like to extend the application with new providers.
+-   **QEMU runtime state is inferred from processes.** A QEMU process whose
+    arguments the operating system hides, for example one started with sudo,
+    makes the QEMU VMs it might belong to show as UNKNOWN, and those VMs cannot
+    be backed up until the process is gone.
 -   **VM shutdown is not yet automated.** Running VMs must be stopped before
     starting their backup. In a future release, the application will ask if it
     should shut down a VM before backing it up.
@@ -318,7 +357,8 @@ be deleted.
 ### Writing a Note to a Backup
 When you create a new backup, you can write a comment to it. This comment applies to all VMs that are 
 copied with that backup. If you want to add more info to an individual VM backup, you can use the "Note" 
-button in each card to enter info on a certain backup. 
+button in each card to enter info on a certain backup. For backups in the current format, the note and the Stable
+flag are stored in the backup itself (`BACKUP-STATE.properties`), so they travel with the backup medium.
 
 ![UTM Backup Manager - Edit Note to Backup](docs/screenshots/07-edit-note-to-backup.png)
 

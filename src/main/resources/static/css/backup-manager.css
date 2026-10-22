@@ -7,6 +7,7 @@
 * { box-sizing: border-box; }
 
 :root {
+    --carousel-side-inset: 46px;
     --bg: #0b0e13;
     --surface: #101620;
     --surface-light: #121722;
@@ -77,35 +78,55 @@ code { overflow-wrap: anywhere; }
 }
 
 .page-header-main {
+    position: sticky;
+    z-index: 30;
+    top: 0;
+
     display: flex;
-    align-items: flex-start;
+    align-items: center;
     justify-content: space-between;
     gap: 24px;
+
+    height: 86px;
+
+    margin-inline: calc(var(--carousel-side-inset) * -1);
+    padding: 12px var(--carousel-side-inset);
+
+    border-bottom: 1px solid var(--border);
+    background: var(--bg);
+    box-shadow: 0 6px 18px rgba(0, 0, 0, .18);
 }
 
 .page-title {
-    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
 }
 
 .page-title h1 {
     margin: 0;
+    line-height: 1.15;
 }
 
 .page-title p {
-    margin: 5px 0 7px;
+    margin: 5px 0 0;
     color: var(--muted);
+    line-height: 1.2;
 }
 
 .header-paths {
     display: flex;
     flex-direction: column;
     gap: 2px;
+    margin-top: 10px;
+    padding-inline: var(--carousel-side-inset);
     color: var(--muted);
     font-size: .75rem;
 }
 
 .header-path {
     display: flex;
+    align-items: center;
     gap: 6px;
     min-width: 0;
 }
@@ -307,6 +328,57 @@ code { overflow-wrap: anywhere; }
 .err {
     color: #fda4af;
     border: 1px solid #713341;
+}
+
+/* Warning banner for read-only storage, provider problems and batch issues.
+   Uses the amber palette of the retention warnings. */
+.notice {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    margin: 12px 0;
+    padding: 9px 12px;
+    border: 1px solid #d89b3c;
+    border-radius: 8px;
+    color: var(--text-muted);
+    font-size: .85rem;
+    line-height: 1.4;
+}
+
+.notice strong {
+    color: #e5ad55;
+}
+
+.notice small {
+    color: var(--muted);
+    font-size: .8rem;
+    overflow-wrap: anywhere;
+}
+
+.notice ul {
+    margin: 4px 0 0;
+    padding-left: 18px;
+}
+
+.notice code {
+    color: var(--text);
+}
+
+.storage-state-value.read-only,
+.provider-state.error {
+    color: #e5ad55;
+    font-weight: 700;
+}
+
+.provider-state {
+    font-weight: 700;
+}
+
+.provider-state.ok {
+    margin: 0;
+    padding: 2px 6px;
+    border-radius: 4px;
+    color: var(--success);
 }
 
 .flash-message {
@@ -550,20 +622,140 @@ code { overflow-wrap: anywhere; }
 
 /* ---------- VM overview ---------- */
 
-.vm-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+.vm-carousel-source {
+    display: flex;
     gap: 1px;
+    overflow: hidden;
+}
+
+.provider-groups {
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+}
+
+.provider-group {
+    min-width: 0;
+}
+
+.provider-group-header {
+    display: flex;
+    align-items: center;
+    min-height: 26px;
+    margin-bottom: 7px;
+    padding-inline: var(--carousel-side-inset);
+}
+
+.provider-group-title {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+}
+
+.provider-group-title h2 {
+    margin: 0;
+    font-size: 1rem;
+    line-height: 1.2;
+}
+
+.vm-carousel-row {
+    display: grid;
+    grid-template-columns: 38px minmax(0, 1fr) 38px;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+}
+
+.provider-carousel-button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 38px;
+    height: 84px;
+    padding: 0;
     border: 1px solid var(--border);
     border-radius: 8px;
-    overflow: hidden;
-    background: var(--border);
+    background: var(--surface);
+    color: var(--text);
+    font-size: 2rem;
+    font-weight: 400;
+    line-height: 1;
+    box-shadow: 0 6px 18px rgba(0, 0, 0, .22);
+}
+
+.provider-carousel-button:hover {
+    background: var(--surface-hover);
+    color: var(--accent);
+}
+
+.provider-carousel-button[hidden] {
+    visibility: hidden;
+}
+
+.vm-carousel-row.compact {
+    grid-template-columns: 38px max-content 38px;
+    width: 100%;
+    max-width: 100%;
+    gap: 8px;
+}
+
+.vm-carousel-row.compact .provider-carousel-button {
+    visibility: hidden;
+}
+
+.vm-carousel-row.compact .vm-carousel {
+    grid-column: 2;
+    width: max-content;
+    max-width: 100%;
+    overflow-x: hidden;
+}
+
+.vm-carousel {
+    display: flex;
+    align-items: stretch;
+    gap: 0;
+    min-width: 0;
+    overflow-x: auto;
+    overflow-y: hidden;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: var(--bg);
+    scroll-behavior: smooth;
+    scroll-snap-type: x proximity;
+    scrollbar-width: thin;
+    scrollbar-color: var(--muted) transparent;
+}
+
+.vm-carousel::-webkit-scrollbar {
+    height: 7px;
+}
+
+.vm-carousel::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.vm-carousel::-webkit-scrollbar-thumb {
+    border-radius: 999px;
+    background: var(--muted);
 }
 
 .vm-column {
-    min-width: 0;
+    flex: 0 0 240px;
+    min-width: 240px;
     background: var(--bg);
+    scroll-snap-align: start;
+    border-right: 1px solid var(--border);
 }
+
+.vm-column:last-child {
+    border-right: 0;
+}
+
+.vm-column-ghost {
+    pointer-events: none;
+}
+
 
 .vm-header {
     display: flex;
@@ -581,10 +773,16 @@ code { overflow-wrap: anywhere; }
 
 .vm-name {
     display: grid;
-    grid-template-columns: 9px auto 9px;
+    grid-template-columns: 9px auto auto;
     align-items: center;
     column-gap: 7px;
     margin-bottom: 3px;
+}
+
+.vm-name .provider-badge {
+    grid-column: 3;
+    justify-self: start;
+    align-self: flex-start;
 }
 
 .vm-name .vm-status {
@@ -766,7 +964,10 @@ code { overflow-wrap: anywhere; }
 
 /* ---------- Retention markers ---------- */
 
-.retention-candidate {
+/* Pill markers. The provider badge reuses this shape in neutral colours, the batch issue in the danger colour. */
+.retention-candidate,
+.batch-issue,
+.provider-badge {
     display: inline-block;
     margin-bottom: 4px;
     padding: 2px 5px;
@@ -776,6 +977,20 @@ code { overflow-wrap: anywhere; }
     font-size: .68rem;
     font-weight: 700;
     letter-spacing: .05em;
+}
+
+.provider-badge {
+    margin-bottom: 0;
+    border-color: var(--border);
+    color: var(--muted);
+    line-height: 1.2;
+    vertical-align: middle;
+    white-space: nowrap;
+}
+
+.batch-issue {
+    border-color: var(--danger);
+    color: var(--danger);
 }
 
 .retention-delete-info {
@@ -853,13 +1068,15 @@ code { overflow-wrap: anywhere; }
     color: var(--danger);
 }
 
-.icon-button.disabled {
+.icon-button.disabled,
+.icon-button:disabled {
     color: #46505f;
     cursor: not-allowed;
     opacity: .45;
 }
 
-.icon-button.disabled:hover {
+.icon-button.disabled:hover,
+.icon-button:disabled:hover {
     background: transparent;
     color: #46505f;
 }
@@ -954,7 +1171,7 @@ code { overflow-wrap: anywhere; }
 
 .backup-vm-option {
     display: grid;
-    grid-template-columns: auto auto minmax(0, 1fr) 7rem 6rem;
+    grid-template-columns: auto auto minmax(0, 1fr) 7rem 8rem;
     align-items: center;
     gap: .75rem;
     padding: .65rem .75rem;
@@ -1144,6 +1361,22 @@ button:disabled {
 /* ---------- Smaller displays ---------- */
 
 @media (max-width: 900px) {
+    :root {
+        --carousel-side-inset: 37px;
+    }
+
+    .vm-carousel-row,
+    .vm-carousel-row.compact {
+        grid-template-columns: 32px minmax(0, max-content) 32px;
+        gap: 5px;
+    }
+
+    .provider-carousel-button {
+        width: 32px;
+        height: 72px;
+        font-size: 1.7rem;
+    }
+
     main { padding: 16px; }
 
     .page-header {
@@ -1159,7 +1392,8 @@ button:disabled {
         text-align: left;
     }
 
-    .vm-grid {
-        grid-template-columns: repeat(auto-fit, minmax(175px, 1fr));
+    .vm-column {
+        flex-basis: 220px;
+        min-width: 220px;
     }
 }

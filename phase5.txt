@@ -1,0 +1,347 @@
+[INFO] Scanning for projects...
+[INFO] Loaded 24175 auto-discovered prefixes for remote repository central (prefixes-central.txt)
+[INFO] 
+[INFO] ---------------< de.fjordkommission:utm-backup-manager >----------------
+[INFO] Building utm-backup-manager 1.4.0
+[INFO]   from pom.xml
+[INFO] --------------------------------[ jar ]---------------------------------
+[INFO] 
+[INFO] --- clean:3.5.0:clean (default-clean) @ utm-backup-manager ---
+[INFO] Deleting /Users/sascha/IdeaProjects/utm-backup-manager/target
+[INFO] 
+[INFO] --- jacoco:0.8.15:prepare-agent (default) @ utm-backup-manager ---
+[INFO] Loaded 74 auto-discovered prefixes for remote repository apache.snapshots (prefixes-apache.snapshots.txt)
+[INFO] argLine set to -javaagent:/Users/sascha/.m2/repository/org/jacoco/org.jacoco.agent/0.8.15/org.jacoco.agent-0.8.15-runtime.jar=destfile=/Users/sascha/IdeaProjects/utm-backup-manager/target/jacoco.exec
+[INFO] 
+[INFO] --- spring-boot:4.1.1:build-info (default) @ utm-backup-manager ---
+[INFO] Loaded 50 auto-discovered prefixes for remote repository ow2-snapshot (prefixes-ow2-snapshot.txt)
+[INFO] 
+[INFO] --- resources:3.5.0:resources (default-resources) @ utm-backup-manager ---
+[INFO] Copying 0 resource from src/main/resources to target/classes
+[INFO] Copying 6 resources from src/main/resources to target/classes
+[INFO] 
+[INFO] --- compiler:3.15.0:compile (default-compile) @ utm-backup-manager ---
+[INFO] Recompiling the module because of changed source code.
+[INFO] Compiling 67 source files with javac [debug parameters release 21] to target/classes
+[INFO] 
+[INFO] --- resources:3.5.0:testResources (default-testResources) @ utm-backup-manager ---
+[INFO] Copying 1 resource from src/test/resources to target/test-classes
+[INFO] 
+[INFO] --- compiler:3.15.0:testCompile (default-testCompile) @ utm-backup-manager ---
+[INFO] Recompiling the module because of changed dependency.
+[INFO] Compiling 34 source files with javac [debug parameters release 21] to target/test-classes
+[INFO] 
+[INFO] --- surefire:3.5.6:test (default-test) @ utm-backup-manager ---
+[INFO] Using auto detected provider org.apache.maven.surefire.junitplatform.JUnitPlatformProvider
+[INFO] 
+[INFO] -------------------------------------------------------
+[INFO]  T E S T S
+[INFO] -------------------------------------------------------
+[INFO] Running de.fjordkommission.utmbackup.config.BackupPropertiesTest
+[INFO] Tests run: 1, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.041 s -- in de.fjordkommission.utmbackup.config.BackupPropertiesTest
+[INFO] Running de.fjordkommission.utmbackup.provider.VmProviderEnabledConditionTest
+Mockito is currently self-attaching to enable the inline-mock-maker. This will no longer work in future releases of the JDK. Please add Mockito as an agent to your build as described in Mockito's documentation: https://javadoc.io/doc/org.mockito/mockito-core/latest/org.mockito/org/mockito/Mockito.html#0.3
+OpenJDK 64-Bit Server VM warning: Sharing is only supported for boot loader classes because bootstrap classpath has been appended
+WARNING: A Java agent has been loaded dynamically (/Users/sascha/.m2/repository/net/bytebuddy/byte-buddy-agent/1.18.11/byte-buddy-agent-1.18.11.jar)
+WARNING: If a serviceability tool is in use, please run with -XX:+EnableDynamicAgentLoading to hide this warning
+WARNING: If a serviceability tool is not in use, please run with -Djdk.instrument.traceUsage for more information
+WARNING: Dynamic loading of agents will be disallowed by default in a future release
+[INFO] Tests run: 1, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.600 s -- in de.fjordkommission.utmbackup.provider.VmProviderEnabledConditionTest
+[INFO] Running de.fjordkommission.utmbackup.provider.VmProviderActivationTest
+15:31:57.688 [main] WARN org.springframework.context.annotation.AnnotationConfigApplicationContext -- Exception encountered during context initialization - cancelling refresh attempt: org.springframework.beans.factory.BeanDefinitionStoreException: Failed to process import candidates for configuration class [de.fjordkommission.utmbackup.provider.VmProviderActivationTest$ProviderConfiguration]: Invalid provider id 'qemu_x' in vm.providers: use only letters, digits and hyphens
+15:31:57.703 [main] WARN de.fjordkommission.utmbackup.provider.VmProviderRegistry -- The property vm.provider is deprecated and will be removed in a future release. Use vm.providers instead, for example vm.providers=utm.
+15:31:57.745 [main] WARN org.springframework.context.annotation.AnnotationConfigApplicationContext -- Exception encountered during context initialization - cancelling refresh attempt: org.springframework.beans.factory.BeanCreationException: Error creating bean with name 'de.fjordkommission.utmbackup.provider.utm.UtmVmProvider': Failed to instantiate [de.fjordkommission.utmbackup.provider.utm.UtmVmProvider]: Constructor threw exception
+15:31:57.757 [main] WARN org.springframework.context.annotation.AnnotationConfigApplicationContext -- Exception encountered during context initialization - cancelling refresh attempt: org.springframework.beans.factory.BeanCreationException: Error creating bean with name 'de.fjordkommission.utmbackup.provider.VmProviderRegistry': Failed to instantiate [de.fjordkommission.utmbackup.provider.VmProviderRegistry]: Constructor threw exception
+15:31:57.762 [main] WARN org.springframework.context.annotation.AnnotationConfigApplicationContext -- Exception encountered during context initialization - cancelling refresh attempt: org.springframework.beans.factory.BeanCreationException: Error creating bean with name 'de.fjordkommission.utmbackup.provider.VmProviderRegistry': Failed to instantiate [de.fjordkommission.utmbackup.provider.VmProviderRegistry]: Constructor threw exception
+15:31:57.771 [main] WARN org.springframework.context.annotation.AnnotationConfigApplicationContext -- Exception encountered during context initialization - cancelling refresh attempt: org.springframework.beans.factory.BeanCreationException: Error creating bean with name 'de.fjordkommission.utmbackup.provider.VmProviderRegistry': Failed to instantiate [de.fjordkommission.utmbackup.provider.VmProviderRegistry]: Constructor threw exception
+15:31:57.777 [main] WARN de.fjordkommission.utmbackup.provider.VmProviderRegistry -- The property vm.provider is deprecated and will be removed in a future release. Use vm.providers instead, for example vm.providers=utm.
+[INFO] Tests run: 16, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.406 s -- in de.fjordkommission.utmbackup.provider.VmProviderActivationTest
+[INFO] Running de.fjordkommission.utmbackup.provider.VmProviderRegistryTest
+15:31:57.783 [main] WARN de.fjordkommission.utmbackup.provider.VmProviderRegistry -- The property vm.provider is deprecated and will be removed in a future release. Use vm.providers instead, for example vm.providers=utm.
+[INFO] Tests run: 11, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.015 s -- in de.fjordkommission.utmbackup.provider.VmProviderRegistryTest
+[INFO] Running de.fjordkommission.utmbackup.provider.EnabledVmProvidersTest
+[INFO] Tests run: 19, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.031 s -- in de.fjordkommission.utmbackup.provider.EnabledVmProvidersTest
+[INFO] Running de.fjordkommission.utmbackup.provider.utm.UtmVmProviderCharacterizationTest
+[INFO] Tests run: 12, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.202 s -- in de.fjordkommission.utmbackup.provider.utm.UtmVmProviderCharacterizationTest
+[INFO] Running de.fjordkommission.utmbackup.storage.BackupStorageMetadataReaderTest
+[INFO] Tests run: 22, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.033 s -- in de.fjordkommission.utmbackup.storage.BackupStorageMetadataReaderTest
+[INFO] Running de.fjordkommission.utmbackup.storage.BackupManifestParserTest
+[INFO] Tests run: 44, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.033 s -- in de.fjordkommission.utmbackup.storage.BackupManifestParserTest
+[INFO] Running de.fjordkommission.utmbackup.storage.BackupStorageEvaluatorTest
+[INFO] Tests run: 11, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.028 s -- in de.fjordkommission.utmbackup.storage.BackupStorageEvaluatorTest
+[INFO] Running de.fjordkommission.utmbackup.storage.BackupStorageMetadataWriterTest
+[INFO] Tests run: 9, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.012 s -- in de.fjordkommission.utmbackup.storage.BackupStorageMetadataWriterTest
+[INFO] Running de.fjordkommission.utmbackup.storage.BackupManifestReaderTest
+[INFO] Tests run: 4, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.005 s -- in de.fjordkommission.utmbackup.storage.BackupManifestReaderTest
+[INFO] Running de.fjordkommission.utmbackup.storage.BackupStorageGuardTest
+[INFO] Tests run: 7, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.007 s -- in de.fjordkommission.utmbackup.storage.BackupStorageGuardTest
+[INFO] Running de.fjordkommission.utmbackup.storage.BackupManifestWriterTest
+[INFO] Tests run: 9, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.005 s -- in de.fjordkommission.utmbackup.storage.BackupManifestWriterTest
+[INFO] Running de.fjordkommission.utmbackup.controller.BackupControllerIntegrationTest
+15:31:58.179 [main] INFO org.springframework.test.context.support.AnnotationConfigContextLoaderUtils -- Could not detect default configuration classes for test class [de.fjordkommission.utmbackup.controller.BackupControllerIntegrationTest]: BackupControllerIntegrationTest does not declare any static, non-private, non-final, nested classes annotated with @Configuration.
+15:31:58.227 [main] INFO org.springframework.boot.test.context.SpringBootTestContextBootstrapper -- Found @SpringBootConfiguration de.fjordkommission.utmbackup.UtmBackupManagerApplication for test class de.fjordkommission.utmbackup.controller.BackupControllerIntegrationTest
+15:31:58.234 [main] INFO org.springframework.test.context.support.AnnotationConfigContextLoaderUtils -- Could not detect default configuration classes for test class [de.fjordkommission.utmbackup.controller.BackupControllerIntegrationTest]: BackupControllerIntegrationTest does not declare any static, non-private, non-final, nested classes annotated with @Configuration.
+15:31:58.235 [main] INFO org.springframework.test.context.support.AnnotationConfigContextLoaderUtils -- Could not detect default configuration classes for test class [de.fjordkommission.utmbackup.AbstractIntegrationTest]: AbstractIntegrationTest does not declare any static, non-private, non-final, nested classes annotated with @Configuration.
+15:31:58.236 [main] INFO org.springframework.boot.test.context.SpringBootTestContextBootstrapper -- Found @SpringBootConfiguration de.fjordkommission.utmbackup.UtmBackupManagerApplication for test class de.fjordkommission.utmbackup.controller.BackupControllerIntegrationTest
+
+  .   ____          _            __ _ _
+ /\\ / ___'_ __ _ _(_)_ __  __ _ \ \ \ \
+( ( )\___ | '_ | '_| | '_ \/ _` | \ \ \ \
+ \\/  ___)| |_)| | | | | || (_| |  ) ) ) )
+  '  |____| .__|_| |_|_| |_\__, | / / / /
+ =========|_|==============|___/=/_/_/_/
+
+ :: Spring Boot ::                (v4.1.1)
+
+2026-10-21T15:31:58.354+02:00  INFO 13643 --- [utm-backup-manager] [           main] d.f.u.c.BackupControllerIntegrationTest  : Starting BackupControllerIntegrationTest using Java 27 with PID 13643 (started by sascha in /Users/sascha/IdeaProjects/utm-backup-manager)
+2026-10-21T15:31:58.355+02:00  INFO 13643 --- [utm-backup-manager] [           main] d.f.u.c.BackupControllerIntegrationTest  : The following 1 profile is active: "test"
+2026-10-21T15:31:58.857+02:00  INFO 13643 --- [utm-backup-manager] [           main] o.s.b.w.a.WelcomePageHandlerMapping      : Adding welcome page template: index
+2026-10-21T15:31:59.056+02:00  INFO 13643 --- [utm-backup-manager] [           main] o.s.b.t.m.w.SpringBootMockServletContext : Initializing Spring TestDispatcherServlet ''
+2026-10-21T15:31:59.056+02:00  INFO 13643 --- [utm-backup-manager] [           main] o.s.t.web.servlet.TestDispatcherServlet  : Initializing Servlet ''
+2026-10-21T15:31:59.057+02:00  INFO 13643 --- [utm-backup-manager] [           main] o.s.t.web.servlet.TestDispatcherServlet  : Completed initialization in 0 ms
+2026-10-21T15:31:59.068+02:00  INFO 13643 --- [utm-backup-manager] [           main] d.f.u.c.BackupControllerIntegrationTest  : Started BackupControllerIntegrationTest in 0.812 seconds (process running for 3.15)
+[INFO] Tests run: 7, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 1.533 s -- in de.fjordkommission.utmbackup.controller.BackupControllerIntegrationTest
+[INFO] Running de.fjordkommission.utmbackup.controller.RetentionCleanupJobControllerTest
+[INFO] Tests run: 3, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.085 s -- in de.fjordkommission.utmbackup.controller.RetentionCleanupJobControllerTest
+[INFO] Running de.fjordkommission.utmbackup.controller.BackupStartControllerTest
+[INFO] Tests run: 13, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.135 s -- in de.fjordkommission.utmbackup.controller.BackupStartControllerTest
+[INFO] Running de.fjordkommission.utmbackup.controller.VmControllerTest
+2026-10-21T15:31:59.948+02:00  INFO 13643 --- [utm-backup-manager] [           main] o.s.mock.web.MockServletContext          : Initializing Spring TestDispatcherServlet ''
+2026-10-21T15:31:59.948+02:00  INFO 13643 --- [utm-backup-manager] [           main] o.s.t.web.servlet.TestDispatcherServlet  : Initializing Servlet ''
+2026-10-21T15:31:59.948+02:00  INFO 13643 --- [utm-backup-manager] [           main] o.s.t.web.servlet.TestDispatcherServlet  : Completed initialization in 0 ms
+2026-10-21T15:31:59.954+02:00  INFO 13643 --- [utm-backup-manager] [           main] o.s.mock.web.MockServletContext          : Initializing Spring TestDispatcherServlet ''
+2026-10-21T15:31:59.955+02:00  INFO 13643 --- [utm-backup-manager] [           main] o.s.t.web.servlet.TestDispatcherServlet  : Initializing Servlet ''
+2026-10-21T15:31:59.955+02:00  INFO 13643 --- [utm-backup-manager] [           main] o.s.t.web.servlet.TestDispatcherServlet  : Completed initialization in 0 ms
+2026-10-21T15:31:59.960+02:00  INFO 13643 --- [utm-backup-manager] [           main] o.s.mock.web.MockServletContext          : Initializing Spring TestDispatcherServlet ''
+2026-10-21T15:31:59.960+02:00  INFO 13643 --- [utm-backup-manager] [           main] o.s.t.web.servlet.TestDispatcherServlet  : Initializing Servlet ''
+2026-10-21T15:31:59.960+02:00  INFO 13643 --- [utm-backup-manager] [           main] o.s.t.web.servlet.TestDispatcherServlet  : Completed initialization in 0 ms
+2026-10-21T15:31:59.963+02:00  INFO 13643 --- [utm-backup-manager] [           main] o.s.mock.web.MockServletContext          : Initializing Spring TestDispatcherServlet ''
+2026-10-21T15:31:59.964+02:00  INFO 13643 --- [utm-backup-manager] [           main] o.s.t.web.servlet.TestDispatcherServlet  : Initializing Servlet ''
+2026-10-21T15:31:59.964+02:00  INFO 13643 --- [utm-backup-manager] [           main] o.s.t.web.servlet.TestDispatcherServlet  : Completed initialization in 0 ms
+[INFO] Tests run: 4, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.048 s -- in de.fjordkommission.utmbackup.controller.VmControllerTest
+[INFO] Running de.fjordkommission.utmbackup.model.VmIdTest
+[INFO] Tests run: 37, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.021 s -- in de.fjordkommission.utmbackup.model.VmIdTest
+[INFO] Running de.fjordkommission.utmbackup.service.BackupAttributionCharacterizationIntegrationTest
+2026-10-21T15:31:59.987+02:00  INFO 13643 --- [utm-backup-manager] [           main] t.c.s.AnnotationConfigContextLoaderUtils : Could not detect default configuration classes for test class [de.fjordkommission.utmbackup.service.BackupAttributionCharacterizationIntegrationTest]: BackupAttributionCharacterizationIntegrationTest does not declare any static, non-private, non-final, nested classes annotated with @Configuration.
+2026-10-21T15:32:00.006+02:00  INFO 13643 --- [utm-backup-manager] [           main] .b.t.c.SpringBootTestContextBootstrapper : Found @SpringBootConfiguration de.fjordkommission.utmbackup.UtmBackupManagerApplication for test class de.fjordkommission.utmbackup.service.BackupAttributionCharacterizationIntegrationTest
+2026-10-21T15:32:00.007+02:00  INFO 13643 --- [utm-backup-manager] [           main] t.c.s.AnnotationConfigContextLoaderUtils : Could not detect default configuration classes for test class [de.fjordkommission.utmbackup.service.BackupAttributionCharacterizationIntegrationTest]: BackupAttributionCharacterizationIntegrationTest does not declare any static, non-private, non-final, nested classes annotated with @Configuration.
+2026-10-21T15:32:00.007+02:00  INFO 13643 --- [utm-backup-manager] [           main] t.c.s.AnnotationConfigContextLoaderUtils : Could not detect default configuration classes for test class [de.fjordkommission.utmbackup.AbstractIntegrationTest]: AbstractIntegrationTest does not declare any static, non-private, non-final, nested classes annotated with @Configuration.
+2026-10-21T15:32:00.008+02:00  INFO 13643 --- [utm-backup-manager] [           main] .b.t.c.SpringBootTestContextBootstrapper : Found @SpringBootConfiguration de.fjordkommission.utmbackup.UtmBackupManagerApplication for test class de.fjordkommission.utmbackup.service.BackupAttributionCharacterizationIntegrationTest
+
+  .   ____          _            __ _ _
+ /\\ / ___'_ __ _ _(_)_ __  __ _ \ \ \ \
+( ( )\___ | '_ | '_| | '_ \/ _` | \ \ \ \
+ \\/  ___)| |_)| | | | | || (_| |  ) ) ) )
+  '  |____| .__|_| |_|_| |_\__, | / / / /
+ =========|_|==============|___/=/_/_/_/
+
+ :: Spring Boot ::                (v4.1.1)
+
+2026-10-21T15:32:00.030+02:00  INFO 13643 --- [utm-backup-manager] [           main] tributionCharacterizationIntegrationTest : Starting BackupAttributionCharacterizationIntegrationTest using Java 27 with PID 13643 (started by sascha in /Users/sascha/IdeaProjects/utm-backup-manager)
+2026-10-21T15:32:00.030+02:00  INFO 13643 --- [utm-backup-manager] [           main] tributionCharacterizationIntegrationTest : The following 1 profile is active: "test"
+2026-10-21T15:32:00.158+02:00  INFO 13643 --- [utm-backup-manager] [           main] o.s.b.w.a.WelcomePageHandlerMapping      : Adding welcome page template: index
+2026-10-21T15:32:00.189+02:00  INFO 13643 --- [utm-backup-manager] [           main] tributionCharacterizationIntegrationTest : Started BackupAttributionCharacterizationIntegrationTest in 0.178 seconds (process running for 4.271)
+[INFO] Tests run: 1, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.212 s -- in de.fjordkommission.utmbackup.service.BackupAttributionCharacterizationIntegrationTest
+[INFO] Running de.fjordkommission.utmbackup.service.BackupWriteGuardIntegrationTest
+[INFO] Tests run: 10, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.224 s -- in de.fjordkommission.utmbackup.service.BackupWriteGuardIntegrationTest
+[INFO] Running de.fjordkommission.utmbackup.service.BackupScannerIntegrationTest
+2026-10-21T15:32:00.424+02:00  INFO 13643 --- [utm-backup-manager] [           main] t.c.s.AnnotationConfigContextLoaderUtils : Could not detect default configuration classes for test class [de.fjordkommission.utmbackup.service.BackupScannerIntegrationTest]: BackupScannerIntegrationTest does not declare any static, non-private, non-final, nested classes annotated with @Configuration.
+2026-10-21T15:32:00.425+02:00  INFO 13643 --- [utm-backup-manager] [           main] .b.t.c.SpringBootTestContextBootstrapper : Found @SpringBootConfiguration de.fjordkommission.utmbackup.UtmBackupManagerApplication for test class de.fjordkommission.utmbackup.service.BackupScannerIntegrationTest
+2026-10-21T15:32:00.426+02:00  INFO 13643 --- [utm-backup-manager] [           main] t.c.s.AnnotationConfigContextLoaderUtils : Could not detect default configuration classes for test class [de.fjordkommission.utmbackup.service.BackupScannerIntegrationTest]: BackupScannerIntegrationTest does not declare any static, non-private, non-final, nested classes annotated with @Configuration.
+2026-10-21T15:32:00.426+02:00  INFO 13643 --- [utm-backup-manager] [           main] t.c.s.AnnotationConfigContextLoaderUtils : Could not detect default configuration classes for test class [de.fjordkommission.utmbackup.AbstractIntegrationTest]: AbstractIntegrationTest does not declare any static, non-private, non-final, nested classes annotated with @Configuration.
+2026-10-21T15:32:00.426+02:00  INFO 13643 --- [utm-backup-manager] [           main] .b.t.c.SpringBootTestContextBootstrapper : Found @SpringBootConfiguration de.fjordkommission.utmbackup.UtmBackupManagerApplication for test class de.fjordkommission.utmbackup.service.BackupScannerIntegrationTest
+[INFO] Tests run: 8, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.054 s -- in de.fjordkommission.utmbackup.service.BackupScannerIntegrationTest
+[INFO] Running de.fjordkommission.utmbackup.service.VmInventoryTest
+[INFO] Tests run: 13, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.006 s -- in de.fjordkommission.utmbackup.service.VmInventoryTest
+[INFO] Running de.fjordkommission.utmbackup.service.BackupScannerManifestTest
+[INFO] Tests run: 6, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.043 s -- in de.fjordkommission.utmbackup.service.BackupScannerManifestTest
+[INFO] Running de.fjordkommission.utmbackup.service.CreateBackupServiceTest
+[INFO] Tests run: 12, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.088 s -- in de.fjordkommission.utmbackup.service.CreateBackupServiceTest
+[INFO] Running de.fjordkommission.utmbackup.service.BackupScannerLegacyCharacterizationTest
+[INFO] Tests run: 19, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.109 s -- in de.fjordkommission.utmbackup.service.BackupScannerLegacyCharacterizationTest
+[INFO] Running de.fjordkommission.utmbackup.service.BackupScannerMultiProviderTest
+[INFO] Tests run: 4, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.008 s -- in de.fjordkommission.utmbackup.service.BackupScannerMultiProviderTest
+[INFO] Running de.fjordkommission.utmbackup.service.RetentionServiceTest
+[INFO] Tests run: 11, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.019 s -- in de.fjordkommission.utmbackup.service.RetentionServiceTest
+[INFO] Running de.fjordkommission.utmbackup.service.BackupJobServiceTest
+[INFO] Tests run: 15, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.012 s -- in de.fjordkommission.utmbackup.service.BackupJobServiceTest
+[INFO] Running de.fjordkommission.utmbackup.service.VmSizeServiceTest
+[INFO] Tests run: 3, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.006 s -- in de.fjordkommission.utmbackup.service.VmSizeServiceTest
+[INFO] Running de.fjordkommission.utmbackup.service.RetentionCleanupJobServiceTest
+[INFO] Tests run: 3, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.002 s -- in de.fjordkommission.utmbackup.service.RetentionCleanupJobServiceTest
+[INFO] 
+[INFO] Results:
+[INFO] 
+[INFO] Tests run: 335, Failures: 0, Errors: 0, Skipped: 0
+[INFO] 
+[INFO] 
+[INFO] --- jar:3.5.1:jar (default-jar) @ utm-backup-manager ---
+[INFO] Building jar: /Users/sascha/IdeaProjects/utm-backup-manager/target/utm-backup-manager-1.4.0.jar
+[INFO] 
+[INFO] --- spring-boot:4.1.1:repackage (repackage) @ utm-backup-manager ---
+[INFO] Replacing main artifact /Users/sascha/IdeaProjects/utm-backup-manager/target/utm-backup-manager-1.4.0.jar with repackaged archive, adding nested dependencies in BOOT-INF/.
+[INFO] The original artifact has been renamed to /Users/sascha/IdeaProjects/utm-backup-manager/target/utm-backup-manager-1.4.0.jar.original
+[INFO] 
+[INFO] --- jacoco:0.8.15:report (report) @ utm-backup-manager ---
+[INFO] Loading execution data file /Users/sascha/IdeaProjects/utm-backup-manager/target/jacoco.exec
+[INFO] Analyzed bundle 'utm-backup-manager' with 92 classes
+[INFO] 
+[INFO] ---------------< de.fjordkommission:utm-backup-manager >----------------
+[INFO] Building utm-backup-manager 1.4.0
+[INFO]   from pom.xml
+[INFO] --------------------------------[ jar ]---------------------------------
+[INFO] 
+[INFO] --- sonar:5.8.0.7211:sonar (default-cli) @ utm-backup-manager ---
+[INFO] Java 27 Homebrew (64-bit)
+[INFO] Mac OS X 27.0.1 (aarch64)
+[INFO] Communicating with SonarQube Community Build 26.9.0.129388
+[INFO] JRE provisioning: os[macos], arch[arm64]
+[INFO] Starting SonarScanner Engine...
+[INFO] Java 21.0.11 Eclipse Adoptium (64-bit)
+[INFO] Load global settings
+[INFO] Load global settings (done) | time=84ms
+[INFO] Server id: 4F833BF3-AaERrRu7I5SYvGkYyDzJ
+[INFO] Loading required plugins
+[INFO] Load plugins index
+[INFO] Load plugins index (done) | time=11ms
+[INFO] Load/download plugins
+[INFO] Load/download plugins (done) | time=15ms
+[INFO] Process project properties
+[INFO] Process project properties (done) | time=8ms
+[INFO] Project key: utm-backup-manager
+[INFO] Base dir: /Users/sascha/IdeaProjects/utm-backup-manager
+[INFO] Working dir: /Users/sascha/IdeaProjects/utm-backup-manager/target/sonar
+[INFO] Load project settings for component key: 'utm-backup-manager'
+[INFO] Load project settings for component key: 'utm-backup-manager' (done) | time=15ms
+[INFO] Load quality profiles
+[INFO] Load quality profiles (done) | time=33ms
+[INFO] Load active rules
+[INFO] Load active rules (done) | time=157ms
+[INFO] Load analysis cache
+[INFO] Load analysis cache (5.2 kB) | time=14ms
+[INFO] Preprocessing files...
+[INFO] 3 languages detected in 103 preprocessed files (done) | time=140ms
+[INFO] 0 files ignored because of scm ignore settings
+[INFO] Loading plugins for detected languages
+[INFO] Load/download plugins
+[INFO] Load/download plugins (done) | time=11ms
+[INFO] Load project repositories
+[INFO] Load project repositories (done) | time=75ms
+[INFO] Indexing files...
+[INFO] Project configuration:
+[INFO] 103 files indexed (done) | time=7ms
+[INFO] Quality profile for java: Sonar way
+[INFO] Quality profile for xml: Sonar way
+[INFO] Quality profile for yaml: Sonar way
+[INFO] ------------- Run sensors on module utm-backup-manager
+[INFO] Load metrics repository
+[INFO] Load metrics repository (done) | time=14ms
+[INFO] Sensor JavaSensor [java]
+[INFO] Configured Java source version (sonar.java.source): 21, preview features enabled (sonar.java.enablePreview): false
+[INFO] Server-side caching is enabled. The Java analyzer will not try to leverage data from a previous analysis.
+[INFO] Using ECJ batch to parse 67 Main java source files with batch size 429 KB.
+[INFO] Starting batch processing.
+[INFO] The Java analyzer cannot skip unchanged files in this context. A full analysis is performed for all files.
+[INFO] 100% analyzed
+[INFO] Batch processing: Done.
+[INFO] Did not optimize analysis for any files, performed a full analysis for all 67 files.
+[INFO] Using ECJ batch to parse 34 Test java source files with batch size 429 KB.
+[WARNING] Invalid character encountered in file /Users/sascha/IdeaProjects/utm-backup-manager/src/test/java/de/fjordkommission/utmbackup/storage/BackupManifestReaderTest.java at line 60 for encoding UTF-8. Please fix file content or configure the encoding to be used using property 'sonar.sourceEncoding'.
+[INFO] Starting batch processing.
+[INFO] 100% analyzed
+[INFO] Batch processing: Done.
+[INFO] Did not optimize analysis for any files, performed a full analysis for all 34 files.
+[INFO] No "Generated" source files to scan.
+[INFO] Sensor JavaSensor [java] (done) | time=2785ms
+[INFO] Sensor IaC YAML File Type Classification Sensor [iac]
+[INFO] Sensor IaC YAML File Type Classification Sensor [iac] (done) | time=1ms
+[INFO] Sensor SurefireSensor [java]
+[INFO] parsing [/Users/sascha/IdeaProjects/utm-backup-manager/target/surefire-reports]
+[INFO] Sensor SurefireSensor [java] (done) | time=52ms
+[INFO] Sensor XML Sensor [xml]
+[INFO] 1 source file to be analyzed
+[INFO] 1/1 source file has been analyzed
+[INFO] Sensor XML Sensor [xml] (done) | time=70ms
+[INFO] Sensor JaCoCo XML Report Importer [jacoco]
+[INFO] 'sonar.coverage.jacoco.xmlReportPaths' is not defined. Using default locations: target/site/jacoco/jacoco.xml,target/site/jacoco-it/jacoco.xml,build/reports/jacoco/test/jacocoTestReport.xml
+[INFO] Importing 1 report(s). Turn your logs in debug mode in order to see the exhaustive list.
+[INFO] Sensor JaCoCo XML Report Importer [jacoco] (done) | time=41ms
+[INFO] Sensor IaC hadolint report Sensor [iac]
+[INFO] Sensor IaC hadolint report Sensor [iac] (done) | time=0ms
+[INFO] Sensor Java Config Sensor [iac]
+[INFO] There are no files to be analyzed for the Java language
+[INFO] Sensor Java Config Sensor [iac] (done) | time=0ms
+[INFO] Sensor IaC Docker Sensor [iac]
+[INFO] There are no files to be analyzed for the Docker language
+[INFO] Sensor IaC Docker Sensor [iac] (done) | time=1ms
+[INFO] Sensor TextAndSecretsSensor [text]
+[INFO] Available processors: 10
+[INFO] Using 10 threads for analysis.
+[INFO] Start fetching files for the text and secrets analysis
+[INFO] Using Git CLI to retrieve dirty files
+[INFO] Retrieving language associated files and files included via "sonar.text.inclusions" that are tracked by git
+[INFO] Starting the text and secrets analysis
+[INFO] 103 source files to be analyzed for the text and secrets analysis
+[INFO] 103/103 source files have been analyzed for the text and secrets analysis
+[INFO] Sensor TextAndSecretsSensor [text] (done) | time=250ms
+[INFO] ------------- Run sensors on project
+[INFO] Sensor JaCoCo Aggregate XML Report Importer [jacoco]
+[INFO] Sensor JaCoCo Aggregate XML Report Importer [jacoco] (done) | time=0ms
+[INFO] Sensor IaC Project Sensor [iac]
+[INFO] Sensor IaC Project Sensor [iac] (done) | time=0ms
+[INFO] Sensor JavaProjectSensor [java]
+[INFO] Sensor JavaProjectSensor [java] (done) | time=0ms
+[INFO] Sensor Zero Coverage Sensor
+[INFO] Sensor Zero Coverage Sensor (done) | time=0ms
+[INFO] Sensor Java CPD Block Indexer
+[INFO] Sensor Java CPD Block Indexer (done) | time=84ms
+[INFO] ------------- Gather SCA dependencies on project
+[INFO] Dependency analysis skipped
+[INFO] SCM Publisher SCM provider for this project is: git
+[INFO] SCM Publisher 29 source files to be analyzed
+[INFO] SCM Publisher 4/29 source files have been analyzed (done) | time=342ms
+[WARNING] Missing blame information for the following files:
+[WARNING]   * src/main/java/de/fjordkommission/utmbackup/storage/BackupStorageMetadataReader.java
+[WARNING]   * src/test/java/de/fjordkommission/utmbackup/service/BackupScannerManifestTest.java
+[WARNING]   * src/main/java/de/fjordkommission/utmbackup/storage/BackupStorageCompatibility.java
+[WARNING]   * src/main/java/de/fjordkommission/utmbackup/storage/BackupStorageMetadataWriter.java
+[WARNING]   * src/main/java/de/fjordkommission/utmbackup/storage/BackupStorageGuard.java
+[WARNING]   * src/main/java/de/fjordkommission/utmbackup/service/BackupService.java
+[WARNING]   * src/test/java/de/fjordkommission/utmbackup/service/CreateBackupServiceTest.java
+[WARNING]   * src/test/java/de/fjordkommission/utmbackup/service/BackupWriteGuardIntegrationTest.java
+[WARNING]   * src/test/java/de/fjordkommission/utmbackup/storage/BackupStorageGuardTest.java
+[WARNING]   * src/test/java/de/fjordkommission/utmbackup/service/BackupScannerLegacyCharacterizationTest.java
+[WARNING]   * src/test/java/de/fjordkommission/utmbackup/storage/BackupStorageMetadataWriterTest.java
+[WARNING]   * src/test/java/de/fjordkommission/utmbackup/storage/BackupStorageEvaluatorTest.java
+[WARNING]   * src/test/java/de/fjordkommission/utmbackup/storage/BackupStorageMetadataReaderTest.java
+[WARNING]   * src/main/java/de/fjordkommission/utmbackup/service/RetentionService.java
+[WARNING]   * src/test/java/de/fjordkommission/utmbackup/service/RetentionServiceTest.java
+[WARNING]   * src/main/java/de/fjordkommission/utmbackup/storage/BackupStorageStatus.java
+[WARNING]   * src/test/java/de/fjordkommission/utmbackup/service/BackupJobServiceTest.java
+[WARNING]   * src/main/java/de/fjordkommission/utmbackup/service/BackupJobService.java
+[WARNING]   * src/test/java/de/fjordkommission/utmbackup/service/BackupScannerMultiProviderTest.java
+[WARNING]   * src/main/java/de/fjordkommission/utmbackup/service/BackupScanner.java
+[WARNING]   * src/main/java/de/fjordkommission/utmbackup/storage/BackupStorageReadOnlyException.java
+[WARNING]   * src/main/java/de/fjordkommission/utmbackup/service/CreateBackupService.java
+[WARNING]   * src/main/java/de/fjordkommission/utmbackup/storage/BackupStorageEvaluator.java
+[WARNING]   * src/main/java/de/fjordkommission/utmbackup/storage/BackupStorageMetadataResult.java
+[WARNING]   * src/main/java/de/fjordkommission/utmbackup/storage/BackupRootMetadata.java
+[WARNING] This may lead to missing/broken features in SonarQube
+[INFO] CPD Executor 27 files had no CPD blocks
+[INFO] CPD Executor Calculating CPD for 40 files
+[INFO] CPD Executor CPD calculation finished (done) | time=12ms
+[INFO] SCM revision ID 'd53064ddc3a9ad4664b92b34a7b8787f5e6f432b'
+[INFO] Analysis report generated in 71ms, dir size=1.0 MB
+[INFO] Analysis report compressed in 292ms, zip size=379.0 kB
+[INFO] Analysis report uploaded in 36ms
+[INFO] ANALYSIS SUCCESSFUL, you can find the results at: http://devsecops:9000/dashboard?id=utm-backup-manager
+[INFO] Note that you will be able to access the updated dashboard once the server has processed the submitted analysis report
+[INFO] More about the report processing at http://devsecops:9000/api/ce/task?id=f234a686-04e7-4369-8909-3ff021f8fe69
+[INFO] Analysis total time: 5.503 s
+[INFO] SonarScanner Engine completed successfully
+[INFO] ------------------------------------------------------------------------
+[INFO] BUILD SUCCESS
+[INFO] ------------------------------------------------------------------------
+[INFO] Total time:  17.519 s
+[INFO] Finished at: 2026-10-21T15:32:10+02:00
+[INFO] ------------------------------------------------------------------------

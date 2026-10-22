@@ -14,6 +14,37 @@ Read `README.md`, `ROADMAP.md`, and the relevant code and tests before proposing
 
 This prioritization reflects a locally run, user-operated tool. Do not present every theoretical edge case as an urgent blocker. Nevertheless, flag credible data-loss risks clearly and distinguish confirmed defects from hypothetical scenarios. Never weaken existing backup protections.
 
+## Build and test strategy
+
+Use the smallest useful verification step while implementing changes.
+
+During development:
+
+- Run focused tests for the classes or behaviour being changed, for example:
+  `mvn -Dtest=VmInventoryTest test`
+- Run `mvn test` when several related test classes are affected.
+- Run `mvn verify` when broader project verification is useful but a clean build
+  is not necessary.
+- Do not run `mvn clean verify` after every edit or small group of edits.
+
+Run `mvn clean verify` only once as the final verification of a substantial task
+or phase, unless there is a concrete reason to suspect stale build artifacts.
+
+If the final verification command already includes a clean build, for example:
+
+    mvn clean verify sonar:sonar ...
+
+do not run a separate `mvn clean verify` immediately beforehand.
+
+Documentation-only changes do not require another full clean build if the code
+has already been verified.
+
+If a focused test fails, fix and rerun the focused test first. Do not repeatedly
+run the entire test suite while debugging one local failure.
+
+Always report which verification commands were actually run and whether they
+passed.
+
 ## Code and documentation conventions
 
 - Use Java 21 and follow the project's established Spring Boot patterns, architecture, naming, and formatting.
@@ -38,6 +69,18 @@ This prioritization reflects a locally run, user-operated tool. Do not present e
 - Do not expose credentials or private configuration values in code, logs, documentation, or commits.
 - For substantial architectural changes or potentially destructive operations, explain the proposed approach and get approval before implementation.
 - Never silently loosen safeguards around stable backups, retention, deletion, or backup integrity.
+
+## Quality gate
+
+At the end of the implementation phase:
+
+- run the required local verification
+- do not query SonarQube unless a fresh analysis covering the current code has
+  already been submitted
+- report that Sonar verification is pending if no fresh analysis exists
+
+After the developer submits a new SonarQube analysis, inspect and fix only the
+new issues caused by the current phase.
 
 ## Reviews and analysis reports
 

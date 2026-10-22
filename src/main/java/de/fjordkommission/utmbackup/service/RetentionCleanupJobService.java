@@ -1,7 +1,7 @@
 package de.fjordkommission.utmbackup.service;
 
 import de.fjordkommission.utmbackup.config.BackupJobConfiguration;
-import de.fjordkommission.utmbackup.model.LocalVm;
+import de.fjordkommission.utmbackup.model.VmId;
 import de.fjordkommission.utmbackup.model.RetentionCleanupJob;
 import de.fjordkommission.utmbackup.model.RetentionCleanupJobStatus;
 import org.springframework.beans.factory.annotation.Qualifier;
@@ -33,8 +33,8 @@ public class RetentionCleanupJobService {
     /**
      * Starts retention cleanup in the background.
      */
-    public void start(List<LocalVm> vms) {
-        List<LocalVm> selectedVms = List.copyOf(vms);
+    public void start(List<VmId> vms) {
+        List<VmId> selectedVms = List.copyOf(vms);
         RetentionCleanupJob runningJob;
 
         synchronized (jobLock) {
@@ -78,7 +78,7 @@ public class RetentionCleanupJobService {
     }
 
     private void runCleanup(
-            List<LocalVm> vms,
+            List<VmId> vms,
             Instant startedAt
     ) {
         try {

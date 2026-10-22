@@ -1,7 +1,9 @@
 package de.fjordkommission.utmbackup.service;
 
 import de.fjordkommission.utmbackup.config.BackupJobConfiguration;
-import de.fjordkommission.utmbackup.model.LocalVm;
+import de.fjordkommission.utmbackup.model.ManagedVm;
+import de.fjordkommission.utmbackup.model.VmId;
+import de.fjordkommission.utmbackup.storage.BackupStorageGuard;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Service;
 
@@ -14,7 +16,6 @@ import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
  * Starts VM backups in the background and exposes their current lifecycle state.
- *
  * Exactly one backup job may run at a time. Completed and failed jobs remain
  * available as the latest snapshot so the web UI can report their outcome.
  */
@@ -27,6 +28,7 @@ public class BackupJobService {
     private final Object jobLock = new Object();
     private final RetentionCleanupJobService retentionCleanupJobService;
     private final RetentionService retentionService;
+    private final BackupStorageGuard storageGuard;
 
     private volatile BackupJob currentJob;
     private volatile List<String> currentVmNames = List.of();
@@ -37,36 +39,40 @@ public class BackupJobService {
             CreateBackupService createBackupService,
             RetentionCleanupJobService retentionCleanupJobService,
             RetentionService retentionService,
+            BackupStorageGuard storageGuard,
             @Qualifier(BackupJobConfiguration.BACKUP_TASK_EXECUTOR)
             Executor backupTaskExecutor
     ) {
         this.createBackupService = createBackupService;
         this.retentionCleanupJobService = retentionCleanupJobService;
         this.retentionService = retentionService;
+        this.storageGuard = storageGuard;
         this.backupTaskExecutor = backupTaskExecutor;
     }
     /**
      * Starts a backup job and returns immediately after the task was accepted.
-     *
      * A second request is rejected while the current job is still running.
      */
-    public BackupJob start(List<LocalVm> vms, String comment) {
+    public BackupJob start(List<ManagedVm> vms, String comment) {
         return start(vms, comment, List.of());
     }
     public BackupJob start(
-            List<LocalVm> vms,
+            List<ManagedVm> vms,
             String comment,
-            List<LocalVm> retentionCleanupVms
+            List<VmId> retentionCleanupVms
     ) {
-        List<LocalVm> selectedVms = List.copyOf(vms);
-        List<LocalVm> cleanupVms = List.copyOf(retentionCleanupVms);
+        // Refused before any state changes, so the caller gets the reason immediately.
+        storageGuard.assertWritable();
+
+        List<ManagedVm> selectedVms = List.copyOf(vms);
+        List<VmId> cleanupVms = List.copyOf(retentionCleanupVms);
 
         Set<String> pendingDeletionIds = cleanupVms.isEmpty()
                 ? Set.of()
                 : Set.copyOf(retentionService.findBackupsPendingDeletion(cleanupVms));
 
         currentVmNames = selectedVms.stream()
-                .map(LocalVm::name)
+                .map(ManagedVm::name)
                 .toList();
 
         BackupJob runningJob;
@@ -151,9 +157,9 @@ public class BackupJobService {
     }
 
     private void runBackup(
-            List<LocalVm> vms,
+            List<ManagedVm> vms,
             String comment,
-            List<LocalVm> retentionCleanupVms,
+            List<VmId> retentionCleanupVms,
             Instant startedAt
     ) {
         try {
@@ -281,7 +287,7 @@ public class BackupJobService {
         );
     }
 
-    private void startRetentionCleanup(List<LocalVm> retentionCleanupVms) {
+    private void startRetentionCleanup(List<VmId> retentionCleanupVms) {
         if (retentionCleanupVms.isEmpty()) {
             return;
         }

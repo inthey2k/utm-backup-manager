@@ -2,7 +2,12 @@ package de.fjordkommission.utmbackup.service;
 
 import de.fjordkommission.utmbackup.config.BackupProperties;
 import de.fjordkommission.utmbackup.model.LocalVm;
+import de.fjordkommission.utmbackup.model.ManagedVm;
+import de.fjordkommission.utmbackup.model.VmId;
+import de.fjordkommission.utmbackup.storage.BackupStorageGuard;
+import org.springframework.boot.info.BuildProperties;
 import org.junit.jupiter.api.Test;
+
 import org.junit.jupiter.api.io.TempDir;
 
 import java.io.UncheckedIOException;
@@ -12,6 +17,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
 
+import static de.fjordkommission.utmbackup.TestVms.stoppedUtm;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
@@ -38,10 +44,10 @@ class CreateBackupServiceTest {
                 List.of(source)
         );
 
-        CreateBackupService.Result result = service.create(vm);
+        CreateBackupService.Result result = service.create(stoppedUtm(vm));
 
         Path backupDirectory = result.backupDirectory();
-        Path copiedVm = backupDirectory.resolve("VMs/TestLinux.utm");
+        Path copiedVm = backupDirectory.resolve("VMs/utm__test-linux-vm/TestLinux.utm");
 
         assertTrue(Files.isDirectory(backupDirectory));
         assertTrue(Files.isDirectory(copiedVm));
@@ -60,7 +66,7 @@ class CreateBackupServiceTest {
 
         String info = Files.readString(backupInfo);
 
-        assertTrue(info.contains("VMs:"));
+        assertTrue(info.contains("Format-Version: 2"));
         assertTrue(info.contains("test-linux-vm"));
         assertTrue(info.contains("Comment:"));
         assertFalse(
@@ -113,7 +119,9 @@ class CreateBackupServiceTest {
 
         CreateBackupService service = new CreateBackupService(
                 properties,
-                vmChangeStatusService
+                vmChangeStatusService,
+                mock(BackupStorageGuard.class),
+                mock(BuildProperties.class)
         );
 
         LocalVm firstVm = new LocalVm(
@@ -129,7 +137,7 @@ class CreateBackupServiceTest {
         );
 
         CreateBackupService.Result result = service.create(
-                List.of(firstVm, secondVm),
+                List.of(stoppedUtm(firstVm), stoppedUtm(secondVm)),
                 "Before system updates"
         );
 
@@ -138,14 +146,14 @@ class CreateBackupServiceTest {
         assertEquals(
                 "first",
                 Files.readString(
-                        backupDirectory.resolve("VMs/First.utm/config.plist")
+                        backupDirectory.resolve("VMs/utm__first-vm/First.utm/config.plist")
                 )
         );
 
         assertEquals(
                 "second",
                 Files.readString(
-                        backupDirectory.resolve("VMs/Second.utm/config.plist")
+                        backupDirectory.resolve("VMs/utm__second-vm/Second.utm/config.plist")
                 )
         );
 
@@ -158,12 +166,12 @@ class CreateBackupServiceTest {
         assertTrue(info.contains("Before system updates"));
 
         verify(vmChangeStatusService).acknowledgeBackup(
-                "first-vm",
+                new VmId("utm", "first-vm"),
                 firstVm
         );
 
         verify(vmChangeStatusService).acknowledgeBackup(
-                "second-vm",
+                new VmId("utm", "second-vm"),
                 secondVm
         );
     }
@@ -189,7 +197,7 @@ class CreateBackupServiceTest {
         );
 
         AtomicBoolean cancel = new AtomicBoolean(false);
-        List<LocalVm> vms = List.of(vm);
+        List<ManagedVm> vms = List.of(stoppedUtm(vm));
 
         assertThrows(
                 BackupCancelledException.class,
@@ -235,7 +243,7 @@ class CreateBackupServiceTest {
         List<CreateBackupService.Progress> updates = new ArrayList<>();
 
         service.create(
-                List.of(vm),
+                List.of(stoppedUtm(vm)),
                 "Progress test",
                 updates::add
         );
@@ -285,7 +293,9 @@ class CreateBackupServiceTest {
 
         CreateBackupService service = new CreateBackupService(
                 properties,
-                vmChangeStatusService
+                vmChangeStatusService,
+                mock(BackupStorageGuard.class),
+                mock(BuildProperties.class)
         );
 
         LocalVm existingVm = new LocalVm(
@@ -300,7 +310,7 @@ class CreateBackupServiceTest {
                 List.of(missingSource)
         );
 
-        List<LocalVm> vms = List.of(existingVm, missingVm);
+        List<ManagedVm> vms = List.of(stoppedUtm(existingVm), stoppedUtm(missingVm));
 
         assertThrows(
                 UncheckedIOException.class,
@@ -336,9 +346,11 @@ class CreateBackupServiceTest {
                 List.of(missingSource)
         );
 
+        ManagedVm managed = stoppedUtm(vm);
+
         assertThrows(
                 UncheckedIOException.class,
-                () -> service.create(vm)
+                () -> service.create(managed)
         );
 
         if (Files.exists(backupRoot)) {
@@ -363,9 +375,11 @@ class CreateBackupServiceTest {
                 List.of()
         );
 
+        ManagedVm managed = stoppedUtm(vm);
+
         IllegalArgumentException exception = assertThrows(
                 IllegalArgumentException.class,
-                () -> service.create(vm)
+                () -> service.create(managed)
         );
 
         assertTrue(exception.getMessage().contains("empty-vm"));
@@ -388,9 +402,9 @@ class CreateBackupServiceTest {
                 List.of(source)
         );
 
-        CreateBackupService.Result first = service.create(vm);
-        CreateBackupService.Result second = service.create(vm);
-        CreateBackupService.Result third = service.create(vm);
+        CreateBackupService.Result first = service.create(stoppedUtm(vm));
+        CreateBackupService.Result second = service.create(stoppedUtm(vm));
+        CreateBackupService.Result third = service.create(stoppedUtm(vm));
 
         assertEquals(
                 first.backupDirectoryName() + "_2",
@@ -426,7 +440,9 @@ class CreateBackupServiceTest {
 
         CreateBackupService service = new CreateBackupService(
                 properties,
-                vmChangeStatusService
+                vmChangeStatusService,
+                mock(BackupStorageGuard.class),
+                mock(BuildProperties.class)
         );
 
         LocalVm vm = new LocalVm(
@@ -435,10 +451,10 @@ class CreateBackupServiceTest {
                 List.of(source)
         );
 
-        service.create(vm);
+        service.create(stoppedUtm(vm));
 
         verify(vmChangeStatusService).acknowledgeBackup(
-                "test-linux-vm",
+                new VmId("utm", "test-linux-vm"),
                 vm
         );
     }
@@ -460,7 +476,9 @@ class CreateBackupServiceTest {
 
         CreateBackupService service = new CreateBackupService(
                 properties,
-                vmChangeStatusService
+                vmChangeStatusService,
+                mock(BackupStorageGuard.class),
+                mock(BuildProperties.class)
         );
 
         LocalVm vm = new LocalVm(
@@ -469,9 +487,11 @@ class CreateBackupServiceTest {
                 List.of(missingSource)
         );
 
+        ManagedVm managed = stoppedUtm(vm);
+
         assertThrows(
                 UncheckedIOException.class,
-                () -> service.create(vm)
+                () -> service.create(managed)
         );
 
         verifyNoInteractions(vmChangeStatusService);
@@ -514,7 +534,7 @@ class CreateBackupServiceTest {
                 List.of(source)
         );
 
-        CreateBackupService.Result result = service.create(vm);
+        CreateBackupService.Result result = service.create(stoppedUtm(vm));
 
         assertTrue(Files.isDirectory(result.backupDirectory()));
         assertFalse(Files.exists(staleIncomplete1));
@@ -546,9 +566,11 @@ class CreateBackupServiceTest {
                 List.of(missingSource)
         );
 
+        ManagedVm managed = stoppedUtm(vm);
+
         assertThrows(
                 UncheckedIOException.class,
-                () -> service.create(vm)
+                () -> service.create(managed)
         );
 
         assertFalse(Files.exists(staleIncomplete));
@@ -566,7 +588,9 @@ class CreateBackupServiceTest {
 
         return new CreateBackupService(
                 properties,
-                vmChangeStatusService
+                vmChangeStatusService,
+                mock(BackupStorageGuard.class),
+                mock(BuildProperties.class)
         );
     }
 }

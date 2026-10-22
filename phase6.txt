@@ -1,0 +1,358 @@
+This is a large phase, so I'll read the current create path before editing it. The design choices that matter most are the failure order, the container naming, the marker timing, and the handling of the existing legacy-key acknowledgement. I'll confirm the current structure first.
+
+  Ran 2 shell commands
+
+The current create path is what I expected. Its layout, its validation and its marker handling are the three places to change. Before editing the services, I'll add the storage-layer helpers: the container naming rule, the canonical backup-id scheme, and a shared atomic-replace helper.
+
+  Ran 1 shell command
+
+The helpers are in place, and the metadata writer now uses the shared replace helper. Next, the manifest writer gets one file-level entry point, which is the only way the new format is written. The guard gets the marker-update rule, so the marker logic lives in one place.
+
+  Ran 1 shell command
+
+Next is CreateBackupService itself. Create now builds and validates the manifest before touching the disk, writes each VM into its own container, writes the manifest only after all data is copied, establishes the marker, and publishes the batch last. The legacy writeBackupInfo method is removed, so ther
+                                                                                                                                 8. Delete behaviour
+                                                                                                                                 Backup deletion must support both formats.
+
+  Format 1:                                                                                                                      - preserve current behaviour
+                                                                                                                                 Format 2:
+  - delete only the container belonging to the selected manifest VM entry                                                        - never delete another VM from the same batch
+  - after deleting one VM, update BACKUP-INFO.txt so it no longer lists that VM
+  - if the batch contains no VMs afterwards, remove the whole batch directory if                                                   that matches current batch cleanup semantics
+  All operations must remain guarded by BackupStorageGuard.
+  Stable protection must remain intact.
+  9. Retention
+
+  Retention must operate on canonical VmId.
+
+  For format 2:                                                                                                                  - identify backups via manifest identity
+  - delete only the selected VM container
+  - preserve other VMs in the same batch
+  - update the manifest consistently
+  Format-1 retention behaviour must remain unchanged.
+
+  Do not weaken stable protection.
+  10. Failure safety
+
+  Pay special attention to partial writes.
+
+  A failed backup must not leave:
+  - a manifest entry for data that was never successfully written
+  - an orphaned container that the scanner mistakes for a valid backup
+  - partially updated root metadata
+  - accidental deletion of another VM's data
+                                                                                                                                 Prefer:
+  - temporary paths
+  - atomic moves where practical
+  - write manifest only when its referenced data is valid
+  - cleanup of incomplete temporary artifacts
+
+  Explain the chosen ordering and failure model.
+
+  11. Mixed-format media
+  Supported media may contain both:                                                                                              - format-1 batches
+  - format-2 batches
+
+  The scanner, delete path and retention path must handle both simultaneously.
+  Do not migrate legacy batches.
+                                                                                                                                 Do not require all batches to share one format.
+
+  12. Tests
+
+  Add focused tests for at least:
+
+  Writing:
+  - one UTM VM produces format-2 layout
+  - multiple VMs produce distinct containers                                                                                     - manifest matches actual directories
+  - root metadata created on first successful format-2 write                                                                     - root metadata not created on failed backup
+  - no format-1 batch is newly written
+  - comments round-trip
+  - OffsetDateTime is written
+  Identity:                                                                                                                      - same local id under different providers remains
+  - duplicate/sanitized directory collisions are handled safely
+  - format-2 backup IDs are deterministic
+  - legacy golden IDs unchanged
+  Scanning:
+  - format-2 batch appears in overview
+  - format-2 backup attaches to correct local VmId                                                                               - backup-only format-2 VM appears correctly
+  - mixed format-1/format-2 medium scans correctly
+  - directory name is not treated as authoritative identity
+
+  Deletion:
+  - deleting one format-2 VM leaves other VMs in the same batch untouched
+  - manifest updated after deletion
+  - empty batch cleanup
+  - stable backup cannot be deleted
+  Retention:
+  - same-provider and cross-provider identities stay distinct
+  - only selected VM container is deleted                                                                                        - manifest remains consistent
+  - stable protection remains intact
+
+  Failure:
+  - failed copy leaves no valid manifest entry
+  - incomplete temp data is not scanned as a valid backup
+  - root metadata remains consistent
+
+  Regression:
+  - all Phase-0 legacy characterization tests remain green
+  - Phase-4 manifest tests remain green
+  - Phase-5 compatibility/guard tests remain green
+                                                                                                                                 13. Documentation
+
+  Update:
+                                                                                                                                     docs/architecture/backup-format.md
+
+  with:
+  - production format-2 layout
+  - container-directory semantics
+  - format-2 backup ID scheme
+  - write ordering/failure-safety model
+  - delete/retention behaviour
+  - mixed-format media behaviour
+                                                                                                                                 Update:
+
+      docs/hypervisor-provider-integration-guide.md
+                                                                                                                                 only if the provider contract changes or provideral
+  data for backup writing.
+                                                                                                                                 Do not add QEMU-specific implementation details y
+
+  14. Build and test strategy
+
+  Follow CLAUDE.md.
+
+  During implementation:
+  - use focused tests
+  - do not repeatedly run mvn clean verify                                                                                       - if the shared target/ issue is still present, u
+    directory/scratch approach and report it
+  - do not treat shared-target conflict artifacts as source defects
+  At the end:
+  - run one final mvn clean verify
+  - check SonarQube / the configured quality gate
+  - inspect and fix valid Phase-6 issues before declaring completion
+
+  If Sonar analysis submission requires a token you do not have, stop after the
+  local verification and report that the developer must submit the analysis.
+                                                                                                                                 15. Final report
+
+  Report:
+  1. files changed
+  2. exact format-2 production layout
+  3. manifest/write ordering
+  4. root-metadata creation semantics
+  5. scanner changes                                                                                                             6. backup-id scheme
+  7. delete behaviour
+  8. retention behaviour
+  9. failure-safety approach
+  10. tests added/updated
+  11. focused test commands run
+  12. newly discovered issues or architectural concerns
+  13. final mvn clean verify result
+  14. final Sonar/quality-gate status
+  Do not start Phase 7.                                                                                                          Do not implement QemuVmProvider.
+  Do not migrate vm_state.
+  Do not move Stable/Notes to filesystem state yet.
+  Do not commit or push anything.
+This is a large phase, so I'll read the current create path before editing it. The design choices that matter most are the failure order, the container naming, the marker timing, and the handling of the existing legacy-key acknowledgement. I'll      confirm the current structure first.
+
+  Ran 2 shell commands
+
+The current create path is what I expected. Its layout, its validation and its marker handling are the three places to change. Before editing the services, I'll add the storage-layer helpers: the container naming rule, the canonical backup-id scheme, and a shared atomic-replace helper.
+
+  Ran 1 shell command
+The helpers are in place, and the metadata writer now uses the shared replace helper. Next, the manifest writer gets one       file-level entry point, which is the only way theuard gets the marker-update rule, so the markerlogic lives in one place.
+
+  Ran 1 shell command
+Next is CreateBackupService itself. Create now builds and validates the manifest before touching the disk, writes each VM into its own container, writes the manifest only after all data is copied, establishes the marker, and publishes the batch last. The legacy writeBackupInfo method is removed, so there is no second writer.
+  Ran 1 shell command
+
+Create now computes the container map twice: once for the copy loop and once inside buildManifest. The result is the same, but it's duplicated work and a second place to get out of sync. I'll compute it once and pass it in.
+
+  Ran 1 shell command
+
+Production code compiles. Next, the scanner. I'll read the current batch-scanning method before changing it, so format-2 batcheare routed to their own branch and format-1 handl
+
+  Ran 1 shell command
+                                                                                                                                 I'll route format-2 batches to a dedicated methodorder and the format-1 path as they are. Eachmanifest entry is resolved through its Directory value, and identity comes from VM-ID. A missing container is reported as a batch issue, and the batch's other VMs still appear.
+
+  Ran 1 shell command
+
+The scanner now routes format-2 batches correctly. Two small follow-ups: StandardCharsets is unused now, and the message for a non-legacy batch that reaches the format-1 path still says format-2 backups are not shown, which is no longer true. I'll fix both, then move on to delete.
+
+  Ran 1 shell command
+                                                                                                                                 Delete needs a format-2 branch. Format-1 deletionformat 2, the manifest entry is removed first,then the VM's own container, and the batch is removed only if no VMs remain. A crash between those steps can leave orphaned data that is never shown, but it can't leave a manifest entry pointing at deleted data.
+
+  Ran 1 shell command
+
+Delete is updated. I'll compile to catch errors before I update the affected tests.
+
+  Ran 2 shell commands
+
+The scanner's imports don't include ZoneId, which was previously covered by a wildcard I removed. I'll add it and recompile.
+
+  Ran 1 shell command
+Production code compiles. Now the existing tests that encode the old layout or the old assumptions. The create tests check legacy paths and the VMs: line, the controller integration test checks the old path, and the attribution test documents the gapthat this phase fixes. The format-2 scanner test s to stay hidden is also out of date. I'll updatethe create tests first.
+
+  Ran 1 shell command
+
+Lines 171 and 180 check the new backup's contents, so they move to the container path. Line 297 builds a legacy fixture on purpose, so it stays. Next, the controller test paths and the attribution test. That test encoded the gap, so it now asserts thcorrect attribution.
+  Ran 1 shell command
+
+This characterization test documented the gap. Format 2 makes the backup carry the canonical VmId, so the local VM now has the backup and no separate entry appears. I'll inverte class comment to match.
+
+  Ran 1 shell command
+
+The top of that class still describes the gap in the present tense, so I'll update it. Then I'll update the scanner-manifest test, which expected format-2 batches to be hidden.
+
+  Ran 1 shell command
+
+The existing tests are updated. Before writing the new identity tests, I'll compute the literal values they will assert: the format-2 backup id for a sample entry, and the container name the sanitization rule produces for a sample id. Pinning these literals is what makes the scheme's stability checkable.
+  Ran 1 shell command
+
+The values are computed. Next, the identity tests: the legacy golden ids stay byte-identical, the format-2 id is pinned and deterministic, and the same local id under two providers gets two ids. Then the container tests: names are single safe path elements, collisions are resolved, and naming is deterministic.
+
+  Ran 1 shell command
+                                                                                                                                 Next, the write tests. They use the real CreateBa a temporary backup root, and they check thelayout, the manifest against the actual directories, the marker rules, and the failure cases.
+                                                                                                                                 Read 1 file
+
+The format-2 write tests are in place. Next, the scanner tests. They build format-2 batches with the real manifest writer, so the fixtures use the production syntax. They check that identity comes from the manifest, that the folder name is not used, that orphan containers are ignored, that a missing container is reported, and that format-1 and format-2 batches coexist.
+                                                                                                                                 Read 1 file
+
+The scanner tests are in place. Last are the lifecycle tests: deletion of one VM from a shared batch, manifest updates, removalof an empty batch, Stable protection, retention a that a format-2 medium without a marker refusesdeletion. They use the real services with a real
+
+  Read 1 file
+A few assertions I just wrote are wrong or vacuous. One checks a payload with a meaningless replace expression, one has a tautological ternary in the retention loop, and there's an unused helper. I'll replace them with direct assertions before running anything.
+
+  Ran 1 shell command
+
+I removed the BackupOverview import, but the find helper still uses that type. I'll put it back, remove the other unused imports, and run the unused-import check across every file I touched.
+  Ran 1 shell command
+                                                                                                                                 Imports are clean and no byte-order marks are pre covers the new identity and container tests, thenew format-2 write, scan and lifecycle tests, and every existing test class that the layout change touches, including the Phase-0 golden tests.
+
+  Ran 1 shell command
+
+These errors point at main classes that test compilation can't find, such as RetentionService and VmInventory, not at the new test code. That matches the shared-target/ conflict from earlier. I'll check whether conflict copies appeared during this build.
+                                                                                                                                 Ran 1 shell command
+This is the shared-target/ conflict again: 24 conflict copies were written during the build, and the main classes were renamed while javac needed them. The sources are clean, with no conflict copies under src/. Following the approach you set out, I'll run the focused set on an isolated copy of src/ and pom.xml.
+  Ran 1 shell command
+
+The one real compile error is in BackupWriteGuardIntegrationTest, which still builds CreateBackupService with three arguments. I'll add the BuildProperties argument and rerun.
+
+  Searched for 1 pattern, ran 1 shell command
+
+This is a wrong expectation in my test, not a scanner defect. The qemu provider is enabled in that test, so the overview correctly shows its display name, QEMU (fake), rather than the id fallback. I'll fix the assertion and rerun the focused scanner test.
+
+  Searched for 1 pattern, ran 1 shell command                                                                                    This one is a real design gap rather than a wrongM takes its display name from the local id, so the manifest's display name, Arch Linux, is lost. Format-2 manifests carry the name, so backup-only VMs should use the newest backup's name. For format-1 backups the stored name is the folder name, which equals the local id, so their display is unchanged.
+  Ran 1 shell command
+
+The scanner tests pass. I'll rerun the full focused Phase-6 set to confirm the complete picture after these corrections.
+
+  Ran 1 shell command
+
+All 236 focused tests pass. Next, the documentation. The format-2 status, the marker sentence and the open-items list all describe the state before this phase, so I'll find those sentences and update them.
+
+  Searched for 1 pattern, ran 2 shell commands
+
+The documentation now describes the production layout, the ID scheme, the write ordering and failure model, delete and retentiobehaviour, and mixed media. The provider integrats, because the provider contract is unchanged.Before the final build, I'll run the static checks again: unused imports, literal byte-order marks and conflict copies in src/.
+
+  Ran 1 shell command
+The static checks are clean. Now the one final mvn clean verify. I'll run it on the isolated copy, because the shared target/ is still producing conflict copies.
+
+  Ran 1 shell command
+
+The final verification passes with 372 tests, and the isolated copy matches the repository sources. Last, a read-only SonarQube check. I'm looking for two things: whether a new analysis contains the Phase-6 files, and whether any Phase-6 issue is open.
+
+  Ran 1 shell command
+                                                                                                                                 Phase 6 is implemented and passes the final localcheck for it has not run. The server's latestanalysis (13:45) predates this code, and none of the Phase-6 files are indexed there. I have a read-only token, so I could not submit an analysis. Your developer needs to run the sonar:sonar analysis, and then I'll query the result and fix any valid Phase-6 findings.
+
+1. Files changed
+
+New production code (storage):
+- BackupContainers.java: container naming and collision rules                                                                  - BackupIdentity.java: the format-1 and format-2
+- AtomicFiles.java: the shared atomic replace helper
+
+Changed production code:                                                                                                       - BackupManifestWriter.java: writeFile(batch, man new manifests
+- BackupStorageGuard.java: ensureFormatTwoMarker(version), which creates or updates the marker
+- BackupStorageMetadataWriter.java: uses AtomicFiles
+- CreateBackupService.java: writes format 2, with the step order below
+- BackupScanner.java: format-2 batch scanning
+- BackupService.java: format-2 deletion
+
+Docs: docs/architecture/backup-format.md. docs/hypervisor-provider-integration-guide.md is unchanged, because the provider contract did not change.
+
+New tests (37): BackupIdentityTest (5), BackupContainersTest (7), FormatTwoWriteTest (11), FormatTwoScanningTest (7),          FormatTwoLifecycleTest (7).
+
+Updated tests:
+- CreateBackupServiceTest and BackupControllerIntegrationTest: new paths, plus BuildProperties in the constructor
+- BackupAttributionCharacterizationIntegrationTest: inverted, since the attribution gap is fixed
+- BackupScannerManifestTest: format-2 batches are now shown                                                                    - BackupWriteGuardIntegrationTest: constructor on
+
+2. Format-2 production layout
+
+<batch>/BACKUP-INFO.txt
+<batch>/VMs/utm__ArchLinux-02-27-utm-6a667c24/ArchLinux 02.27.utm/...
+
+Each direct child of VMs/ is one VM's container, and its sources are copied inside it under their own names. Identity comes only from the manifest entry whose Directory names the container.
+Container naming: <providerId>__<local id>. Any character outside [A-Za-z0-9_-] becomes -. The local-id part is truncated at 64characters. If the name was changed, or collides itively, a - and an 8-hex SHA-256 of the canonical id are appended. Names are assigned in canonical-id order.
+
+Deviation from your example: dots are also replaced, so the example becomes utm__ArchLinux-02-27-utm-…, not utm__ArchLinux-02.27. I did this so no name can ever be .. or contain a separator. Say if you want dots kept.
+                                                                                                                               3. Manifest and write ordering
+
+1. The guard checks compatibility.
+2. Input is validated, and the manifest is built and verified by the writer's round-trip check. Unsafe names fail here, before    any file exists.
+3. .incomplete-<batch>/VMs/ is created.
+4. Each VM's sources are copied into its container.                                                                            5. BACKUP-INFO.txt is written last among the cont
+6. The marker is created or updated through the guard, only after the batch is complete.
+7. The incomplete directory is moved to its final name.
+8. Change-tracking acknowledgement, for UTM VMs only.
+
+The manifest holds Format-Version: 2, an offset-aware Time, one VM: block per entry (Provider, VM-ID, Name, Directory), and the comment last. The comment is trimmed on the way in and out, as before.
+
+4. Root-metadata semantics
+- No marker is created when a backup starts.
+- A marker is created when the first format-2 batch is complete, and before the batch is published.                            - An existing marker at format 2 from the same aphanged. Otherwise it is rewritten with created.*kept and last.written.by.version updated.
+- A newer or invalid marker is refused.
+
+Trade-off: if the publish move fails after the marker is written, the medium declares format 2 with no format-2 batch. That is consistent, and nothing is shown for the failed backup. It does mean the marker can exist after a failed backup. I chose this over the reverse order, which can leave a published format-2 batch with no marker.
+
+5. Scanner changes
+- Format-2 batches are scanned from their manifests. Identity comes from VM-ID, the container from Directory, and the time from the manifest's offset-aware Time.                                                                                            - A format-2 backup attaches to the local VM withthere is no local VM, it appears as a backup-onlyentry, and the entry's Name is shown.
+- Containers that the manifest does not list are ignored.
+- A missing container is reported as a batch issue, and the batch's other VMs still show.
+- Format-1 scanning is unchanged. The format-1 backup id is still computed by the same formula.
+
+6. Backup-id scheme
+
+- Format 1: unchanged, base64url(batch + "\n" + folder). Pinned by golden tests.                                               - Format 2: base64url("format-2\n" + batch + "\n" display name. The same local id under twoproviders gets different ids. The tag keeps it disjoint from format 1, because a format-1 batch name always starts with a year.
+7. Delete behaviour
+
+- Format 1 is unchanged.
+- For format 2, the manifest is rewritten without the selected entry, then only that VM's container is removed. If no entry remains, the batch directory is removed.
+- The guard and the Stable check run first, as before.
+                                                                                                                               8. Retention behaviour
+
+Retention works on canonical ids and calls the same delete path. It deletes only the selected VM's containers, so other VMs in batch and other providers are untouched. Format-2, which is more precise than the file-system time used for format 1.
+
+9. Failure safety
+
+- A failure before publish removes the incomplete directory, and the marker is never written for that batch.
+- The manifest is written only after the data it refers to is in place.                                                        - A copy failure leaves no manifest entry and no
+- Incomplete directories are never scanned.
+- Delete records the removal in the manifest before removing data. A crash can leave orphaned data, which is never shown, but    never a manifest entry for deleted data.
+
+10. Tests added or updated
+
+Covered: the layout, distinct containers, manifest matching the directories, marker creation and non-creation, no format-1 writes, comments, offset time, and the existing marker's update rules. Also covered: collisions, deterministic names and ids, the golden legacy ids, scanning and attribution, the mixed medium, deletion, retention, Stable protection, incomplete batches, and the rule that a format-2 batch without a marker blocks deletion.
+                                                                                                                               11. Focused test commands run
+                                                                                                                               - mvn clean test -Dtest='BackupIdentityTest,Backut,CreateBackupServiceTest,BackupScanner*Test,BackupAttributionCharacterizationIntegrationTest,BackupControllerIntegrationTest,BackupWriteGuardIntegrationTest,RetentionServiceTest,BackupJobServiceTest,BackupStorage*Test,BackupManifest*Test': 236 tests, all passing, run on the isolated copy.
+- mvn clean test -Dtest='FormatTwoScanningTest,BackupScannerLegacyCharacterizationTest,BackupScannerManifestTest,BackupScannerM  ltiProviderTest': 36 tests, all passing, after
+
+12. Newly discovered issues and architectural concerns
+- Cross-version risk: a 1.4.x or 1.5.0 build sees each container as a pseudo-VM and does not understand the format-2 manifest. Its delete removes only that container, but it does not update the manifest. The new build then reports a missing container. Recommend a release note rather than a code change.
+- The restriction to UTM remains. CreateBackupService derives the canonical id as utm:<local id>, because it receives LocalVm. The right fix is to pass ManagedVm or VmId in, which needs a broader test change.
+- Orphaned data after a crash during delete is invisible and takes disk space. There is no cleanup for it yet.                 - Delete temporaries: a crash during a manifest rFO-*.tmp in the batch. It is harmless, since it is not a manifest name, but it is not cleaned up.
+- Shared target/ again: the repository's target/ produced 24 conflict copies during a build, so the focused runs and the final verify ran on the isolated copy. The repository sources have no conflict copies.
+                                                                                                                               13. Final mvn clean verifyRun on the isolated copy, identical to the reposiff -r): BUILD SUCCESS, 372 tests, 0 failures, 0errors, 0 skipped.                                                                                                             14. Sonar and quality gate
+Not verified for Phase 6. Read-only queries show 0 unresolved issues, but the latest analysis (13:45) has none of the Phase-6  files. Submitting an analysis needs a token that not have. The developer should run mvn cleanverify sonar:sonar -Dsonar.projectKey=utm-backup-manager -Dsonar.host.url=http://devsecops:9000 -Dsonar.token="$SONAR_TOKEN".
+Phase 7 has not been started. QEMU is not implemented, vm_state keys are unchanged, and Stable and note state stays in SQLite. Nothing was committed or pushed.
+
+✻ Cogitated for 29m 49s · done 3:05 AM

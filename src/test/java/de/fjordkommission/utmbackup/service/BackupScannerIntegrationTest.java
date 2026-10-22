@@ -3,6 +3,7 @@ package de.fjordkommission.utmbackup.service;
 import de.fjordkommission.utmbackup.AbstractIntegrationTest;
 import de.fjordkommission.utmbackup.model.BackupOverview;
 import de.fjordkommission.utmbackup.model.VmBackup;
+import de.fjordkommission.utmbackup.model.VmId;
 import de.fjordkommission.utmbackup.model.VmOverview;
 import de.fjordkommission.utmbackup.repository.StableRepository;
 
@@ -71,7 +72,7 @@ class BackupScannerIntegrationTest extends AbstractIntegrationTest {
         assertEquals(4, vm.normalCount());
         assertEquals(0, vm.stableCount());
 
-        assertTrue(overview.retentionExceeded().contains("test-linux-vm"));
+        assertTrue(overview.retentionExceeded().contains(new VmId("utm", "test-linux-vm")));
 
         VmBackup oldest = findBackup(vm, "2026-09-01_1200");
 
@@ -101,7 +102,7 @@ class BackupScannerIntegrationTest extends AbstractIntegrationTest {
         assertEquals(3, vm.normalCount());
         assertEquals(1, vm.stableCount());
 
-        assertFalse(overview.retentionExceeded().contains("test-linux-vm"));
+        assertFalse(overview.retentionExceeded().contains(new VmId("utm", "test-linux-vm")));
         assertFalse(
                 overview.retentionCandidatesForDeletion().contains(oldest.id())
         );

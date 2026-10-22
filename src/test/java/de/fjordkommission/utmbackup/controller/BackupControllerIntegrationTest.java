@@ -141,7 +141,7 @@ class BackupControllerIntegrationTest extends AbstractIntegrationTest {
     @Test
     void startsBackupForStoppedVmAndReportsStatus() throws Exception {
         mockMvc.perform(post("/backup")
-                        .param("vmIds", "test-linux-vm")
+                        .param("vmIds", "utm:test-linux-vm")
                         .param("comment", "Integration test backup"))
                 .andExpect(status().is3xxRedirection())
                 .andExpect(view().name("redirect:/"))
@@ -168,7 +168,7 @@ class BackupControllerIntegrationTest extends AbstractIntegrationTest {
                     "integration test configuration",
                     Files.readString(
                             createdBackup.resolve(
-                                    "VMs/TestLinux.utm/config.plist"
+                                    "VMs/utm__test-linux-vm/TestLinux.utm/config.plist"
                             )
                     )
             );
@@ -177,7 +177,7 @@ class BackupControllerIntegrationTest extends AbstractIntegrationTest {
                     "integration test disk",
                     Files.readString(
                             createdBackup.resolve(
-                                    "VMs/TestLinux.utm/Data/disk.img"
+                                    "VMs/utm__test-linux-vm/TestLinux.utm/Data/disk.img"
                             )
                     )
             );
