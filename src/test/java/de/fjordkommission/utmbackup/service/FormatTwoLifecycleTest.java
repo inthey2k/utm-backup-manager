@@ -16,6 +16,8 @@ import de.fjordkommission.utmbackup.storage.BackupManifest;
 import de.fjordkommission.utmbackup.storage.BackupManifestReader;
 import de.fjordkommission.utmbackup.storage.BackupManifestResult;
 import de.fjordkommission.utmbackup.storage.BackupManifestWriter;
+import de.fjordkommission.utmbackup.storage.BackupState;
+import de.fjordkommission.utmbackup.storage.BackupStateWriter;
 import de.fjordkommission.utmbackup.storage.BackupStorageGuard;
 import de.fjordkommission.utmbackup.storage.BackupStorageMetadataReader;
 import de.fjordkommission.utmbackup.storage.BackupStorageReadOnlyException;
@@ -78,7 +80,7 @@ class FormatTwoLifecycleTest {
                 changeStatus,
                 guard
         );
-        backupService = new BackupService(scanner, repo, guard);
+        backupService = new BackupService(scanner, repo, guard, new BackupStateWriter());
         retentionService = new RetentionService(scanner, backupService, guard);
     }
 
@@ -159,7 +161,7 @@ class FormatTwoLifecycleTest {
         marker();
         Path batch = batch("2026-10-20_1200", 20, entry("utm", "A.utm", "utm__A"));
         String id = idOf(new VmId("utm", "A.utm"), "2026-10-20_1200");
-        when(repo.findAll()).thenReturn(Map.of(id, new StableRepository.Meta(true, null)));
+        new BackupStateWriter().writeFile(batch.resolve("VMs").resolve("utm__A"), new BackupState(true, ""));
 
         assertThrows(IllegalStateException.class, () -> backupService.delete(id));
 
@@ -214,7 +216,8 @@ class FormatTwoLifecycleTest {
         batch("2026-10-02_1200", 2, entry("utm", "A.utm", "utm__A"));
         batch("2026-10-03_1200", 3, entry("utm", "A.utm", "utm__A"));
         String oldestStable = idOf(new VmId("utm", "A.utm"), "2026-10-01_1200");
-        when(repo.findAll()).thenReturn(Map.of(oldestStable, new StableRepository.Meta(true, null)));
+        new BackupStateWriter().writeFile(root.resolve("2026-10-01_1200").resolve("VMs").resolve("utm__A"),
+                new BackupState(true, ""));
 
         retentionService.deleteBackupsExceedingRetention(List.of(new VmId("utm", "A.utm")));
 

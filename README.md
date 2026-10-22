@@ -318,7 +318,8 @@ be deleted.
 ### Writing a Note to a Backup
 When you create a new backup, you can write a comment to it. This comment applies to all VMs that are 
 copied with that backup. If you want to add more info to an individual VM backup, you can use the "Note" 
-button in each card to enter info on a certain backup. 
+button in each card to enter info on a certain backup. For backups in the current format, the note and the Stable
+flag are stored in the backup itself (`BACKUP-STATE.properties`), so they travel with the backup medium.
 
 ![UTM Backup Manager - Edit Note to Backup](docs/screenshots/07-edit-note-to-backup.png)
 

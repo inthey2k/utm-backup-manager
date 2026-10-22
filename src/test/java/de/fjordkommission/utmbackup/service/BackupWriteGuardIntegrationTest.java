@@ -13,6 +13,7 @@ import de.fjordkommission.utmbackup.provider.FakeVmProvider;
 import de.fjordkommission.utmbackup.provider.VmProviderRegistry;
 import de.fjordkommission.utmbackup.repository.SettingsRepository;
 import de.fjordkommission.utmbackup.repository.StableRepository;
+import de.fjordkommission.utmbackup.storage.BackupStateWriter;
 import de.fjordkommission.utmbackup.storage.BackupStorageGuard;
 import de.fjordkommission.utmbackup.storage.BackupStorageMetadataReader;
 import de.fjordkommission.utmbackup.storage.BackupStorageReadOnlyException;
@@ -65,7 +66,7 @@ class BackupWriteGuardIntegrationTest {
     void deleteIsRefusedBeforeAnyFileIsRemovedOrMetadataChanged() throws IOException {
         marker(NEWER_MARKER);
         BackupScanner mockedScanner = mock(BackupScanner.class);
-        BackupService service = new BackupService(mockedScanner, repo, guard);
+        BackupService service = new BackupService(mockedScanner, repo, guard, new BackupStateWriter());
 
         assertThrows(BackupStorageReadOnlyException.class, () -> service.delete("any-id"));
 
@@ -77,7 +78,7 @@ class BackupWriteGuardIntegrationTest {
     void stableChangeIsRefusedBeforeSqliteIsChanged() throws IOException {
         marker("invalid");
         BackupScanner mockedScanner = mock(BackupScanner.class);
-        BackupService service = new BackupService(mockedScanner, repo, guard);
+        BackupService service = new BackupService(mockedScanner, repo, guard, new BackupStateWriter());
 
         assertThrows(BackupStorageReadOnlyException.class, () -> service.stable("any-id", true));
 
@@ -88,7 +89,7 @@ class BackupWriteGuardIntegrationTest {
     void noteChangeIsRefusedBeforeSqliteIsChanged() throws IOException {
         marker(NEWER_MARKER);
         BackupScanner mockedScanner = mock(BackupScanner.class);
-        BackupService service = new BackupService(mockedScanner, repo, guard);
+        BackupService service = new BackupService(mockedScanner, repo, guard, new BackupStateWriter());
 
         assertThrows(BackupStorageReadOnlyException.class, () -> service.note("any-id", "text"));
 
@@ -178,7 +179,7 @@ class BackupWriteGuardIntegrationTest {
         BackupScanner mockedScanner = mock(BackupScanner.class);
         VmBackup backup = new VmBackup("id", BATCH, "Linux.utm", root, null, "", false, null);
         when(mockedScanner.find("id")).thenReturn(Optional.of(backup));
-        BackupService service = new BackupService(mockedScanner, repo, guard);
+        BackupService service = new BackupService(mockedScanner, repo, guard, new BackupStateWriter());
 
         service.stable("id", true);
 

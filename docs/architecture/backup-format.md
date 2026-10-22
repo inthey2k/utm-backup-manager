@@ -210,6 +210,8 @@ a marker that is unreadable is never ignored.
 - Mutating operations are refused before their first change: backup creation,
   deletion, retention cleanup, Stable changes, note changes, and root-marker writes.
   No file is created, moved or removed, and no SQLite row is changed.
+- Stable and note changes for format 2 also write `BACKUP-STATE.properties`, which is
+  described in *Stable and note state*.
 - A refused operation fails with the domain reason, for example
   `Backup storage is read-only: the medium uses storage format 3, which is newer than the supported format 2`.
   Existing error paths show this message without further changes.
@@ -242,7 +244,9 @@ Every new batch is written in this layout:
 ```
 
 - Each direct child of `VMs/` is exactly one logical VM, its **container**. Its
-  sources are copied inside it under their own file names.
+  sources are copied inside it under their own file names. The container may also
+  hold `BACKUP-STATE.properties`, the mutable Stable and note state of that VM
+  backup (see *Stable and note state*). It is optional and is never a source.
 - The container name is only a filesystem name. It is never parsed. Identity comes
   from the manifest entry whose `Directory` names the container.
 - Container name rule: `<providerId>__<local id>`, where every character outside
@@ -256,8 +260,9 @@ Every new batch is written in this layout:
 
 ## Format-2 backup IDs
 
-A backup id is the key of its Stable and note metadata in SQLite, so it is fixed
-once used.
+A backup id is the key of its row in the SQLite metadata table, so it is fixed once
+used. For format 2 that row is only a cache of the state on the medium (see
+*Stable and note state*).
 
 | Format | Scheme | Example input |
 |---|---|---|
@@ -313,12 +318,121 @@ rewritten.
   3. if no entry remains, the batch directory is removed too.
   A crash between steps 1 and 2 leaves orphaned data that is never shown. It never
   leaves a manifest entry that points at deleted data.
-- The Stable check and the guard run before any of this. Stable backups cannot be
-  deleted, as before.
-- Retention works on canonical ids and on the same per-VM backup list. It deletes
-  the oldest non-Stable backups of the selected VMs through the same delete path, so
-  other VMs of the same batch and other providers are untouched.
+- The guard runs before any of this. Before the manifest is rewritten, the
+  container's `BACKUP-STATE.properties` is read again. A backup that is Stable there
+  cannot be deleted, and an unreadable state file blocks the deletion. SQLite is not
+  consulted, so a stale Stable flag there neither protects nor unprotects a backup.
+- Retention works on canonical ids and on the same per-VM backup list. The Stable
+  state shown in that list comes from the medium, so a Stable format-2 backup is never
+  a retention candidate. An unreadable state file is shown as Stable. It is excluded
+  from retention and blocked from deletion, so it is never removed by mistake.
+  Retention deletes the oldest non-Stable backups of the selected VMs through the same
+  delete path, so other VMs of the same batch and other providers are untouched.
 - Format-1 deletion and retention are unchanged.
+
+## Stable and note state
+
+Stable and the note are mutable. They are not part of the immutable batch identity
+or the manifest. Each format-2 backup, that is each VM of a batch, has its own state
+file. This matches the per-backup scope of Stable and notes.
+
+`BACKUP-STATE.properties` lives in the VM's container, next to its copied sources:
+
+```properties
+# UTM Backup Manager: mutable state of this backup, replaced atomically.
+stable=true
+note=Before kernel update
+```
+
+Syntax:
+
+- UTF-8, with or without BOM, LF or CRLF line endings. Bytes that are not valid
+  UTF-8 make the file invalid.
+- `key=value`. Blank lines and lines starting with `#` are ignored. A line without `=`
+  is malformed.
+- `stable` (required) must be exactly `true` or `false`. A missing, duplicated or
+  other value (for example `yes`) is malformed.
+- `note` (optional) is one line. The escapes `\\`, `\n` and `\r` represent a backslash
+  and line breaks. Any other backslash sequence is malformed. The note is stripped at
+  both ends and is empty when absent.
+- A known key that appears twice is malformed. Unknown keys are ignored, so later
+  versions can add fields.
+- The writer adds no timestamp, so the same state always gives the same bytes. It
+  checks by re-parsing that the output reads back unchanged, and it writes through a
+  temporary file that is moved over the target.
+
+### Note and BACKUP-INFO comment
+
+These are two different things and keep their semantics:
+
+- `Comment:` in `BACKUP-INFO.txt` is the immutable comment written with the batch.
+  It applies to every VM of the batch and is never changed by the application.
+- The **note** in `BACKUP-STATE.properties` is the mutable note of one VM backup,
+  edited through the "Note" button. It is never written into the manifest.
+
+### Authority rules
+
+| Format | Authority for Stable and note | SQLite |
+|---|---|---|
+| 1 | SQLite (`vm_backup_metadata`), as in 1.4.x. The legacy `_stable` directory name still gives Stable once. | The authority. No state file is written. |
+| 2 | `BACKUP-STATE.properties` of the container | A cache (see below). It is never read for format-2 Stable or notes. |
+
+For format 2 the file wins. The two sources are never combined with OR or a merge.
+If they disagree, the file decides. Concretely:
+
+- A file that says `stable=true` protects the backup, even if SQLite says `false`.
+- A file that says `stable=false` does not protect the backup, even if SQLite says `true`.
+- The note comes from the file alone.
+
+### Defaults when the file is absent
+
+A format-2 backup without `BACKUP-STATE.properties` is not an error. It is
+`stable=false` with an empty note, and SQLite is not consulted. The file is created by
+the first Stable or note change.
+
+### Unreadable state
+
+A file that exists but is invalid is never replaced by the defaults or by SQLite:
+
+- The scanner shows the backup as **Stable**, so it is excluded from retention and cannot
+  be deleted. The batch issue names the VM and gives the reason.
+- Changing Stable or the note is refused with the reason, and nothing is written.
+- Deletion is refused with the reason.
+
+The user repairs or removes the file on the medium to continue. Removing it gives the
+defaults.
+
+### Write ordering
+
+Stable and note changes for format 2 run in this order:
+
+1. The compatibility guard (`assertWritable`) refuses a read-only medium.
+2. The backup is found by the scanner and must be format 2 by its manifest.
+3. The current state file is read. An absent file gives the defaults; an invalid file
+   stops the change.
+4. The new state, with the other field unchanged, is written atomically to
+   `BACKUP-STATE.properties`. This is the commit point.
+5. SQLite is updated as a mirror of the new state, only after step 4 succeeded.
+
+Failure semantics:
+
+- A failure in step 4 fails the operation. The old file is kept, SQLite is unchanged,
+  and no partial file is left behind.
+- A failure in step 5 after a successful step 4 is reported as: the change was saved
+  to the backup, but the local metadata cache could not be updated. The backup is
+  authoritative, so the change is in effect. SQLite can be stale until the next
+  successful change. Nothing reads it for format 2, so the scan and deletion stay
+  correct.
+
+### SQLite's role for format 2
+
+SQLite keeps a row per format-2 backup id, updated only as a mirror of the state file.
+It exists for compatibility with the existing table and for a future local index. It
+is never a source for Stable, notes, deletion, or retention of format 2. A stale row
+has no effect, and no schema change is needed.
+
+Format 1 is unchanged: Stable and notes are read and written in SQLite, and no
+`BACKUP-STATE.properties` is created for a format-1 batch.
 
 ## Mixed-format media
 
@@ -354,8 +468,6 @@ touched.
 
 ## Not yet defined here
 
-- Stable and note state for format 2 batches. Still stored in SQLite, keyed by the
-  format-2 backup id.
 - Enabling backups of VMs from providers other than UTM. Format 2 can store them;
   the restriction is still in the backup-start controller until the provider
   implementation is verified.

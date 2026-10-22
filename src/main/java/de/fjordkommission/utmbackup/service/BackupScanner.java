@@ -10,6 +10,9 @@ import de.fjordkommission.utmbackup.storage.BackupManifestReader;
 import de.fjordkommission.utmbackup.storage.BackupIdentity;
 import de.fjordkommission.utmbackup.storage.BackupManifestResult;
 import de.fjordkommission.utmbackup.storage.BackupStorageGuard;
+import de.fjordkommission.utmbackup.storage.BackupState;
+import de.fjordkommission.utmbackup.storage.BackupStateReader;
+import de.fjordkommission.utmbackup.storage.BackupStateResult;
 import de.fjordkommission.utmbackup.storage.BackupStorageReadOnlyException;
 import de.fjordkommission.utmbackup.storage.LegacyBackupTime;
 import org.springframework.stereotype.Service;
@@ -40,6 +43,7 @@ public class BackupScanner {
     private final VmChangeStatusService vmChangeStatusService;
     private final BackupStorageGuard storageGuard;
     private final BackupManifestReader manifestReader = new BackupManifestReader();
+    private final BackupStateReader stateReader = new BackupStateReader();
 
 
     public BackupScanner(
@@ -284,7 +288,7 @@ public class BackupScanner {
 
         if (manifestResult instanceof BackupManifestResult.Parsed(BackupManifest parsed)
                 && parsed.formatVersion() == BackupFormat.PROVIDER_AWARE) {
-            scanFormatTwoBatch(directory, vmDirectory, parsed, metadata, backupsByVm, batchIssues);
+            scanFormatTwoBatch(directory, vmDirectory, parsed, backupsByVm, batchIssues);
             return;
         }
 
@@ -381,7 +385,6 @@ public class BackupScanner {
             Path directory,
             Path vmDirectory,
             BackupManifest manifest,
-            Map<String, StableRepository.Meta> metadata,
             Map<VmId, List<VmBackup>> backupsByVm,
             List<BackupBatchIssue> batchIssues
     ) {
@@ -395,7 +398,7 @@ public class BackupScanner {
             Path container = vmDirectory.resolve(entry.directory());
 
             if (Files.isDirectory(container)) {
-                addFormatTwoBackup(batchName, entry, container, backupTime, manifest.comment(), metadata, backupsByVm);
+                addFormatTwoBackup(batchName, entry, container, backupTime, manifest.comment(), backupsByVm, batchIssues);
             } else {
                 batchIssues.add(new BackupBatchIssue(
                         batchName,
@@ -411,11 +414,11 @@ public class BackupScanner {
             Path container,
             LocalDateTime backupTime,
             String comment,
-            Map<String, StableRepository.Meta> metadata,
-            Map<VmId, List<VmBackup>> backupsByVm
+            Map<VmId, List<VmBackup>> backupsByVm,
+            List<BackupBatchIssue> batchIssues
     ) {
         String id = BackupIdentity.formatTwoId(batchName, entry.id());
-        StableRepository.Meta storedMetadata = metadata.get(id);
+        BackupState state = formatTwoState(batchName, entry, container, batchIssues);
 
         VmBackup backup = new VmBackup(
                 id,
@@ -424,11 +427,36 @@ public class BackupScanner {
                 container,
                 backupTime,
                 comment,
-                storedMetadata != null && storedMetadata.stable(),
-                storedMetadata != null ? storedMetadata.note() : null
+                state.stable(),
+                state.note().isEmpty() ? null : state.note()
         );
 
         backupsByVm.computeIfAbsent(entry.id(), ignored -> new ArrayList<>()).add(backup);
+    }
+
+    /**
+     * The authoritative Stable and note state of a format-2 backup, read from its
+     * container. SQLite is not consulted. An unreadable state file keeps the backup
+     * protected: it is shown as Stable, so retention and deletion skip it, and the batch
+     * issue gives the reason. The defaults apply only when the file is absent.
+     */
+    private BackupState formatTwoState(
+            String batchName,
+            BackupManifest.VmEntry entry,
+            Path container,
+            List<BackupBatchIssue> batchIssues
+    ) {
+        return switch (stateReader.read(container)) {
+            case BackupStateResult.Absent() -> BackupState.DEFAULT;
+            case BackupStateResult.Parsed(BackupState state) -> state;
+            case BackupStateResult.Invalid(String reason) -> {
+                batchIssues.add(new BackupBatchIssue(
+                        batchName,
+                        "VM " + entry.id() + " has an unreadable state, so it is kept as Stable: " + reason
+                ));
+                yield new BackupState(true, "");
+            }
+        };
     }
     /**
      * Returns the format-1 manifest of a batch that can be shown. Any other batch is
