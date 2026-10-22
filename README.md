@@ -224,6 +224,23 @@ since its most recent acknowledged backup. This is a practical
 indication for deciding whether another backup may be useful; it is not
 a cryptographic comparison of complete VM contents.
 
+## Status indicators in the overview
+
+-   Each VM shows a provider badge, such as `UTM`, next to its name.
+-   The header shows whether each enabled provider was queried successfully
+    (`Active`) or not (`Unavailable`). A provider whose VMs cannot be listed,
+    or whose VM states are incomplete, is explained in a warning above the
+    overview. Its existing backups stay visible.
+-   VMs of providers that the backup writer does not support yet are shown,
+    but they cannot be selected for a backup.
+-   If the backup storage is read-only, a warning explains why. Existing
+    backups stay readable, while creating backups and the Stable, note and
+    delete actions are disabled. The application enforces these rules on
+    the server as well.
+-   Batches that could not be shown completely are listed above the
+    overview. Their affected backups are marked `BATCH ISSUE`. A backup whose
+    state file cannot be read is kept protected as Stable.
+
 ## Safety and data integrity
 
 The application follows deliberately conservative rules:

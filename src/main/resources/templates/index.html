@@ -27,10 +27,25 @@
                     <div class="header-path" th:each="provider : ${configuration.providers()}">
                         <span th:text="${provider.providerName() + ' · ' + #messages.msg('config.vmDirectory')}">Local VMs</span>
                         <code th:text="${provider.configurationValue('localVmDirectory')}"></code>
+                        <span class="provider-state"
+                              th:if="${overview != null}"
+                              th:classappend="${overview.providerHealthy(provider.providerId()) ? 'ok' : 'error'}"
+                              th:text="${overview.providerHealthy(provider.providerId())
+                                  ? #messages.msg('provider.state.ok')
+                                  : #messages.msg('provider.state.error')}">
+                        </span>
                     </div>
                     <div class="header-path">
                         <span th:text="#{config.backupRoot}">Backup root</span>
                         <code th:text="${configuration.backupRoot()}"></code>
+                    </div>
+                    <div class="header-path storage-state">
+                        <span th:text="#{storage.label}">Backup storage</span>
+                        <span class="storage-state-value"
+                              th:classappend="${storageStatus.writable ? '' : 'read-only'}"
+                              th:title="${storageStatus.reason()}"
+                              th:text="#{|storage.state.${storageStatus.compatibility().name()}|}">
+                        </span>
                     </div>
                 </div>
             </div>
@@ -39,8 +54,10 @@
                 <button type="button"
                         class="create-backup-button"
                         id="create-backup-button"
-                        th:disabled="${!backupRootAvailable or backupJobRunning}"
+                        th:disabled="${!backupRootAvailable or backupJobRunning or !storageStatus.writable}"
+                        th:title="${storageStatus.writable ? null : #messages.msg('storage.notWritable')}"
                         th:attr="data-job-running=${backupJobRunning},
+                             data-storage-blocked=${!storageStatus.writable},
                              data-label-ready=#{backup.create},
                              data-label-running=#{backup.job.running}"
                         th:text="${backupJobRunning
@@ -258,6 +275,53 @@
         </div>
     </dialog>
 
+    <!-- Read-only storage: changes are blocked, readable backups stay visible -->
+    <div class="notice"
+         th:if="${!storageStatus.writable and storageStatus.compatibility().name() != 'UNAVAILABLE'}">
+        <strong th:text="#{|storage.state.${storageStatus.compatibility().name()}|}">Read-only</strong>
+        <span th:text="#{storage.readOnly.explanation}">
+            Changes are blocked. Existing backups remain readable.
+        </span>
+        <small th:text="${storageStatus.reason()}"></small>
+    </div>
+
+    <div th:if="${backupRootAvailable}">
+        <!-- Provider problems: the rest of the page stays usable -->
+        <div class="notice"
+             th:each="provider : ${overview.providers()}"
+             th:if="${!provider.listed() or provider.hasErrors()}">
+            <strong>
+                <span th:text="${provider.providerName()}"></span>
+                <span class="provider-badge"
+                      th:text="${provider.providerBadge()}"
+                      th:title="${provider.providerName()}"></span>
+            </strong>
+            <span th:if="${!provider.listed()}" th:text="#{provider.notListed}">
+                VMs of this provider cannot be listed.
+            </span>
+            <span th:if="${provider.listed() and provider.hasErrors()}" th:text="#{provider.partiallyUnavailable}">
+                Live VM information is incomplete.
+            </span>
+            <ul>
+                <li th:each="error : ${provider.errors()}" th:text="${error}"></li>
+            </ul>
+        </div>
+
+        <!-- Batch issues: affected backups are marked on their cards -->
+        <div class="notice" th:if="${!overview.batchIssues().isEmpty()}">
+            <strong th:text="#{backup.batchIssues.title}">Backup batch issues</strong>
+            <span th:text="#{backup.batchIssues.description}">
+                Some backup batches could not be shown completely.
+            </span>
+            <ul>
+                <li th:each="issue : ${overview.batchIssues()}">
+                    <code th:text="${issue.batchDirectoryName()}"></code>
+                    <span th:text="${issue.reason()}"></span>
+                </li>
+            </ul>
+        </div>
+    </div>
+
     <!-- VM overview -->
     <p th:if="${backupRootAvailable and overview.vms().isEmpty()}"
        th:text="#{overview.empty}">
@@ -277,6 +341,9 @@
                           th:aria-label="${vm.status().name()}">
                     </span>
                     <strong th:text="${vm.name()}"></strong>
+                    <span class="provider-badge"
+                          th:text="${vm.providerBadge()}"
+                          th:title="${vm.providerName()}"></span>
                 </div>
 
                 <span>
@@ -304,8 +371,14 @@
                      th:classappend="${vm.changeStatus().cssClass()}"
                      th:text="${#messages.msg('vm.changeStatus.' + vm.changeStatus().name())}">
                 </div>
+                <div class="vm-change-status unknown"
+                     th:if="${!vm.local()}"
+                     th:text="${overview.providerEnabled(vm.providerId())
+                         ? #messages.msg('vm.backupOnly')
+                         : #messages.msg('provider.notEnabled')}">
+                </div>
                 <div class="vm-change-status"
-                     th:unless="${vm.status().name() == 'STOPPED'}">&nbsp;</div>
+                     th:if="${vm.local() and vm.status().name() != 'STOPPED'}">&nbsp;</div>
             </header>
 
             <!-- VM without backups -->
@@ -334,6 +407,11 @@
                         <span th:text="#{backup.retentionCandidate}">
                             DELETE CANDIDATE
                         </span>
+                    </div>
+                    <div class="batch-issue"
+                         th:if="${overview.hasBatchIssue(backup.backupDirectoryName())}"
+                         th:text="#{backup.batchIssue}">
+                        BATCH ISSUE
                     </div>
 
                     <!-- Stable marker -->
@@ -367,7 +445,7 @@
                     </div>
 
                     <!-- Action menu -->
-                    <div class="actions">
+                    <div class="actions" th:with="writable=${storageStatus.writable}">
                         <!-- Pin to mark as stable -->
                         <form th:action="@{/stable/{id}(id=${backup.id()})}"
                               method="post">
@@ -377,12 +455,17 @@
                             <button type="submit"
                                     class="icon-button pin"
                                     th:classappend="${backup.stable()} ? ' active' : ''"
-                                    th:title="${backup.stable()
-                                        ? #messages.msg('backup.stable.remove')
-                                        : #messages.msg('backup.stable.add')}"
-                                    th:aria-label="${backup.stable()
-                                        ? #messages.msg('backup.stable.remove')
-                                        : #messages.msg('backup.stable.add')}">
+                                    th:disabled="${!writable}"
+                                    th:title="${!writable
+                                        ? #messages.msg('storage.notWritable')
+                                        : backup.stable()
+                                            ? #messages.msg('backup.stable.remove')
+                                            : #messages.msg('backup.stable.add')}"
+                                    th:aria-label="${!writable
+                                        ? #messages.msg('storage.notWritable')
+                                        : backup.stable()
+                                            ? #messages.msg('backup.stable.remove')
+                                            : #messages.msg('backup.stable.add')}">
                                 <svg viewBox="0 0 24 24"
                                      aria-hidden="true">
                                     <path d="M12 17v5"/>
@@ -397,8 +480,9 @@
                         <button type="button"
                                 class="icon-button note-button"
                                 th:classappend="${backup.note() != null and !backup.note().isBlank()} ? ' active' : ''"
-                                th:title="#{backup.note.edit}"
-                                th:aria-label="#{backup.note.edit}"
+                                th:disabled="${!writable}"
+                                th:title="${writable ? #messages.msg('backup.note.edit') : #messages.msg('storage.notWritable')}"
+                                th:aria-label="${writable ? #messages.msg('backup.note.edit') : #messages.msg('storage.notWritable')}"
                                 th:attr="data-dialog-id=${'note-' + backup.id()}">
                             <svg viewBox="0 0 24 24"
                                  aria-hidden="true">
@@ -410,8 +494,9 @@
                         <button th:if="${!backup.stable()}"
                                 type="button"
                                 class="icon-button delete delete-button"
-                                th:title="#{backup.delete}"
-                                th:aria-label="#{backup.delete}"
+                                th:disabled="${!writable}"
+                                th:title="${writable ? #messages.msg('backup.delete') : #messages.msg('storage.notWritable')}"
+                                th:aria-label="${writable ? #messages.msg('backup.delete') : #messages.msg('storage.notWritable')}"
                                 th:attr="data-dialog-id=${'delete-' + backup.id()}">
                             <svg viewBox="0 0 24 24"
                                  aria-hidden="true">
@@ -449,7 +534,12 @@
                                     <small th:text="#{backup.note.for}">
                                         Note for
                                     </small>
-                                    <h2 th:text="${vm.name}"></h2>
+                                    <h2>
+                                        <span th:text="${vm.name}"></span>
+                                        <span class="provider-badge"
+                                              th:text="${vm.providerBadge()}"
+                                              th:title="${vm.providerName()}"></span>
+                                    </h2>
                                 </div>
                                 <button type="button"
                                         class="dialog-close"
@@ -501,7 +591,12 @@
                                     <small th:text="#{backup.delete.title}">
                                         Delete VM backup
                                     </small>
-                                    <h2 th:text="${vm.name}"></h2>
+                                    <h2>
+                                        <span th:text="${vm.name}"></span>
+                                        <span class="provider-badge"
+                                              th:text="${vm.providerBadge()}"
+                                              th:title="${vm.providerName()}"></span>
+                                    </h2>
                                 </div>
                                 <button type="button"
                                         class="dialog-close delete-cancel"
@@ -649,19 +744,29 @@
                            th:value="${vm.id()}"
                            th:attr="data-vm-name=${vm.name()},
                                     data-retention-cleanup-required=${vm.normalCount() >= overview.retentionLimit()}"
-                           th:disabled="${vm.status().name() != 'STOPPED' or vm.providerId() != 'utm'}">
+                           th:disabled="${vm.status().name() != 'STOPPED' or !vm.backupSupported() or !storageStatus.writable}">
 
                     <span class="vm-status"
                           th:classappend="${vm.status().cssClass()}"
                           th:title="${vm.status().name()}"
                           th:aria-label="${vm.status().name()}">
                     </span>
-                    <span class="backup-vm-name" th:text="${vm.name()}">
+                    <span class="backup-vm-name">
+                        <span th:text="${vm.name()}"></span>
+                        <span class="provider-badge"
+                              th:text="${vm.providerBadge()}"
+                              th:title="${vm.providerName()}"></span>
                     </span>
                     <span class="backup-vm-size" th:attr="data-vm-id=${vm.id()}">
                         <span class="vm-size-spinner" aria-hidden="true"></span>
                     </span>
-                    <span class="backup-vm-status" th:text="${#messages.msg('vm.status.' + vm.status().name())}">
+                    <span class="backup-vm-status"
+                          th:text="${!vm.backupSupported()
+                              ? #messages.msg('backup.provider.notSupportedShort')
+                              : #messages.msg('vm.status.' + vm.status().name())}"
+                          th:title="${!vm.backupSupported()
+                              ? #messages.msg('backup.provider.notSupported', vm.providerName())
+                              : null}">
                     </span>
                 </label>
             </div>

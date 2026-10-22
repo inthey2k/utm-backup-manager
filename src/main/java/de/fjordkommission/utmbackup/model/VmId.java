@@ -1,12 +1,12 @@
 package de.fjordkommission.utmbackup.model;
 
+import java.util.Locale;
 import java.util.Optional;
 import java.util.regex.Pattern;
 
 /**
  * Canonical, provider-qualified identity of a VM, serialized as
  * {@code providerId:localId}, for example {@code utm:ArchLinux 02.27.utm}.
- *
  * The provider id never contains a colon, so parsing splits on the first colon
  * only and local ids may contain colons. The local id is the provider-local
  * {@link LocalVm#id()} and is meaningful only within its provider.
@@ -37,6 +37,14 @@ public record VmId(String providerId, String localId) {
                     "Local VM id must not be blank"
             );
         }
+    }
+
+    /**
+     * Short label for the provider badge shown next to VM names, derived from the
+     * provider id so new providers need no UI changes.
+     */
+    public static String providerBadge(String providerId) {
+        return providerId.toUpperCase(Locale.ROOT);
     }
 
     /**

@@ -5,7 +5,6 @@ import java.util.Map;
 
 /**
  * The result of querying one provider during an inventory build.
- *
  * A failure is recorded in {@link #errors()} and never thrown to the caller, so
  * one provider cannot hide the VMs or backups of another.
  *
@@ -33,5 +32,10 @@ public record ProviderSnapshot(
 
     public boolean hasErrors() {
         return !errors.isEmpty();
+    }
+
+    /** Provider badge label, derived from the provider id. */
+    public String providerBadge() {
+        return VmId.providerBadge(providerId);
     }
 }

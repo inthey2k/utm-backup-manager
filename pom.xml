@@ -15,6 +15,9 @@
         <tomcat.version>11.0.26</tomcat.version>
         <logback.version>1.6.4</logback.version>
         <custom.build.directory>${project.basedir}/target</custom.build.directory>
+        <sonar.coverage.jacoco.xmlReportPaths>
+            ${project.build.directory}/site/jacoco/jacoco.xml
+        </sonar.coverage.jacoco.xmlReportPaths>
     </properties>
     <dependencyManagement>
         <dependencies>

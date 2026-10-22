@@ -1,10 +1,11 @@
 package de.fjordkommission.utmbackup.model;
 
+import de.fjordkommission.utmbackup.service.LegacyBackupLayout;
+
 import java.util.List;
 
 /**
  * Connects a VM with its existing backup(s) for the overview.
- *
  * The VM is identified by its canonical {@link VmId}. {@code localVm} is null for
  * backup-only VMs, which no enabled provider currently reports. Keeping these
  * entries visible prevents existing backups from disappearing from the interface.
@@ -29,6 +30,19 @@ public record VmOverview(
 
     public String providerId() {
         return id.providerId();
+    }
+
+    /** Provider badge label shown next to the VM name. The canonical id is never shown. */
+    public String providerBadge() {
+        return VmId.providerBadge(providerId());
+    }
+
+    /**
+     * Whether the backup writer can back up this VM. The writer still uses the
+     * format-1 UTM layout, so only the legacy provider qualifies.
+     */
+    public boolean backupSupported() {
+        return LegacyBackupLayout.PROVIDER_ID.equals(providerId());
     }
 
     public long backupCount() {

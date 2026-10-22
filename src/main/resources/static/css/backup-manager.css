@@ -106,6 +106,7 @@ code { overflow-wrap: anywhere; }
 
 .header-path {
     display: flex;
+    align-items: center;
     gap: 6px;
     min-width: 0;
 }
@@ -307,6 +308,56 @@ code { overflow-wrap: anywhere; }
 .err {
     color: #fda4af;
     border: 1px solid #713341;
+}
+
+/* Warning banner for read-only storage, provider problems and batch issues.
+   Uses the amber palette of the retention warnings. */
+.notice {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    margin: 12px 0;
+    padding: 9px 12px;
+    border: 1px solid #d89b3c;
+    border-radius: 8px;
+    color: var(--text-muted);
+    font-size: .85rem;
+    line-height: 1.4;
+}
+
+.notice strong {
+    color: #e5ad55;
+}
+
+.notice small {
+    color: var(--muted);
+    font-size: .8rem;
+    overflow-wrap: anywhere;
+}
+
+.notice ul {
+    margin: 4px 0 0;
+    padding-left: 18px;
+}
+
+.notice code {
+    color: var(--text);
+}
+
+.storage-state-value.read-only,
+.provider-state.error {
+    color: #e5ad55;
+    font-weight: 700;
+}
+
+.provider-state {
+    font-weight: 700;
+}
+
+.provider-state.ok {
+    color: var(--success);
+    padding: 4px 6px 5px 6px;
+    border-radius: 4px;
 }
 
 .flash-message {
@@ -581,10 +632,16 @@ code { overflow-wrap: anywhere; }
 
 .vm-name {
     display: grid;
-    grid-template-columns: 9px auto 9px;
+    grid-template-columns: 9px auto auto;
     align-items: center;
     column-gap: 7px;
     margin-bottom: 3px;
+}
+
+.vm-name .provider-badge {
+    grid-column: 3;
+    justify-self: start;
+    align-self: flex-start;
 }
 
 .vm-name .vm-status {
@@ -766,7 +823,10 @@ code { overflow-wrap: anywhere; }
 
 /* ---------- Retention markers ---------- */
 
-.retention-candidate {
+/* Pill markers. The provider badge reuses this shape in neutral colours, the batch issue in the danger colour. */
+.retention-candidate,
+.batch-issue,
+.provider-badge {
     display: inline-block;
     margin-bottom: 4px;
     padding: 2px 5px;
@@ -776,6 +836,20 @@ code { overflow-wrap: anywhere; }
     font-size: .68rem;
     font-weight: 700;
     letter-spacing: .05em;
+}
+
+.provider-badge {
+    margin-bottom: 0;
+    border-color: var(--border);
+    color: var(--muted);
+    line-height: 1.2;
+    vertical-align: middle;
+    white-space: nowrap;
+}
+
+.batch-issue {
+    border-color: var(--danger);
+    color: var(--danger);
 }
 
 .retention-delete-info {
@@ -853,13 +927,15 @@ code { overflow-wrap: anywhere; }
     color: var(--danger);
 }
 
-.icon-button.disabled {
+.icon-button.disabled,
+.icon-button:disabled {
     color: #46505f;
     cursor: not-allowed;
     opacity: .45;
 }
 
-.icon-button.disabled:hover {
+.icon-button.disabled:hover,
+.icon-button:disabled:hover {
     background: transparent;
     color: #46505f;
 }
@@ -954,7 +1030,7 @@ code { overflow-wrap: anywhere; }
 
 .backup-vm-option {
     display: grid;
-    grid-template-columns: auto auto minmax(0, 1fr) 7rem 6rem;
+    grid-template-columns: auto auto minmax(0, 1fr) 7rem 8rem;
     align-items: center;
     gap: .75rem;
     padding: .65rem .75rem;

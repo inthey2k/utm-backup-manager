@@ -145,8 +145,11 @@ function updateCreateBackupButton() {
         return;
     }
 
+    // Read-only storage is rendered server-side; the backend guard still rejects the job.
     createBackupButton.disabled =
-        backupJobRunning || !backupDialog;
+        backupJobRunning
+        || !backupDialog
+        || createBackupButton.dataset.storageBlocked === "true";
 
     createBackupButton.textContent = backupJobRunning
         ? createBackupButton.dataset.labelRunning
