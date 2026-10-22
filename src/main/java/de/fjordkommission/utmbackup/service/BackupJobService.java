@@ -1,7 +1,7 @@
 package de.fjordkommission.utmbackup.service;
 
 import de.fjordkommission.utmbackup.config.BackupJobConfiguration;
-import de.fjordkommission.utmbackup.model.LocalVm;
+import de.fjordkommission.utmbackup.model.ManagedVm;
 import de.fjordkommission.utmbackup.model.VmId;
 import de.fjordkommission.utmbackup.storage.BackupStorageGuard;
 import org.springframework.beans.factory.annotation.Qualifier;
@@ -53,18 +53,18 @@ public class BackupJobService {
      * Starts a backup job and returns immediately after the task was accepted.
      * A second request is rejected while the current job is still running.
      */
-    public BackupJob start(List<LocalVm> vms, String comment) {
+    public BackupJob start(List<ManagedVm> vms, String comment) {
         return start(vms, comment, List.of());
     }
     public BackupJob start(
-            List<LocalVm> vms,
+            List<ManagedVm> vms,
             String comment,
             List<VmId> retentionCleanupVms
     ) {
         // Refused before any state changes, so the caller gets the reason immediately.
         storageGuard.assertWritable();
 
-        List<LocalVm> selectedVms = List.copyOf(vms);
+        List<ManagedVm> selectedVms = List.copyOf(vms);
         List<VmId> cleanupVms = List.copyOf(retentionCleanupVms);
 
         Set<String> pendingDeletionIds = cleanupVms.isEmpty()
@@ -72,7 +72,7 @@ public class BackupJobService {
                 : Set.copyOf(retentionService.findBackupsPendingDeletion(cleanupVms));
 
         currentVmNames = selectedVms.stream()
-                .map(LocalVm::name)
+                .map(ManagedVm::name)
                 .toList();
 
         BackupJob runningJob;
@@ -157,7 +157,7 @@ public class BackupJobService {
     }
 
     private void runBackup(
-            List<LocalVm> vms,
+            List<ManagedVm> vms,
             String comment,
             List<VmId> retentionCleanupVms,
             Instant startedAt

@@ -1,8 +1,9 @@
 package de.fjordkommission.utmbackup.service;
 
 import de.fjordkommission.utmbackup.config.BackupProperties;
-import de.fjordkommission.utmbackup.model.LocalVm;
+import de.fjordkommission.utmbackup.model.ManagedVm;
 import de.fjordkommission.utmbackup.model.VmId;
+import de.fjordkommission.utmbackup.model.VmStatus;
 import de.fjordkommission.utmbackup.storage.BackupContainers;
 import de.fjordkommission.utmbackup.storage.BackupFormat;
 import de.fjordkommission.utmbackup.storage.BackupManifest;
@@ -75,12 +76,12 @@ public class CreateBackupService {
     }
 
     /** Uses a null value for the comment string */
-    public Result create(LocalVm vm) {
+    public Result create(ManagedVm vm) {
         return create(List.of(vm), null);
     }
 
     /** Uses the constant value NO_PROGRESS for the ProgressListener **/
-    public Result create(List<LocalVm> vms, String comment) {
+    public Result create(List<ManagedVm> vms, String comment) {
         return create(vms, comment, NO_PROGRESS, NEVER_CANCELLED);
     }
 
@@ -88,7 +89,7 @@ public class CreateBackupService {
      * Uses the constant value NEVER_CANCELLED as Cancellation Check
      */
     public Result create(
-            List<LocalVm> vms,
+            List<ManagedVm> vms,
             String comment,
             ProgressListener progressListener
     ) {
@@ -100,12 +101,14 @@ public class CreateBackupService {
         );
     }
     /**
-     * Creates a backup and reports copy progress to the supplied listener.
-     * The listener is deliberately independent of the web layer and job model,
-     * so this service can still be used without the background-job mechanism.
+     * Creates a format-2 backup of the given VMs and reports copy progress to the
+     * supplied listener. The listener is deliberately independent of the web layer
+     * and job model, so this service can still be used without the background-job
+     * mechanism. Every VM must be STOPPED: a disk that is copied while the VM runs
+     * is not a consistent backup.
      */
     public Result create(
-            List<LocalVm> vms,
+            List<ManagedVm> vms,
             String comment,
             ProgressListener progressListener,
             CancellationCheck cancellationCheck
@@ -131,7 +134,7 @@ public class CreateBackupService {
         LocalDateTime localBackupTime = backupTime.atZoneSameInstant(ZoneId.systemDefault()).toLocalDateTime();
         String directoryName = findAvailableDirectoryName(localBackupTime);
         Map<VmId, String> containers = BackupContainers.assign(vms.stream()
-                .map(vm -> LegacyBackupLayout.vmIdForFolder(vm.id()))
+                .map(ManagedVm::id)
                 .toList());
         BackupManifest manifest = buildManifest(vms, containers, comment, backupTime);
 
@@ -159,14 +162,14 @@ public class CreateBackupService {
             for (int vmIndex = 0; vmIndex < vms.size(); vmIndex++) {
                 checkCancelled(cancellationCheck);
 
-                LocalVm vm = vms.get(vmIndex);
+                ManagedVm vm = vms.get(vmIndex);
                 progress.startVm(vm.name(), vmIndex + 1);
 
                 // One container per VM: its sources are copied inside it, under their own names.
-                Path container = vmDirectory.resolve(containers.get(LegacyBackupLayout.vmIdForFolder(vm.id())));
+                Path container = vmDirectory.resolve(containers.get(vm.id()));
                 Files.createDirectories(container);
 
-                for (Path source : vm.backupSources()) {
+                for (Path source : vm.localVm().backupSources()) {
                     copySource(
                             source,
                             container.resolve(source.getFileName()),
@@ -188,8 +191,8 @@ public class CreateBackupService {
 
             Files.move(incompleteDirectory, backupDirectory);
 
-            for (LocalVm vm : vms) {
-                vmChangeStatusService.acknowledgeBackup(LegacyBackupLayout.vmIdForFolder(vm.id()), vm);
+            for (ManagedVm vm : vms) {
+                vmChangeStatusService.acknowledgeBackup(vm.id(), vm.localVm());
             }
 
             return new Result(
@@ -216,16 +219,16 @@ public class CreateBackupService {
         }
     }
 
-    private void validateVms(List<LocalVm> vms) {
+    private void validateVms(List<ManagedVm> vms) {
         if (vms == null || vms.isEmpty()) {
             throw new IllegalArgumentException(
                     "At least one VM must be selected"
             );
         }
 
-        Set<String> ids = new HashSet<>();
+        Set<VmId> ids = new HashSet<>();
 
-        for (LocalVm vm : vms) {
+        for (ManagedVm vm : vms) {
             if (vm == null) {
                 throw new IllegalArgumentException(
                         "VM must not be null"
@@ -238,23 +241,37 @@ public class CreateBackupService {
                 );
             }
 
-            if (vm.backupSources().isEmpty()) {
+            validateVmSources(vm);
+        }
+    }
+
+    /**
+     * Checks the state and the sources of one VM. The state is checked here as well
+     * as in the controller, so no caller can copy a VM in use.
+     */
+    private static void validateVmSources(ManagedVm vm) {
+        if (vm.status() != VmStatus.STOPPED) {
+            throw new IllegalArgumentException(
+                    "VM must be stopped before a backup: " + vm.id() + " is " + vm.status()
+            );
+        }
+
+        if (vm.localVm().backupSources().isEmpty()) {
+            throw new IllegalArgumentException(
+                    "VM has no backup sources: " + vm.id()
+            );
+        }
+
+        // Sources share one container, so their file names must be unique within the VM.
+        Set<Path> targets = new HashSet<>();
+
+        for (Path source : vm.localVm().backupSources()) {
+            Path fileName = source.getFileName();
+
+            if (fileName == null || !targets.add(fileName)) {
                 throw new IllegalArgumentException(
-                        "VM has no backup sources: " + vm.id()
+                        "Duplicate backup target in VM " + vm.id() + ": " + fileName
                 );
-            }
-
-            // Sources share one container, so their file names must be unique within the VM.
-            Set<Path> targets = new HashSet<>();
-
-            for (Path source : vm.backupSources()) {
-                Path fileName = source.getFileName();
-
-                if (fileName == null || !targets.add(fileName)) {
-                    throw new IllegalArgumentException(
-                            "Duplicate backup target in VM " + vm.id() + ": " + fileName
-                    );
-                }
             }
         }
     }
@@ -271,11 +288,11 @@ public class CreateBackupService {
         }
     }
 
-    private long determineTotalBytes(List<LocalVm> vms) throws IOException {
+    private long determineTotalBytes(List<ManagedVm> vms) throws IOException {
         long totalBytes = 0;
 
-        for (LocalVm vm : vms) {
-            for (Path source : vm.backupSources()) {
+        for (ManagedVm vm : vms) {
+            for (Path source : vm.localVm().backupSources()) {
                 totalBytes = Math.addExact(totalBytes, sizeOf(source));
             }
         }
@@ -485,16 +502,16 @@ public class CreateBackupService {
      * is refused before anything is written.
      */
     private BackupManifest buildManifest(
-            List<LocalVm> vms,
+            List<ManagedVm> vms,
             Map<VmId, String> containers,
             String comment,
             OffsetDateTime backupTime
     ) {
         List<BackupManifest.VmEntry> entries = new ArrayList<>();
 
-        for (LocalVm vm : vms) {
-            VmId id = LegacyBackupLayout.vmIdForFolder(vm.id());
-            String name = vm.name() == null || vm.name().isBlank() ? vm.id() : vm.name();
+        for (ManagedVm vm : vms) {
+            VmId id = vm.id();
+            String name = vm.name() == null || vm.name().isBlank() ? id.localId() : vm.name();
 
             entries.add(new BackupManifest.VmEntry(id, name, containers.get(id)));
         }

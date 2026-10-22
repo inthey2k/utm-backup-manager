@@ -141,9 +141,7 @@ class BackupScannerMultiProviderTest {
                 List.of(providers),
                 new VmProperties(
                         java.util.Arrays.stream(providers).map(FakeVmProvider::providerId).toList(),
-                        null,
-                        null
-                )
+                        null)
         );
 
         SettingsRepository settings = mock(SettingsRepository.class);

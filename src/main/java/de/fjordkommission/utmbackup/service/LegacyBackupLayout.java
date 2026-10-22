@@ -7,9 +7,8 @@ import de.fjordkommission.utmbackup.model.VmId;
  * In format 1 every VM folder directly below {@code VMs/} is a UTM package, and
  * its folder name is the provider-local id. Those backups therefore belong to
  * {@code utm:<folder name>}, even when UTM is not currently enabled.
- * The on-disk layout does not change in this phase. These rules are the only
- * place that maps legacy folders to canonical identities, and they must be
- * replaced when the format-2 storage is introduced.
+ * New backups are format 2 and carry their canonical identity in the manifest,
+ * so this class is used only when reading format-1 batches.
  */
 public final class LegacyBackupLayout {
 

@@ -76,7 +76,7 @@ class FormatTwoLifecycleTest {
                 repo,
                 settings,
                 new VmInventory(new VmProviderRegistry(List.of(utm, qemu),
-                        new VmProperties(List.of("utm", "qemu"), null, null))),
+                        new VmProperties(List.of("utm", "qemu"), null))),
                 changeStatus,
                 guard
         );

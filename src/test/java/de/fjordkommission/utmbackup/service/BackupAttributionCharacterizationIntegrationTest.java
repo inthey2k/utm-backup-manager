@@ -2,7 +2,7 @@ package de.fjordkommission.utmbackup.service;
 
 import de.fjordkommission.utmbackup.AbstractIntegrationTest;
 import de.fjordkommission.utmbackup.model.BackupOverview;
-import de.fjordkommission.utmbackup.model.LocalVm;
+import de.fjordkommission.utmbackup.model.ManagedVm;
 import de.fjordkommission.utmbackup.model.VmId;
 import de.fjordkommission.utmbackup.model.VmOverview;
 import de.fjordkommission.utmbackup.model.VmStatus;
@@ -70,13 +70,12 @@ class BackupAttributionCharacterizationIntegrationTest extends AbstractIntegrati
      */
     @Test
     void backupOfTestProviderVmIsAttributedToTheLocalVm() {
-        LocalVm localVm = vmInventory.build().vms().stream()
+        ManagedVm managedVm = vmInventory.build().vms().stream()
                 .filter(vm -> vm.id().equals(new VmId("utm", LOCAL_VM_ID)))
                 .findFirst()
-                .orElseThrow()
-                .localVm();
+                .orElseThrow();
 
-        createBackupService.create(List.of(localVm), "Attribution characterization");
+        createBackupService.create(List.of(managedVm), "Attribution characterization");
 
         BackupOverview overview = scanner.scan();
 

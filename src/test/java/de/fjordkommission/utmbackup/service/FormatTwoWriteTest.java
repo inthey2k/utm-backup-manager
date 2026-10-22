@@ -2,6 +2,7 @@ package de.fjordkommission.utmbackup.service;
 
 import de.fjordkommission.utmbackup.config.BackupProperties;
 import de.fjordkommission.utmbackup.model.LocalVm;
+import de.fjordkommission.utmbackup.model.ManagedVm;
 import de.fjordkommission.utmbackup.storage.BackupFormat;
 import de.fjordkommission.utmbackup.storage.BackupManifest;
 import de.fjordkommission.utmbackup.storage.BackupManifestReader;
@@ -23,6 +24,7 @@ import java.util.List;
 import java.util.regex.Pattern;
 import java.util.stream.Stream;
 
+import static de.fjordkommission.utmbackup.TestVms.stoppedUtm;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -64,8 +66,8 @@ class FormatTwoWriteTest {
         return source;
     }
 
-    private static LocalVm vm(String localId, String name, Path source) {
-        return new LocalVm(localId, name, List.of(source));
+    private static ManagedVm vm(String localId, String name, Path source) {
+        return stoppedUtm(new LocalVm(localId, name, List.of(source)));
     }
 
     private Path onlyBatch() throws IOException {
@@ -162,7 +164,7 @@ class FormatTwoWriteTest {
     @Test
     void rootMetadataIsNotCreatedWhenTheBackupFails() throws IOException {
         CreateBackupService service = service("1.5.0");
-        List<LocalVm> missing = List.of(vm("Missing.utm", "Missing", tempDir.resolve("does-not-exist")));
+        List<ManagedVm> missing = List.of(vm("Missing.utm", "Missing", tempDir.resolve("does-not-exist")));
 
         assertThrows(UncheckedIOException.class, () -> service.create(missing, null));
 
@@ -226,7 +228,7 @@ class FormatTwoWriteTest {
         CreateBackupService service = service("1.5.0");
         String newer = "format.version=3\ncreated.at=2026-10-21T12:00:00+02:00\n";
         Files.writeString(root.resolve(BackupStorageMetadataReader.FILE_NAME), newer, StandardCharsets.UTF_8);
-        List<LocalVm> vms = List.of(vm("Linux.utm", "Linux", archPackage("Linux.utm")));
+        List<ManagedVm> vms = List.of(vm("Linux.utm", "Linux", archPackage("Linux.utm")));
 
         assertThrows(BackupStorageReadOnlyException.class, () -> service.create(vms, null));
 
@@ -238,8 +240,8 @@ class FormatTwoWriteTest {
     void failedBackupLeavesNoPublishedBatchAndNoTemporaryArtifacts() throws IOException {
         CreateBackupService service = service("1.5.0");
         Path source = archPackage("Linux.utm");
-        LocalVm good = vm("Linux.utm", "Linux", source);
-        List<LocalVm> batch = List.of(good, vm("Missing.utm", "Missing", tempDir.resolve("gone")));
+        ManagedVm good = vm("Linux.utm", "Linux", source);
+        List<ManagedVm> batch = List.of(good, vm("Missing.utm", "Missing", tempDir.resolve("gone")));
 
         assertThrows(UncheckedIOException.class, () -> service.create(batch, null));
 

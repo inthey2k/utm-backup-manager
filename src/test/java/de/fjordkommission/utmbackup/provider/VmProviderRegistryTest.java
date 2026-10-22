@@ -14,11 +14,11 @@ import static org.junit.jupiter.api.Assertions.*;
 class VmProviderRegistryTest {
 
     private static VmProperties vmProviders(String... providers) {
-        return new VmProperties(List.of(providers), null, null);
+        return new VmProperties(List.of(providers), null);
     }
 
     private static VmProperties legacyProvider(String provider) {
-        return new VmProperties(null, provider, null);
+        return new VmProperties(null, provider);
     }
 
     @Test

@@ -74,6 +74,234 @@ const backupSubmitButton = backupDialog?.querySelector(
 );
 
 // ---------------------------------------------------------------------------
+// VM carousel grouped by provider
+// ---------------------------------------------------------------------------
+document.addEventListener("DOMContentLoaded", () => {
+    const source = document.getElementById("vm-carousel-source");
+
+    if (!source) {
+        return;
+    }
+
+    const cards = Array.from(source.querySelectorAll(":scope > .vm-column"));
+    const providers = new Map();
+
+    cards.forEach(card => {
+        const providerId = card.dataset.providerId;
+        const providerName = card.dataset.providerName || providerId;
+        const providerBadge =
+            card.dataset.providerBadge || providerId.toUpperCase();
+
+        if (!providers.has(providerId)) {
+            providers.set(providerId, {
+                name: providerName,
+                badge: providerBadge,
+                cards: []
+            });
+        }
+
+        providers.get(providerId).cards.push(card);
+    });
+
+    const groups = document.createElement("div");
+    groups.className = "provider-groups";
+
+    providers.forEach(provider => {
+        const group = document.createElement("section");
+        group.className = "provider-group";
+
+        const header = document.createElement("header");
+        header.className = "provider-group-header";
+
+        const title = document.createElement("div");
+        title.className = "provider-group-title";
+
+        const heading = document.createElement("h2");
+        heading.textContent = provider.name;
+
+        const badge = document.createElement("span");
+        badge.className = "provider-badge";
+        badge.textContent = provider.badge;
+        badge.title = provider.name;
+
+        title.append(heading, badge);
+        header.appendChild(title);
+
+        const row = document.createElement("div");
+        row.className = "vm-carousel-row";
+
+        const previous = createCarouselButton(
+            "provider-carousel-prev",
+            "‹",
+            "Previous virtual machines"
+        );
+
+        const next = createCarouselButton(
+            "provider-carousel-next",
+            "›",
+            "Next virtual machines"
+        );
+
+        const carousel = document.createElement("div");
+        carousel.className = "vm-carousel";
+        carousel.tabIndex = 0;
+
+        provider.cards.forEach(card => carousel.appendChild(card));
+
+        row.append(previous, carousel, next);
+        group.append(header, row);
+        groups.appendChild(group);
+
+        // The row must be in the DOM before dimensions are reliable.
+        requestAnimationFrame(() => {
+            initialiseProviderCarousel(
+                row,
+                carousel,
+                provider.cards,
+                previous,
+                next
+            );
+        });
+    });
+
+    source.replaceWith(groups);
+});
+
+function initialiseProviderCarousel(
+    row,
+    carousel,
+    cards,
+    previous,
+    next
+) {
+    if (cards.length === 0) {
+        row.hidden = true;
+        return;
+    }
+
+    const cardWidth = cards[0].getBoundingClientRect().width;
+    const originalWidth = cardWidth * cards.length;
+    const hasOverflow = originalWidth > carousel.clientWidth + 1;
+
+    previous.hidden = !hasOverflow;
+    next.hidden = !hasOverflow;
+    row.classList.toggle("compact", !hasOverflow);
+
+    if (!hasOverflow) {
+        carousel.scrollLeft = 0;
+        return;
+    }
+
+    const before = document.createDocumentFragment();
+    const after = document.createDocumentFragment();
+
+    cards.forEach(card => {
+        before.appendChild(createCarouselGhost(card));
+        after.appendChild(createCarouselGhost(card));
+    });
+
+    cards[0].before(before);
+    carousel.appendChild(after);
+
+    // Start in the middle segment, which contains the real cards.
+    setScrollPositionImmediately(carousel, originalWidth);
+
+    let normaliseTimer = null;
+
+    const normalise = () => {
+        let target = carousel.scrollLeft;
+
+        if (target < originalWidth) {
+            target += originalWidth;
+        } else if (target >= originalWidth * 2) {
+            target -= originalWidth;
+        } else {
+            return;
+        }
+
+        setScrollPositionImmediately(carousel, target);
+    };
+
+    const scheduleNormalise = () => {
+        if (normaliseTimer !== null) {
+            clearTimeout(normaliseTimer);
+        }
+
+        normaliseTimer = window.setTimeout(() => {
+            normalise();
+            normaliseTimer = null;
+        }, 100);
+    };
+
+    carousel.addEventListener(
+        "scroll",
+        scheduleNormalise,
+        {passive: true}
+    );
+
+    previous.addEventListener("click", () => {
+        carousel.scrollBy({
+            left: -cardWidth,
+            behavior: "smooth"
+        });
+    });
+
+    next.addEventListener("click", () => {
+        carousel.scrollBy({
+            left: cardWidth,
+            behavior: "smooth"
+        });
+    });
+}
+
+function setScrollPositionImmediately(carousel, left) {
+    const previousBehaviour = carousel.style.scrollBehavior;
+
+    carousel.style.scrollBehavior = "auto";
+    carousel.scrollLeft = left;
+    carousel.offsetHeight;
+    carousel.style.scrollBehavior = previousBehaviour;
+}
+
+function createCarouselButton(cssClass, text, label) {
+    const button = document.createElement("button");
+
+    button.type = "button";
+    button.className =
+        "provider-carousel-button " + cssClass;
+    button.textContent = text;
+    button.setAttribute("aria-label", label);
+    button.title = label;
+
+    return button;
+}
+
+function createCarouselGhost(card) {
+    const clone = card.cloneNode(true);
+
+    clone.classList.add("vm-column-ghost");
+    clone.setAttribute("aria-hidden", "true");
+
+    clone.querySelectorAll("[id]").forEach(element => {
+        element.removeAttribute("id");
+    });
+
+    clone.querySelectorAll("button, input, textarea, select, a").forEach(
+        element => {
+            element.setAttribute("tabindex", "-1");
+            element.setAttribute("disabled", "disabled");
+        }
+    );
+
+    clone.querySelectorAll("form").forEach(form => {
+        form.removeAttribute("action");
+    });
+
+    return clone;
+}
+
+
+// ---------------------------------------------------------------------------
 // Dialog handling
 // ---------------------------------------------------------------------------
 retentionConfirmationCancel?.addEventListener("click", () => {

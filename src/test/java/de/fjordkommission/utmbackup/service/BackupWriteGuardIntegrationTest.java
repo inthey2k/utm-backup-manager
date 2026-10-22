@@ -4,6 +4,7 @@ import de.fjordkommission.utmbackup.config.BackupProperties;
 import de.fjordkommission.utmbackup.config.VmProperties;
 import de.fjordkommission.utmbackup.model.BackupOverview;
 import de.fjordkommission.utmbackup.model.LocalVm;
+import de.fjordkommission.utmbackup.model.ManagedVm;
 import de.fjordkommission.utmbackup.model.VmBackup;
 import de.fjordkommission.utmbackup.model.VmChangeStatus;
 import de.fjordkommission.utmbackup.model.VmId;
@@ -32,6 +33,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Stream;
 
 import static org.junit.jupiter.api.Assertions.*;
+import static de.fjordkommission.utmbackup.TestVms.stoppedUtm;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyString;
@@ -105,7 +107,7 @@ class BackupWriteGuardIntegrationTest {
                 new BackupProperties(root, null, null), changeStatus, guard, mock(org.springframework.boot.info.BuildProperties.class));
         List<String> before = entries();
 
-        List<LocalVm> vms = List.of(new LocalVm("Linux.utm", "Linux", List.of(source)));
+        List<ManagedVm> vms = List.of(stoppedUtm(new LocalVm("Linux.utm", "Linux", List.of(source))));
 
         assertThrows(BackupStorageReadOnlyException.class, () -> create.create(vms, "comment"));
 
@@ -137,7 +139,7 @@ class BackupWriteGuardIntegrationTest {
         BackupJobService jobs = new BackupJobService(
                 create, mock(RetentionCleanupJobService.class), retention, guard, executor);
 
-        List<LocalVm> vms = List.of(new LocalVm("Linux.utm", "Linux", List.of(root)));
+        List<ManagedVm> vms = List.of(stoppedUtm(new LocalVm("Linux.utm", "Linux", List.of(root))));
 
         assertThrows(BackupStorageReadOnlyException.class, () -> jobs.start(vms, null));
 
@@ -209,7 +211,7 @@ class BackupWriteGuardIntegrationTest {
                 List.of(new LocalVm("Linux.utm", "Linux", List.of(Path.of("/vms", "Linux.utm")))),
                 Map.of("Linux.utm", VmStatus.STOPPED)
         );
-        VmProviderRegistry registry = new VmProviderRegistry(List.of(utm), new VmProperties(List.of("utm"), null, null));
+        VmProviderRegistry registry = new VmProviderRegistry(List.of(utm), new VmProperties(List.of("utm"), null));
         SettingsRepository settings = mock(SettingsRepository.class);
         when(settings.getRetentionLimit()).thenReturn(3);
         VmChangeStatusService changeStatus = mock(VmChangeStatusService.class);

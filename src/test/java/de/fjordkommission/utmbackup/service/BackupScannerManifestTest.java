@@ -149,7 +149,7 @@ class BackupScannerManifestTest {
                 Map.of(LEGACY_FOLDER, VmStatus.STOPPED)
         );
 
-        VmProviderRegistry registry = new VmProviderRegistry(List.of(utm), new VmProperties(List.of("utm"), null, null));
+        VmProviderRegistry registry = new VmProviderRegistry(List.of(utm), new VmProperties(List.of("utm"), null));
 
         SettingsRepository settings = mock(SettingsRepository.class);
         when(settings.getRetentionLimit()).thenReturn(3);

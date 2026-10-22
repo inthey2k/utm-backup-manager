@@ -1,6 +1,7 @@
 package de.fjordkommission.utmbackup.provider;
 
 import de.fjordkommission.utmbackup.config.VmProperties;
+import de.fjordkommission.utmbackup.provider.utm.UtmProviderConfiguration;
 import de.fjordkommission.utmbackup.provider.utm.UtmVmProvider;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
@@ -12,7 +13,6 @@ import static org.junit.jupiter.api.Assertions.*;
 
 /**
  * Verifies which provider beans are created for a given configuration.
- *
  * Uses a bare application context, so no real hypervisor is probed and no
  * vm.utm.* values are needed unless UTM is enabled.
  */
@@ -236,13 +236,13 @@ class VmProviderActivationTest {
 
     @Configuration(proxyBeanMethods = false)
     @EnableConfigurationProperties(VmProperties.class)
-    @Import({UtmVmProvider.class, VmProviderRegistry.class})
+    @Import({UtmProviderConfiguration.class, UtmVmProvider.class, VmProviderRegistry.class})
     static class ProviderConfiguration {
     }
 
     @Configuration(proxyBeanMethods = false)
     @EnableConfigurationProperties(VmProperties.class)
-    @Import({UtmVmProvider.class, VmProviderRegistry.class,
+    @Import({UtmProviderConfiguration.class, UtmVmProvider.class, VmProviderRegistry.class,
             de.fjordkommission.utmbackup.provider.TestVmProvider.class})
     static class TestProfileConfiguration {
     }

@@ -7,7 +7,7 @@ server.port=8085
 server.servlet.session.tracking-modes=cookie
 
 # Enabled VM providers, comma-separated, in the order they are listed.
-# Supported providers: utm
+# Supported providers: utm, qemu
 # Resolution order: vm.providers, then the deprecated vm.provider, then utm.
 vm.providers=utm
 
@@ -23,6 +23,11 @@ vm.utm.package-suffix=.utm
 
 # Path to the UTM command-line interface
 vm.utm.cli=/path/to/utmctl
+
+# QEMU provider, only used when qemu is listed in vm.providers, for example vm.providers=utm,qemu
+# Directory with one subdirectory per QEMU VM. The subdirectory name is the VM id, and it must
+# contain a top-level .qcow2 or .raw disk image. QEMU VMs are backed up only while stopped.
+#vm.qemu.directory=/path/to/your/qemu/vms
 
 # Directory where VM backups will be stored.
 # This directory must already exist.

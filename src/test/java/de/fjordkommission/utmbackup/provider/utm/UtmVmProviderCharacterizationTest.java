@@ -1,6 +1,5 @@
 package de.fjordkommission.utmbackup.provider.utm;
 
-import de.fjordkommission.utmbackup.config.VmProperties;
 import de.fjordkommission.utmbackup.model.LocalVm;
 import de.fjordkommission.utmbackup.model.VmStatus;
 import org.junit.jupiter.api.Test;
@@ -19,11 +18,9 @@ import static org.junit.jupiter.api.Assertions.*;
 
 /**
  * Tests for {@link UtmVmProvider} discovery and runtime-state resolution.
- *
  * Discovery tests document 1.4.x behaviour that is unchanged. Status tests cover
  * the Phase 1 contract: statuses are keyed by the provider-local id (the package
  * folder name), and ambiguous or unmatched utmctl data never becomes STOPPED.
- *
  * A fake {@code utmctl} shell script stands in for the real CLI, so these tests
  * never touch an installed UTM. The fake command requires a POSIX shell, so the
  * class is limited to Linux and macOS.
@@ -225,13 +222,7 @@ class UtmVmProviderCharacterizationTest {
     }
 
     private static UtmVmProvider provider(Path vmDirectory, Path utmctl) {
-        return new UtmVmProvider(
-                new VmProperties(
-                        null,
-                        null,
-                        new VmProperties.Utm(vmDirectory, ".utm", utmctl)
-                )
-        );
+        return new UtmVmProvider(new UtmProperties(vmDirectory, ".utm", utmctl));
     }
 
     /**

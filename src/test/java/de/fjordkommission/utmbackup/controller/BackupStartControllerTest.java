@@ -189,7 +189,7 @@ class BackupStartControllerTest {
         );
 
         verify(backupJobService).start(
-                List.of(vm),
+                List.of(managed(utmVmId, VmStatus.STOPPED)),
                 "Test comment",
                 List.of()
         );
@@ -247,7 +247,7 @@ class BackupStartControllerTest {
         );
 
         verify(backupJobService).start(
-                List.of(vm),
+                List.of(managed(utmVmId, VmStatus.STOPPED)),
                 "Test comment",
                 List.of(utmVmId)
         );
@@ -275,7 +275,7 @@ class BackupStartControllerTest {
         assertEquals("redirect:/", result);
 
         verify(backupJobService).start(
-                List.of(vm),
+                List.of(managed(utmVmId, VmStatus.STOPPED)),
                 "Test comment",
                 List.of()
         );
@@ -283,17 +283,17 @@ class BackupStartControllerTest {
 
     @Test
     void requestIdsWithSpacesDotsAndColonsResolveToTheirVm() {
-        LocalVm archLinux = new LocalVm(
-                "ArchLinux 02.27.utm",
-                "ArchLinux 02.27",
-                List.of(Path.of("ArchLinux 02.27.utm"))
-        );
-        prepareInventory(new ManagedVm(
+        ManagedVm archLinux = new ManagedVm(
                 new VmId("utm", "ArchLinux 02.27.utm"),
                 "UTM",
-                archLinux,
+                new LocalVm(
+                        "ArchLinux 02.27.utm",
+                        "ArchLinux 02.27",
+                        List.of(Path.of("ArchLinux 02.27.utm"))
+                ),
                 VmStatus.STOPPED
-        ));
+        );
+        prepareInventory(archLinux);
         when(retentionService.findVmsRequiringRetentionCleanup(anyList())).thenReturn(List.of());
         prepareStartedMessage();
 
@@ -309,56 +309,45 @@ class BackupStartControllerTest {
 
     @Test
     void sameLocalIdInTwoProvidersAddressesTwoDistinctVms() {
-        LocalVm utmArch = new LocalVm("ArchLinux", "ArchLinux", List.of(Path.of("utm-ArchLinux.utm")));
-        LocalVm qemuArch = new LocalVm("ArchLinux", "ArchLinux", List.of(Path.of("qemu-ArchLinux")));
-        prepareInventory(
-                new ManagedVm(new VmId("utm", "ArchLinux"), "UTM", utmArch, VmStatus.STOPPED),
-                new ManagedVm(new VmId("qemu", "ArchLinux"), "QEMU", qemuArch, VmStatus.STOPPED)
-        );
+        ManagedVm utmArch = new ManagedVm(new VmId("utm", "ArchLinux"), "UTM",
+                new LocalVm("ArchLinux", "ArchLinux", List.of(Path.of("utm-ArchLinux.utm"))), VmStatus.STOPPED);
+        ManagedVm qemuArch = new ManagedVm(new VmId("qemu", "ArchLinux"), "QEMU",
+                new LocalVm("ArchLinux", "ArchLinux", List.of(Path.of("qemu-ArchLinux"))), VmStatus.STOPPED);
+        prepareInventory(utmArch, qemuArch);
         when(retentionService.findVmsRequiringRetentionCleanup(anyList())).thenReturn(List.of());
         prepareStartedMessage();
 
-        // The UTM VM is selected and backed up; the QEMU VM is rejected, not silently merged.
-        controller.backup(
-                List.of("utm:ArchLinux"),
-                null,
-                new RedirectAttributesModelMap(),
-                false
-        );
+        controller.backup(List.of("utm:ArchLinux"), null, new RedirectAttributesModelMap(), false);
         verify(backupJobService).start(List.of(utmArch), null, List.of());
 
-        RedirectAttributesModelMap redirectAttributes = new RedirectAttributesModelMap();
-        controller.backup(
-                List.of("qemu:ArchLinux"),
-                null,
-                redirectAttributes,
-                false
-        );
-        assertEquals(
-                "Backups of QEMU VMs are not supported yet. Select only VMs of the UTM provider.",
-                redirectAttributes.getFlashAttributes().get("error")
-        );
+        controller.backup(List.of("qemu:ArchLinux"), null, new RedirectAttributesModelMap(), false);
+        verify(backupJobService).start(List.of(qemuArch), null, List.of());
     }
 
     @Test
-    void nonUtmVmIsRejectedBeforeAnyStateOrRetentionCheck() {
-        prepareInventory(new ManagedVm(
-                new VmId("qemu", "ArchLinux"),
-                "QEMU",
-                new LocalVm("ArchLinux", "ArchLinux", List.of(Path.of("ArchLinux"))),
-                VmStatus.STOPPED
-        ));
+    void stoppedQemuVmIsStartedLikeAnyOtherProvider() {
+        ManagedVm qemuArch = new ManagedVm(new VmId("qemu", "ArchLinux"), "QEMU",
+                new LocalVm("ArchLinux", "ArchLinux", List.of(Path.of("/vms/qemu/ArchLinux"))), VmStatus.STOPPED);
+        prepareInventory(qemuArch);
+        when(retentionService.findVmsRequiringRetentionCleanup(anyList())).thenReturn(List.of());
+        prepareStartedMessage();
 
         RedirectAttributesModelMap redirectAttributes = new RedirectAttributesModelMap();
-        controller.backup(
-                List.of("qemu:ArchLinux"),
-                null,
-                redirectAttributes,
-                false
-        );
+        controller.backup(List.of("qemu:ArchLinux"), "QEMU backup", redirectAttributes, false);
+
+        assertEquals("Backup started.", redirectAttributes.getFlashAttributes().get("message"));
+        verify(backupJobService).start(List.of(qemuArch), "QEMU backup", List.of());
+    }
+
+    @Test
+    void runningQemuVmIsRejectedServerSide() {
+        prepareInventory(qemuVm(VmStatus.RUNNING));
+
+        RedirectAttributesModelMap redirectAttributes = new RedirectAttributesModelMap();
+        controller.backup(List.of("qemu:ArchLinux"), null, redirectAttributes, false);
 
         assertEquals(
-                "Backups of QEMU VMs are not supported yet. Select only VMs of the UTM provider.",
+                "Backup cannot be created because VM ArchLinux is RUNNING.",
                 redirectAttributes.getFlashAttributes().get("error")
         );
         verifyNoInteractions(backupJobService);
@@ -366,27 +355,42 @@ class BackupStartControllerTest {
     }
 
     @Test
-    void mixedProviderBatchIsRejectedAsAWhole() {
-        LocalVm utmVm = new LocalVm("ArchLinux", "ArchLinux", List.of(Path.of("utm")));
-        LocalVm qemuVm = new LocalVm("FreeBSD", "FreeBSD", List.of(Path.of("qemu")));
-        prepareInventory(
-                new ManagedVm(new VmId("utm", "ArchLinux"), "UTM", utmVm, VmStatus.STOPPED),
-                new ManagedVm(new VmId("qemu", "FreeBSD"), "QEMU", qemuVm, VmStatus.STOPPED)
-        );
+    void unknownQemuVmIsRejectedServerSide() {
+        prepareInventory(qemuVm(VmStatus.UNKNOWN));
 
         RedirectAttributesModelMap redirectAttributes = new RedirectAttributesModelMap();
-        controller.backup(
-                List.of("utm:ArchLinux", "qemu:FreeBSD"),
-                null,
-                redirectAttributes,
-                false
-        );
+        controller.backup(List.of("qemu:ArchLinux"), null, redirectAttributes, false);
 
         assertEquals(
-                "Backups of QEMU VMs are not supported yet. Select only VMs of the UTM provider.",
+                "Backup cannot be created because VM ArchLinux is UNKNOWN.",
                 redirectAttributes.getFlashAttributes().get("error")
         );
         verifyNoInteractions(backupJobService);
+        verifyNoInteractions(retentionService);
+    }
+
+    @Test
+    void mixedUtmAndQemuBatchIsStartedTogether() {
+        ManagedVm utmVm = new ManagedVm(new VmId("utm", "ArchLinux"), "UTM",
+                new LocalVm("ArchLinux", "ArchLinux", List.of(Path.of("utm"))), VmStatus.STOPPED);
+        ManagedVm qemuVm = new ManagedVm(new VmId("qemu", "FreeBSD"), "QEMU",
+                new LocalVm("FreeBSD", "FreeBSD", List.of(Path.of("qemu"))), VmStatus.STOPPED);
+        prepareInventory(utmVm, qemuVm);
+        when(retentionService.findVmsRequiringRetentionCleanup(anyList())).thenReturn(List.of());
+        prepareStartedMessage();
+
+        controller.backup(List.of("utm:ArchLinux", "qemu:FreeBSD"), null, new RedirectAttributesModelMap(), false);
+
+        verify(backupJobService).start(List.of(utmVm, qemuVm), null, List.of());
+    }
+
+    private ManagedVm qemuVm(VmStatus status) {
+        return new ManagedVm(
+                new VmId("qemu", "ArchLinux"),
+                "QEMU",
+                new LocalVm("ArchLinux", "ArchLinux", List.of(Path.of("/vms/qemu/ArchLinux"))),
+                status
+        );
     }
 
     private ManagedVm managed(VmId id, VmStatus status) {

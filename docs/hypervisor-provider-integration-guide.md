@@ -271,6 +271,21 @@ The UTM provider follows this pattern by running one `utmctl list` command and p
 
 Provider failures should preferably degrade safely to `UNKNOWN` rather than falsely reporting a VM as stopped.
 
+### Status from process inspection
+
+Some providers infer the state from running processes. Operating-system restrictions
+can hide a process's details, for example when a process runs as another user, such
+as QEMU started with sudo on macOS. A hidden process cannot be attributed to a VM,
+so:
+
+- a visible process whose arguments reference a VM directory or disk means `RUNNING`,
+- a process of the hypervisor's kind whose arguments are hidden makes the VMs that
+  do not match any visible process `UNKNOWN`, never `STOPPED`,
+- unrelated hidden processes are ignored.
+
+The QEMU provider implements these rules in `QemuRuntimeStatus`. Matching must also
+consider paths resolved through symbolic links.
+
 ---
 
 # 6. `findAll()`
@@ -313,7 +328,7 @@ public List<LocalVm> findAll() {
 
 If the configured VM location is unavailable, choose behavior deliberately.
 
-The UTM provider currently returns an empty list if its VM directory does not exist and throws an `IllegalStateException` when an existing directory cannot be read.
+The UTM provider currently returns an empty list if its VM directory does not exist and throws an `IllegalStateException` when an existing directory cannot be read. The QEMU provider throws for a missing root instead, because a missing root is far more likely to be a misconfiguration than an empty installation. Choose the behaviour deliberately and document it.
 
 ---
 
@@ -418,9 +433,11 @@ Do not expose:
 
 # 9. Provider-specific configuration
 
-Provider selection is configured under `vm.providers` (see section 2). Each provider's settings live in its own namespace, for example `vm.utm.*`.
+Provider selection is configured under `vm.providers` (see section 2). Each provider's settings live in its own namespace, for example `vm.utm.*` or `vm.qemu.*`.
 
-UTM-specific configuration currently lives in `VmProperties.Utm`. A new provider normally adds its own `@ConfigurationProperties` record under its own prefix, and should not add fields to `VmProperties`.
+Invalid settings of an enabled provider can be handled in two ways. A constructor exception stops the whole application, as the UTM provider does when its settings are missing. Reporting the problem from `findAll()`, as the QEMU provider does, keeps the application running and shows the provider as unavailable. Prefer the second route for a provider that can be unavailable while the others work.
+
+Each provider registers its own settings. UTM uses `UtmProperties` (`vm.utm.*`) and QEMU uses `QemuProperties` (`vm.qemu.*`), both in their provider package and both registered by a small `@Configuration` class annotated with `@ConditionalOnVmProvider`. A new provider adds the same pair of classes and never edits `UtmBackupManagerApplication` or `VmProperties`.
 
 Example:
 
@@ -616,6 +633,8 @@ UNKNOWN
 ```
 
 Only use `STOPPED` when the hypervisor clearly reports that state.
+
+Backup creation also requires `STOPPED`. `CreateBackupService` refuses any other state, so a provider that reports `RUNNING` or `UNKNOWN` correctly is protected even if the web layer changes.
 
 Unexpected CLI output, timeouts, parse failures or unavailable APIs should normally result in `UNKNOWN`.
 

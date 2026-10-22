@@ -13,6 +13,7 @@ import de.fjordkommission.utmbackup.model.VmStatus;
 import de.fjordkommission.utmbackup.service.BackupScanner;
 import de.fjordkommission.utmbackup.storage.BackupStorageMetadataReader;
 import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -25,6 +26,7 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.LocalDateTime;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -66,13 +68,26 @@ class BackupOverviewPageTest extends AbstractIntegrationTest {
     @MockitoBean
     private BackupScanner scanner;
 
+    /**
+     * The backup root is shared with other integration tests, which leave batches behind.
+     * A root with batches but no marker is read-only, so the page tests start from an empty root.
+     */
+    @BeforeEach
+    void clearSharedBackupRoot() throws IOException {
+        if (Files.exists(TEST_BACKUP_ROOT)) {
+            try (var paths = Files.walk(TEST_BACKUP_ROOT)) {
+                paths.sorted(Comparator.reverseOrder()).forEach(path -> path.toFile().delete());
+            }
+        }
+    }
+
     @AfterEach
     void removeStorageMarker() throws IOException {
         Files.deleteIfExists(TEST_BACKUP_ROOT.resolve(BackupStorageMetadataReader.FILE_NAME));
     }
 
     @Test
-    void showsProviderBadgesAndBlocksBackupOfNonUtmVms() throws Exception {
+    void showsProviderBadgesAndAllowsStoppedVmsOfEveryProvider() throws Exception {
         VmOverview utm = localVm(UTM_VM, UTM_NAME, VmStatus.STOPPED);
         VmOverview qemu = localVm(QEMU_VM, "ArchLinux", VmStatus.STOPPED);
         VmOverview retired = backupOnlyVm(QEMU_OLD_VM);
@@ -89,7 +104,7 @@ class BackupOverviewPageTest extends AbstractIntegrationTest {
         assertThat(html, containsString(">UTM</span>"));
         assertThat(html, containsString(">QEMU</span>"));
         assertThat(html, containsString(">RELIC</span>"));
-        assertThat(html, containsString("Not supported yet"));
+        assertThat(html, not(containsString("Not supported yet")));
         // Backup-only VM of an enabled provider versus one whose provider is not enabled.
         assertThat(html, containsString("No local VM"));
         assertThat(html, containsString("Provider not enabled"));
@@ -99,7 +114,7 @@ class BackupOverviewPageTest extends AbstractIntegrationTest {
         assertThat(html, not(containsString(">utm:")));
 
         assertFalse(checkboxDisabled(html, UTM_VM.toString()));
-        assertTrue(checkboxDisabled(html, QEMU_VM.toString()));
+        assertFalse(checkboxDisabled(html, QEMU_VM.toString()));
     }
 
     @Test

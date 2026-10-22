@@ -81,7 +81,7 @@ class FormatTwoStateTest {
                 repo,
                 settings,
                 new VmInventory(new VmProviderRegistry(List.of(utm),
-                        new VmProperties(List.of("utm"), null, null))),
+                        new VmProperties(List.of("utm"), null))),
                 changeStatus,
                 guard
         );

@@ -1,6 +1,5 @@
 package de.fjordkommission.utmbackup.provider.utm;
 
-import de.fjordkommission.utmbackup.config.VmProperties;
 import de.fjordkommission.utmbackup.model.LocalVm;
 import de.fjordkommission.utmbackup.model.VmStatus;
 import de.fjordkommission.utmbackup.provider.ConditionalOnVmProvider;
@@ -27,7 +26,6 @@ import java.util.stream.Stream;
 
 /**
  * Integrates UTM with the backup manager.
- *
  * UTM stores each VM as a .utm package directory. The complete package is
  * therefore exposed as the backup source for that VM.
  */
@@ -43,11 +41,9 @@ public class UtmVmProvider implements VmProvider {
     private final Path executable;
     private final String packageSuffix;
 
-    public UtmVmProvider( VmProperties vmProperties ) {
-        VmProperties.Utm utm = vmProperties.utm();
-
-        // Only reached when UTM is enabled, so missing settings are a configuration error.
-        if (utm == null || utm.directory() == null || utm.cli() == null) {
+    public UtmVmProvider(UtmProperties utm) {
+        // Only created when UTM is enabled, so missing settings are a configuration error.
+        if (utm.directory() == null || utm.cli() == null) {
             throw new IllegalStateException(
                     "UTM is enabled in vm.providers, but vm.utm.directory and "
                             + "vm.utm.cli must both be configured"
@@ -132,7 +128,6 @@ public class UtmVmProvider implements VmProvider {
      * Returns the runtime state of each local VM, keyed by its package folder
      * name (the local id). utmctl reports display names, which are resolved
      * against the discovered packages here and never leave this class.
-     *
      * A VM is reported UNKNOWN when its display name matches several local
      * packages or several utmctl rows. A VM without any utmctl row is omitted,
      * which also counts as UNKNOWN.

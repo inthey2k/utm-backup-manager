@@ -73,7 +73,7 @@ class FormatTwoScanningTest {
                 repo,
                 settings,
                 new VmInventory(new VmProviderRegistry(List.of(providers),
-                        new VmProperties(java.util.Arrays.stream(providers).map(FakeVmProvider::providerId).toList(), null, null))),
+                        new VmProperties(java.util.Arrays.stream(providers).map(FakeVmProvider::providerId).toList(), null))),
                 changeStatus,
                 mock(BackupStorageGuard.class)
         );

@@ -31,7 +31,7 @@ class VmInventoryTest {
 
         return new VmInventory(new VmProviderRegistry(
                 List.of(providers),
-                new VmProperties(ids, null, null)
+                new VmProperties(ids, null)
         ));
     }
 
@@ -283,7 +283,7 @@ class VmInventoryTest {
 
         VmInventory.Inventory inventory = new VmInventory(new VmProviderRegistry(
                 List.of(nameless, utm),
-                new VmProperties(List.of("qemu", "utm"), null, null)
+                new VmProperties(List.of("qemu", "utm"), null)
         )).build();
 
         assertEquals(2, inventory.vms().size());

@@ -4,7 +4,6 @@ import de.fjordkommission.utmbackup.model.ManagedVm;
 import de.fjordkommission.utmbackup.model.VmId;
 import de.fjordkommission.utmbackup.model.VmStatus;
 import de.fjordkommission.utmbackup.service.BackupJobService;
-import de.fjordkommission.utmbackup.service.LegacyBackupLayout;
 import de.fjordkommission.utmbackup.service.VmInventory;
 import de.fjordkommission.utmbackup.service.RetentionService;
 import org.springframework.context.MessageSource;
@@ -42,8 +41,8 @@ public class BackupStartController {
 
     /**
      * Starts a backup for the selected canonical VM ids ({@code providerId:localId}).
-     * Backup writing still uses the legacy UTM layout, so a batch may contain
-     * only UTM VMs. A non-UTM selection is rejected before anything is written.
+     * Only STOPPED VMs are accepted, whatever their provider. The check is repeated
+     * by {@code CreateBackupService}, so the rule does not depend on this controller.
      */
     @PostMapping("/backup")
     String backup(
@@ -64,16 +63,6 @@ public class BackupStartController {
             List<ManagedVm> selectedVms = vmIds.stream()
                     .map(vmId -> selectedVm(inventory, vmId))
                     .toList();
-
-            for (ManagedVm vm : selectedVms) {
-                // Backup writing is still limited to UTM. Its layout and change tracking are verified only for UTM.
-                if (!LegacyBackupLayout.PROVIDER_ID.equals(vm.providerId())) {
-                    throw new IllegalStateException(
-                            "Backups of " + vm.providerName() + " VMs are not supported yet. "
-                                    + "Select only VMs of the UTM provider."
-                    );
-                }
-            }
 
             for (ManagedVm vm : selectedVms) {
                 if (vm.status() != VmStatus.STOPPED) {
@@ -101,7 +90,7 @@ public class BackupStartController {
             }
 
             backupJobService.start(
-                    selectedVms.stream().map(ManagedVm::localVm).toList(),
+                    selectedVms,
                     comment,
                     retentionConfirmed
                             ? retentionCleanupIds

@@ -22,32 +22,6 @@
                 <p th:text="#{app.subtitle}">
                     Overview of your VM backups
                 </p>
-
-                <div class="header-paths">
-                    <div class="header-path" th:each="provider : ${configuration.providers()}">
-                        <span th:text="${provider.providerName() + ' · ' + #messages.msg('config.vmDirectory')}">Local VMs</span>
-                        <code th:text="${provider.configurationValue('localVmDirectory')}"></code>
-                        <span class="provider-state"
-                              th:if="${overview != null}"
-                              th:classappend="${overview.providerHealthy(provider.providerId()) ? 'ok' : 'error'}"
-                              th:text="${overview.providerHealthy(provider.providerId())
-                                  ? #messages.msg('provider.state.ok')
-                                  : #messages.msg('provider.state.error')}">
-                        </span>
-                    </div>
-                    <div class="header-path">
-                        <span th:text="#{config.backupRoot}">Backup root</span>
-                        <code th:text="${configuration.backupRoot()}"></code>
-                    </div>
-                    <div class="header-path storage-state">
-                        <span th:text="#{storage.label}">Backup storage</span>
-                        <span class="storage-state-value"
-                              th:classappend="${storageStatus.writable ? '' : 'read-only'}"
-                              th:title="${storageStatus.reason()}"
-                              th:text="#{|storage.state.${storageStatus.compatibility().name()}|}">
-                        </span>
-                    </div>
-                </div>
             </div>
 
             <div class="page-header-actions">
@@ -74,6 +48,32 @@
                         aria-expanded="false">
                     ⋮
                 </button>
+            </div>
+        </div>
+
+        <div class="header-paths">
+            <div class="header-path" th:each="provider : ${configuration.providers()}">
+                <span th:text="${provider.providerName() + ' · ' + #messages.msg('config.vmDirectory')}">Local VMs</span>
+                <code th:text="${provider.configurationValue('localVmDirectory')}"></code>
+                <span class="provider-state"
+                      th:if="${overview != null}"
+                      th:classappend="${overview.providerHealthy(provider.providerId()) ? 'ok' : 'error'}"
+                      th:text="${overview.providerHealthy(provider.providerId())
+                          ? #messages.msg('provider.state.ok')
+                          : #messages.msg('provider.state.error')}">
+                </span>
+            </div>
+            <div class="header-path">
+                <span th:text="#{config.backupRoot}">Backup root</span>
+                <code th:text="${configuration.backupRoot()}"></code>
+            </div>
+            <div class="header-path storage-state">
+                <span th:text="#{storage.label}">Backup storage</span>
+                <span class="storage-state-value"
+                      th:classappend="${storageStatus.writable ? '' : 'read-only'}"
+                      th:title="${storageStatus.reason()}"
+                      th:text="#{|storage.state.${storageStatus.compatibility().name()}|}">
+                </span>
             </div>
         </div>
     </header>
@@ -327,10 +327,14 @@
        th:text="#{overview.empty}">
         No VMs or backups found.
     </p>
-    <div class="vm-grid"
+    <div class="vm-carousel-source"
+         id="vm-carousel-source"
          th:if="${backupRootAvailable and !overview.vms().isEmpty()}">
         <section class="vm-column"
-                 th:each="vm : ${overview.vms()}">
+                 th:each="vm : ${overview.vms()}"
+                 th:attr="data-provider-id=${vm.providerId()},
+                          data-provider-name=${vm.providerName()},
+                          data-provider-badge=${vm.providerBadge()}">
 
             <!-- VM header -->
             <header class="vm-header">
@@ -654,7 +658,6 @@
         </section>
     </div>
 
-
     <!-- Read-only display of current configuration from application.properties -->
     <dialog class="configuration-dialog"
             id="configuration-dialog">
@@ -744,7 +747,7 @@
                            th:value="${vm.id()}"
                            th:attr="data-vm-name=${vm.name()},
                                     data-retention-cleanup-required=${vm.normalCount() >= overview.retentionLimit()}"
-                           th:disabled="${vm.status().name() != 'STOPPED' or !vm.backupSupported() or !storageStatus.writable}">
+                           th:disabled="${vm.status().name() != 'STOPPED' or !storageStatus.writable}">
 
                     <span class="vm-status"
                           th:classappend="${vm.status().cssClass()}"
@@ -761,12 +764,7 @@
                         <span class="vm-size-spinner" aria-hidden="true"></span>
                     </span>
                     <span class="backup-vm-status"
-                          th:text="${!vm.backupSupported()
-                              ? #messages.msg('backup.provider.notSupportedShort')
-                              : #messages.msg('vm.status.' + vm.status().name())}"
-                          th:title="${!vm.backupSupported()
-                              ? #messages.msg('backup.provider.notSupported', vm.providerName())
-                              : null}">
+                          th:text="${#messages.msg('vm.status.' + vm.status().name())}">
                     </span>
                 </label>
             </div>

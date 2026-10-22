@@ -1,7 +1,5 @@
 package de.fjordkommission.utmbackup.model;
 
-import de.fjordkommission.utmbackup.service.LegacyBackupLayout;
-
 import java.util.List;
 
 /**
@@ -35,14 +33,6 @@ public record VmOverview(
     /** Provider badge label shown next to the VM name. The canonical id is never shown. */
     public String providerBadge() {
         return VmId.providerBadge(providerId());
-    }
-
-    /**
-     * Whether the backup writer can back up this VM. The writer still uses the
-     * format-1 UTM layout, so only the legacy provider qualifies.
-     */
-    public boolean backupSupported() {
-        return LegacyBackupLayout.PROVIDER_ID.equals(providerId());
     }
 
     public long backupCount() {

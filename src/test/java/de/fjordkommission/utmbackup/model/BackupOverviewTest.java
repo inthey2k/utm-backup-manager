@@ -25,12 +25,6 @@ class BackupOverviewTest {
     }
 
     @Test
-    void onlyUtmVmsAreBackupSupportedUntilFormatTwoWriterSupportsMore() {
-        assertTrue(overview(new VmId(UTM, "Linux.utm")).backupSupported());
-        assertFalse(overview(new VmId(QEMU, "ArchLinux")).backupSupported());
-    }
-
-    @Test
     void providerHealthRequiresListedVmsAndNoErrors() {
         BackupOverview overview = new BackupOverview(
                 List.of(),

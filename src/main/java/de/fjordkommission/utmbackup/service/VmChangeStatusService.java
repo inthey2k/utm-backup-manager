@@ -104,7 +104,7 @@ public class VmChangeStatusService {
 
     /**
      * Includes both the source itself and all descendants. This matches the
-     * existing UTM backup-state semantics where directory mtimes also count.
+     * existing backup-state semantics where directory mtimes also count.
      */
     private long newestModificationTime(Path source) throws IOException {
         try (Stream<Path> paths = Files.walk(source)) {
