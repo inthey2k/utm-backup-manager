@@ -43,3 +43,6 @@ inspect-code-result.tar.gz
 # Claude Code reviews
 /docs/reviews
 
+/docs/architecture/component-overview-1.4.0.pdf
+/docs/architecture/database-overview-1.4.0.pdf
+/docs/architecture/class-diagram-1.4.0.pdf
