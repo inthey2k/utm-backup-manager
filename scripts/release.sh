@@ -25,7 +25,19 @@ fi
 
 CURRENT_VERSION="$(mvn help:evaluate -Dexpression=project.version -q -DforceStdout)"
 
-IFS='.' read -r CURRENT_MAJOR CURRENT_MINOR CURRENT_PATCH <<< "$CURRENT_VERSION"
+if [[ ! "$CURRENT_VERSION" =~ ^([0-9]+)\.([0-9]+)\.([0-9]+)(-SNAPSHOT)?$ ]]; then
+    echo "Unsupported project version: $CURRENT_VERSION"
+    exit 1
+fi
+
+CURRENT_MAJOR="${BASH_REMATCH[1]}"
+CURRENT_MINOR="${BASH_REMATCH[2]}"
+CURRENT_PATCH="${BASH_REMATCH[3]}"
+CURRENT_IS_SNAPSHOT=false
+
+if [[ -n "${BASH_REMATCH[4]:-}" ]]; then
+    CURRENT_IS_SNAPSHOT=true
+fi
 
 echo
 echo "Release type:"
@@ -51,14 +63,18 @@ case "$RELEASE_TYPE_SELECTION" in
         ;;
 esac
 
-case "$RELEASE_TYPE" in
-    "Bugfix")
-        SUGGESTED_VERSION="$CURRENT_MAJOR.$CURRENT_MINOR.$((CURRENT_PATCH + 1))"
-        ;;
-    "Maintenance"|"Feature")
-        SUGGESTED_VERSION="$CURRENT_MAJOR.$((CURRENT_MINOR + 1)).0"
-        ;;
-esac
+if [[ "$CURRENT_IS_SNAPSHOT" == true ]]; then
+    SUGGESTED_VERSION="$CURRENT_MAJOR.$CURRENT_MINOR.$CURRENT_PATCH"
+else
+    case "$RELEASE_TYPE" in
+        "Bugfix")
+            SUGGESTED_VERSION="$CURRENT_MAJOR.$CURRENT_MINOR.$((CURRENT_PATCH + 1))"
+            ;;
+        "Maintenance"|"Feature")
+            SUGGESTED_VERSION="$CURRENT_MAJOR.$((CURRENT_MINOR + 1)).0"
+            ;;
+    esac
+fi
 
 VERSION="${1:-}"
 
