@@ -2,103 +2,38 @@
 
 ## Project context
 
-UTM Backup Manager is a Java 21 / Spring Boot application for managing local UTM virtual-machine backups through a browser-based interface. It is intended primarily for hobbyists and ambitious VM enthusiasts ("VM herders"), not as an enterprise backup platform.
+UTM Backup Manager is a Java 21 / Spring Boot application for managing local VM backups through a browser-based interface. It has a multi-provider architecture and currently supports UTM and QEMU. It is primarily a user-operated enthusiast tool, not an enterprise backup platform.
 
-Before proposing changes, read `README.md`, `ROADMAP.md`, and the relevant code and tests. Treat the existing implementation and documentation as the source of truth; verify assumptions against the code.
+Read the relevant code, tests, `README.md`, and `ROADMAP.md` before making substantial changes. Treat the implementation as the source of truth and verify assumptions against it.
 
-## Development priorities
+## Core development rules
 
-1. Complete planned features and improve the user experience.
-2. Keep contributor-facing documentation accurate, clear, and welcoming.
-3. Address non-critical refactoring, robustness, concurrency, and security hardening in later maintenance releases.
+- Follow the existing architecture, Spring Boot patterns, naming, and formatting.
+- Keep changes focused; avoid unnecessary dependencies and unrelated refactoring.
+- Preserve existing behavior unless the task explicitly requires a change.
+- Write source comments, JavaDoc, and technical documentation in English.
+- Add or update focused tests for changed behavior where practical.
+- Keep affected documentation consistent with implemented behavior.
+- Distinguish confirmed defects from hypothetical risks and do not overstate non-critical issues.
+- Never weaken backup integrity, retention, Stable-backup protection, or other existing safety guards.
 
-This prioritization reflects a locally run, user-operated tool. Do not present every theoretical edge case as an urgent blocker. Nevertheless, flag credible data-loss risks clearly and distinguish confirmed defects from hypothetical scenarios. Never weaken existing backup protections.
+## Working tree and Git
 
-## Build and test strategy
+- You operate on the original Git working tree shared from the macOS host. Changes are immediately visible in IntelliJ IDEA.
+- The project owner handles Git operations.
+- Do not create branches/worktrees, stage, commit, push, reset, revert, tag, release, or run release/deployment scripts unless explicitly requested.
+- Preserve user changes and untracked files. Never clean, overwrite, or discard them without explicit approval.
+- Leave implementation changes uncommitted for review.
+- Do not modify files outside this repository without permission.
 
-Use the smallest useful verification step while implementing changes.
+## Data and credentials
 
-During development:
-
-- Run focused tests for the classes or behaviour being changed, for example:
-  `mvn -Dtest=VmInventoryTest test`
-- Run `mvn test` when several related test classes are affected.
-- Run `mvn verify` when broader project verification is useful but a clean build
-  is not necessary.
-- Do not run `mvn clean verify` after every edit or small group of edits.
-
-Run `mvn clean verify` only once as the final verification of a substantial task
-or phase, unless there is a concrete reason to suspect stale build artifacts.
-
-If the final verification command already includes a clean build, for example:
-
-    mvn clean verify sonar:sonar ...
-
-do not run a separate `mvn clean verify` immediately beforehand.
-
-Documentation-only changes do not require another full clean build if the code
-has already been verified.
-
-If a focused test fails, fix and rerun the focused test first. Do not repeatedly
-run the entire test suite while debugging one local failure.
-
-Always report which verification commands were actually run and whether they
-passed.
-
-## Code and documentation conventions
-
-- Use Java 21 and follow the project's established Spring Boot patterns, architecture, naming, and formatting.
-- Keep changes focused and maintainable; avoid unnecessary dependencies or large rewrites.
-- Write source comments, JavaDoc, and technical documentation in **English**.
-- Keep comments concise. Describe what a class or method does and explain *why* an implementation choice matters; add inline comments only for non-obvious logic.
-- Preserve existing behavior unless the task explicitly calls for a change.
-- Add or update focused regression tests for bug fixes and tests for new behavior where practical.
-- Run relevant tests and report what passed, failed, or could not be run. Do not claim verification without actually performing it.
-- Keep `README.md`, `ROADMAP.md`, release notes, and other affected documentation consistent with implemented behavior.
-
-## Working safely
-
-- You operate on the **original Git working tree** shared from the macOS host. Edits are immediately visible to the developer in IntelliJ; this is not a disposable copy.
-- The project owner handles all Git operations. Do not run Git commands, create branches or worktrees, stage, commit, push, reset, or revert unless explicitly requested.
-- Edit the existing working tree directly; do not require a separate Git worktree.
-- Preserve existing user changes and untracked files; never discard, overwrite, or clean them without explicit approval.
-- Leave all changes uncommitted for review in IntelliJ IDEA, and summarize created, modified, or deleted files when finished.
-- Do not create releases or tags or invoke deployment/release scripts without explicit authorization.
-- Do not change files outside this repository without permission.
-- Do not delete or modify real VM backups, backup metadata, or UTM VM files unless explicitly instructed. Prefer mocks, fixtures, and temporary test directories.
-- Do not expose credentials or private configuration values in code, logs, documentation, or commits.
-- For substantial architectural changes or potentially destructive operations, explain the proposed approach and get approval before implementation.
-- Never silently loosen safeguards around stable backups, retention, deletion, or backup integrity.
-
-## Quality gate
-
-At the end of the implementation phase:
-
-- run the required local verification
-- do not query SonarQube unless a fresh analysis covering the current code has
-  already been submitted
-- report that Sonar verification is pending if no fresh analysis exists
-
-After the developer submits a new SonarQube analysis, inspect and fix only the
-new issues caused by the current phase.
-
-## Reviews and analysis reports
-
-For **substantial completed analyses** (such as architecture reviews, code-quality assessments, security reviews, or focused technical investigations):
-
-- Save a readable Markdown report in `docs/reviews/` as part of the requested deliverable, unless the user explicitly asks not to write files.
-- Use a descriptive name in the format `YYYY-MM-DD-review-topic.md`. Create `docs/reviews/` if needed.
-- Include the date, scope, findings with concrete evidence (file paths and line references when useful), impact, and practical recommendations.
-- Clearly distinguish **confirmed defects**, **plausible risks**, and **optional improvements**. Prioritize them according to this project's actual use case, rather than generic enterprise standards.
-- Do not overwrite an existing report without permission. Do not create a report for every quick question or minor code explanation.
-- Include the saved report path in your final response.
-
-**Read-only review convention:** A request for a *read-only code review* forbids changes to application code, configuration, and tests, but **permits writing the requested report under `docs/reviews/`**. If the user explicitly requests *no file modifications at all*, do not save a report; present it in the conversation instead.
+- Do not modify or delete real VM backups, VM files, or production backup metadata unless explicitly instructed.
+- Prefer mocks, fixtures, and temporary directories for tests.
+- Never expose credentials or private configuration values.
 
 ## Communication
 
-- Be direct, specific, and collaborative. Explain trade-offs without overstating risk.
-- When identifying a defect, cite the relevant code and suggest a way to reproduce or test it.
-- Separate observations from assumptions; ask when requirements are genuinely ambiguous.
-- Before broad refactoring, propose a small, reviewable plan.
-- At the end of implementation tasks, summarize changed files, tests run, remaining caveats, and any follow-up documentation updates.
+- Be direct and specific.
+- For substantial architectural changes, briefly state the proposed design and affected areas before implementation.
+- At the end of implementation work, summarize changed files, verification actually run, remaining caveats, and relevant documentation updates.
