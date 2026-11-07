@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>UTM Backup Manager</title>
-    <link rel="stylesheet" th:href="@{/css/backup-manager.css}">
+    <link rel="stylesheet" th:href="@{/css/backup-manager.css(v=${applicationVersion})}">
 </head>
 
 <body>
@@ -880,7 +880,7 @@
     </dialog>
 </main>
 
-<script th:src="@{/js/backup-manager.js}" defer></script>
+<script th:src="@{/js/backup-manager.js(v=${applicationVersion})}" defer></script>
 <div class="application-version-corner">
     UTM Backup Manager v<span th:text="${applicationVersion}">x.x.x</span>
 </div>

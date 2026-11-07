@@ -4,12 +4,12 @@
     <parent>
         <groupId>org.springframework.boot</groupId>
         <artifactId>spring-boot-starter-parent</artifactId>
-        <version>4.1.1</version>
+        <version>4.1.2</version>
         <relativePath/>
     </parent>
     <groupId>de.fjordkommission</groupId>
     <artifactId>utm-backup-manager</artifactId>
-    <version>1.5.0</version>
+    <version>1.5.1-SNAPSHOT</version>
     <properties>
         <java.version>21</java.version>
         <tomcat.version>11.0.26</tomcat.version>
@@ -18,6 +18,7 @@
         <sonar.coverage.jacoco.xmlReportPaths>
             ${project.build.directory}/site/jacoco/jacoco.xml
         </sonar.coverage.jacoco.xmlReportPaths>
+        <jackson-bom.version>3.1.8</jackson-bom.version>
     </properties>
     <dependencyManagement>
         <dependencies>
@@ -73,8 +74,13 @@
                     <jvmArguments>
                         --enable-native-access=ALL-UNNAMED
                     </jvmArguments>
+                    <systemPropertyVariables>
+                        <utm-backup-manager.version>
+                            ${project.version}
+                        </utm-backup-manager.version>
+                    </systemPropertyVariables>
                 </configuration>
-                 <executions>
+                <executions>
                     <execution>
                         <goals>
                             <goal>build-info</goal>

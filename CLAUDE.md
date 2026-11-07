@@ -4,7 +4,7 @@
 
 UTM Backup Manager is a Java 21 / Spring Boot application for managing local UTM virtual-machine backups through a browser-based interface. It is intended primarily for hobbyists and ambitious VM enthusiasts ("VM herders"), not as an enterprise backup platform.
 
-Read `README.md`, `ROADMAP.md`, and the relevant code and tests before proposing changes. Treat the existing implementation and documentation as the source of truth; verify assumptions against the code.
+Before proposing changes, read `README.md`, `ROADMAP.md`, and the relevant code and tests. Treat the existing implementation and documentation as the source of truth; verify assumptions against the code.
 
 ## Development priorities
 
