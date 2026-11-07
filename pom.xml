@@ -19,20 +19,6 @@
         </sonar.coverage.jacoco.xmlReportPaths>
         <jackson-bom.version>3.1.8</jackson-bom.version>
     </properties>
-    <dependencyManagement>
-        <dependencies>
-            <dependency>
-                <groupId>tools.jackson.core</groupId>
-                <artifactId>jackson-databind</artifactId>
-                <version>3.1.7</version>
-            </dependency>
-            <dependency>
-                <groupId>tools.jackson.core</groupId>
-                <artifactId>jackson-core</artifactId>
-                <version>3.1.7</version>
-            </dependency>
-        </dependencies>
-    </dependencyManagement>
     <dependencies>
         <dependency>
             <groupId>org.springframework.boot</groupId>
