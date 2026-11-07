@@ -233,11 +233,19 @@
                 <span th:text="#{backup.progress.minutes.short}">min</span>
             </span>
             <span class="separator">-</span>
-            <span class="progress-time">
-            <span th:text="#{backup.progress.remaining}">Remaining:</span>
-            <span id="backup-progress-remaining" class="progress-time-value">--:--</span>
-            <span th:text="#{backup.progress.minutes.short}">min</span>
-        </span>
+            <span class="progress-time"
+                    id="backup-progress-remaining-container"
+                    th:attr="data-label-calculating=#{backup.progress.calculating}">
+                <span th:text="#{backup.progress.remaining}">Remaining:</span>
+                <span id="backup-progress-remaining"
+                    class="progress-time-value">
+                --:--
+                </span>
+                <span id="backup-progress-remaining-unit"
+                    th:text="#{backup.progress.minutes.short}">
+                min
+                </span>
+            </span>
         </div>
 
     </section>

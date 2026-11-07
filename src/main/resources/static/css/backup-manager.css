@@ -487,6 +487,16 @@ code { overflow-wrap: anywhere; }
     font-feature-settings: "tnum";
 }
 
+.progress-time.calculating {
+    display: inline-flex;
+    align-items: baseline;
+}
+
+.progress-time.calculating .progress-time-value {
+    width: auto;
+    min-width: 0;
+}
+
 .progress-vm {
     display: inline-grid;
     grid-template-columns: auto 5ch;

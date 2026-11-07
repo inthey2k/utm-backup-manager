@@ -568,10 +568,33 @@ function updateBackupTimes() {
     }
 
     if (backupProgressRemaining) {
-        backupProgressRemaining.textContent =
-            displayedRemainingSeconds === null
-                ? "--:--"
-                : formatDuration(displayedRemainingSeconds);
+        const remainingContainer =
+            document.getElementById(
+                "backup-progress-remaining-container"
+            );
+
+        const remainingUnit =
+            document.getElementById(
+                "backup-progress-remaining-unit"
+            );
+
+        if (displayedRemainingSeconds === null) {
+            const dots = ".".repeat(
+                (displayedElapsedSeconds % 3) + 1
+            );
+
+            backupProgressRemaining.textContent =
+                remainingContainer.dataset.labelCalculating + dots;
+
+            remainingUnit.hidden = true;
+            remainingContainer.classList.add("calculating");
+        } else {
+            backupProgressRemaining.textContent =
+                formatDuration(displayedRemainingSeconds);
+
+            remainingUnit.hidden = false;
+            remainingContainer.classList.remove("calculating");
+        }
     }
 }
 
