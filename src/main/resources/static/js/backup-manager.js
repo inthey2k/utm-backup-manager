@@ -106,7 +106,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const groups = document.createElement("div");
     groups.className = "provider-groups";
 
-    providers.forEach(provider => {
+    providers.forEach((provider, providerId) => {
         const group = document.createElement("section");
         group.className = "provider-group";
 
@@ -159,7 +159,8 @@ document.addEventListener("DOMContentLoaded", () => {
                 carousel,
                 provider.cards,
                 previous,
-                next
+                next,
+                providerId
             );
         });
     });
@@ -172,7 +173,8 @@ function initialiseProviderCarousel(
     carousel,
     cards,
     previous,
-    next
+    next,
+    providerId
 ) {
     if (cards.length === 0) {
         row.hidden = true;
@@ -205,6 +207,25 @@ function initialiseProviderCarousel(
 
     // Start in the middle segment, which contains the real cards.
     setScrollPositionImmediately(carousel, originalWidth);
+
+    const storageKey =
+        `utm-backup-manager.carousel.${providerId}`;
+
+    const savedScrollLeft =
+        sessionStorage.getItem(storageKey);
+
+    if (savedScrollLeft !== null) {
+        const restoredScrollLeft = Number(savedScrollLeft);
+
+        if (Number.isFinite(restoredScrollLeft)) {
+            setScrollPositionImmediately(
+                carousel,
+                restoredScrollLeft
+            );
+        }
+
+        sessionStorage.removeItem(storageKey);
+    }
 
     let normaliseTimer = null;
 
@@ -251,6 +272,28 @@ function initialiseProviderCarousel(
             left: cardWidth,
             behavior: "smooth"
         });
+    });
+
+    // remember current column in carousel
+    document.addEventListener("submit", event => {
+        const form = event.target.closest(".stable-form");
+
+        if (!form) {
+            return;
+        }
+
+        const vmColumn = form.closest(".vm-column");
+        const carousel = form.closest(".vm-carousel");
+        const providerId = vmColumn?.dataset.providerId;
+
+        if (!carousel || !providerId) {
+            return;
+        }
+
+        sessionStorage.setItem(
+            `utm-backup-manager.carousel.${providerId}`,
+            String(carousel.scrollLeft)
+        );
     });
 }
 

@@ -451,7 +451,8 @@
                     <!-- Action menu -->
                     <div class="actions" th:with="writable=${storageStatus.writable}">
                         <!-- Pin to mark as stable -->
-                        <form th:action="@{/stable/{id}(id=${backup.id()})}"
+                        <form   class="stable-form"
+                                th:action="@{/stable/{id}(id=${backup.id()})}"
                               method="post">
                             <input type="hidden"
                                    name="stable"
