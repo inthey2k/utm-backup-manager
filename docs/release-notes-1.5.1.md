@@ -1,4 +1,4 @@
-# UTM Backup Manager 1.5.0
+# UTM Backup Manager 1.5.1
 
 Version 1.5.1 fixes some frontend issues, which bugged me during the use of the app.
 
