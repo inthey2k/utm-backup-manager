@@ -13,6 +13,7 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.Executor;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
 
 /**
  * Starts VM backups in the background and exposes their current lifecycle state.
@@ -35,7 +36,8 @@ public class BackupJobService {
     // List of the VMs to be marked as pending deletion after backup job
     private volatile Set<String> currentRetentionPendingDeletionIds = Set.of();
     // List of the providers to which the currently backed-up VMs belong
-    private volatile List<String> currentVmProviderBadges = List.of();
+    private final AtomicReference<List<String>> currentVmProviderBadges =
+            new AtomicReference<>(List.of());
 
     public BackupJobService(
             CreateBackupService createBackupService,
@@ -77,9 +79,11 @@ public class BackupJobService {
                 .map(ManagedVm::name)
                 .toList();
 
-        currentVmProviderBadges = selectedVms.stream()
-                .map(vm -> vm.providerId().toUpperCase())
-                .toList();
+        currentVmProviderBadges.set(
+                selectedVms.stream()
+                        .map(vm -> vm.providerId().toUpperCase())
+                        .toList()
+        );
 
         BackupJob runningJob;
 
@@ -129,7 +133,7 @@ public class BackupJobService {
      * Returns the current provider of the VM that is being backed-up
      */
     public List<String> currentVmProviderBadges() {
-        return currentVmProviderBadges;
+        return currentVmProviderBadges.get();
     }
 
     /**
