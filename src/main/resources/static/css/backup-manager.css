@@ -1227,6 +1227,7 @@ code { overflow-wrap: anywhere; }
     color: #e5ad55;
     font-size: .68rem;
     font-weight: 700;
+    text-transform: uppercase;
     line-height: 1.2;
     letter-spacing: .05em;
     vertical-align: middle;
