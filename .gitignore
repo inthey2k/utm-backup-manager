@@ -5,6 +5,9 @@ target/
 .idea/
 *.iml
 
+# SonarQube artefacts
+.sonar/
+
 # macOS
 .DS_Store
 
@@ -46,3 +49,4 @@ inspect-code-result.tar.gz
 /docs/architecture/component-overview-1.4.0.pdf
 /docs/architecture/database-overview-1.4.0.pdf
 /docs/architecture/class-diagram-1.4.0.pdf
+
