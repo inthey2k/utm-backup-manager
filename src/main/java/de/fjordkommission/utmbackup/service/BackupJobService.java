@@ -34,6 +34,8 @@ public class BackupJobService {
     private volatile List<String> currentVmNames = List.of();
     // List of the VMs to be marked as pending deletion after backup job
     private volatile Set<String> currentRetentionPendingDeletionIds = Set.of();
+    // List of the providers to which the currently backed-up VMs belong
+    private volatile List<String> currentVmProviderBadges = List.of();
 
     public BackupJobService(
             CreateBackupService createBackupService,
@@ -73,6 +75,10 @@ public class BackupJobService {
 
         currentVmNames = selectedVms.stream()
                 .map(ManagedVm::name)
+                .toList();
+
+        currentVmProviderBadges = selectedVms.stream()
+                .map(vm -> vm.providerId().toUpperCase())
                 .toList();
 
         BackupJob runningJob;
@@ -117,6 +123,13 @@ public class BackupJobService {
         }
 
         return runningJob;
+    }
+
+    /**
+     * Returns the current provider of the VM that is being backed-up
+     */
+    public List<String> currentVmProviderBadges() {
+        return currentVmProviderBadges;
     }
 
     /**

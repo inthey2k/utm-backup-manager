@@ -27,6 +27,7 @@ public class BackupJobController {
                 .map(job -> BackupJobResponse.from(
                         job,
                         backupJobService.currentVmNames(),
+                        backupJobService.currentVmProviderBadges(),
                         backupJobService.currentRetentionPendingDeletionIds()
                 ))
                 .orElseGet(BackupJobResponse::idle);
@@ -48,6 +49,7 @@ public class BackupJobController {
             int currentVmNumber,
             int vmCount,
             List<String> vmNames,
+            List<String> vmProviderBadges,
             Instant startedAt,
             Instant finishedAt,
             long elapsedSeconds,
@@ -57,6 +59,7 @@ public class BackupJobController {
         static BackupJobResponse from(
                 BackupJob job,
                 List<String> vmNames,
+                List<String> vmProviderBadges,
                 Set<String> retentionPendingDeletionIds) {
             return new BackupJobResponse(
                     job.status().name(),
@@ -69,6 +72,7 @@ public class BackupJobController {
                     job.currentVmNumber(),
                     job.vmCount(),
                     vmNames,
+                    vmProviderBadges,
                     job.startedAt(),
                     job.finishedAt(),
                     Math.max(
@@ -100,6 +104,7 @@ public class BackupJobController {
                     null,
                     0,
                     0,
+                    List.of(),
                     List.of(),
                     null,
                     null,

@@ -478,6 +478,7 @@ function updateBackupProgressVms(job) {
     backupProgressVms.replaceChildren();
 
     const vmNames = job.vmNames || [];
+    const vmProviderBadges = job.vmProviderBadges || [];
 
     vmNames.forEach((vmName, index) => {
         const vmNumber = index + 1;
@@ -505,8 +506,16 @@ function updateBackupProgressVms(job) {
 
         const label = document.createElement("span");
         label.textContent = vmName;
+        const providerBadge = document.createElement("span");
+        providerBadge.className = "provider-badge";
+        providerBadge.textContent = vmProviderBadges[index] || "";
 
         vmElement.append(icon, label);
+
+        if (providerBadge.textContent) {
+            vmElement.appendChild(providerBadge);
+        }
+
         backupProgressVms.appendChild(vmElement);
     });
 }

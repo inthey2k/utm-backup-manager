@@ -3,6 +3,7 @@ package de.fjordkommission.utmbackup.service;
 import de.fjordkommission.utmbackup.model.LocalVm;
 import de.fjordkommission.utmbackup.model.ManagedVm;
 import de.fjordkommission.utmbackup.model.VmId;
+import de.fjordkommission.utmbackup.model.VmStatus;
 import de.fjordkommission.utmbackup.storage.BackupStorageGuard;
 import org.junit.jupiter.api.Test;
 
@@ -546,6 +547,47 @@ class BackupJobServiceTest {
 
         verifyNoInteractions(retentionCleanupJobService);
     }
+
+    @Test
+    void exposesProviderBadgesForSelectedVms() {
+        CreateBackupService createBackupService =
+                mock(CreateBackupService.class);
+        CapturingExecutor executor = new CapturingExecutor();
+
+        BackupJobService service =
+                createService(createBackupService, executor);
+
+        ManagedVm utmVm = stoppedUtm(vm);
+
+        LocalVm qemuLocalVm = new LocalVm(
+                "freebsd",
+                "FreeBSD",
+                List.of(Path.of("FreeBSD"))
+        );
+
+        ManagedVm qemuVm = new ManagedVm(
+                new VmId("qemu", qemuLocalVm.id()),
+                "QEMU",
+                qemuLocalVm,
+                VmStatus.STOPPED
+        );
+
+        service.start(
+                List.of(utmVm, qemuVm),
+                null
+        );
+
+        assertEquals(
+                List.of("Test VM", "FreeBSD"),
+                service.currentVmNames()
+        );
+
+        assertEquals(
+                List.of("UTM", "QEMU"),
+                service.currentVmProviderBadges()
+        );
+    }
+
 
     /**
      * Stores a submitted task so tests can control exactly when it starts.
