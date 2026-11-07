@@ -1218,6 +1218,20 @@ code { overflow-wrap: anywhere; }
     flex-direction: column;
     gap: .4rem;
 }
+.change-badge {
+    display: inline-block;
+    margin-left: 3px;
+    padding: 2px 5px;
+    border: 1px solid #d89b3c;
+    border-radius: 4px;
+    color: #e5ad55;
+    font-size: .68rem;
+    font-weight: 700;
+    line-height: 1.2;
+    letter-spacing: .05em;
+    vertical-align: middle;
+    white-space: nowrap;
+}
 
 .vm-size-spinner {
     display: inline-block;

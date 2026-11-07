@@ -760,6 +760,11 @@
                         <span class="provider-badge"
                               th:text="${vm.providerBadge()}"
                               th:title="${vm.providerName()}"></span>
+                        <span class="change-badge"
+                              th:if="${vm.changeStatus().name() == 'CHANGED'}"
+                              th:text="#{vm.changeStatus.CHANGED}">
+                            Changed
+                        </span>
                     </span>
                     <span class="backup-vm-size" th:attr="data-vm-id=${vm.id()}">
                         <span class="vm-size-spinner" aria-hidden="true"></span>
