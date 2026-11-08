@@ -3,9 +3,12 @@ package de.fjordkommission.utmbackup.provider.utm;
 import org.w3c.dom.Document;
 import org.w3c.dom.Element;
 import org.w3c.dom.Node;
+import org.xml.sax.ErrorHandler;
 import org.xml.sax.SAXException;
+import org.xml.sax.SAXParseException;
 
 import javax.xml.XMLConstants;
+import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
 import javax.xml.parsers.ParserConfigurationException;
 import java.io.IOException;
@@ -41,6 +44,24 @@ public final class UtmPackageIdentity {
 
     private static final Pattern UUID = Pattern.compile(
             "[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{12}");
+
+    /** Fails the parse on error or fatal error, and ignores warnings. Prints nothing. */
+    private static final ErrorHandler QUIET_ERRORS = new ErrorHandler() {
+        @Override
+        public void warning(SAXParseException exception) {
+            // Warnings do not affect the identity, so they are ignored silently.
+        }
+
+        @Override
+        public void error(SAXParseException exception) throws SAXException {
+            throw exception;
+        }
+
+        @Override
+        public void fatalError(SAXParseException exception) throws SAXException {
+            throw exception;
+        }
+    };
 
     private UtmPackageIdentity() {
     }
@@ -116,7 +137,11 @@ public final class UtmPackageIdentity {
             factory.setFeature("http://xml.org/sax/features/external-parameter-entities", false);
             factory.setXIncludeAware(false);
             factory.setExpandEntityReferences(false);
-            document = factory.newDocumentBuilder().parse(config.toFile());
+            DocumentBuilder builder = factory.newDocumentBuilder();
+            // Malformed input is an expected outcome here. The parser's default handler would
+            // print it to stderr, so errors are rethrown to the caller and nothing is printed.
+            builder.setErrorHandler(QUIET_ERRORS);
+            document = builder.parse(config.toFile());
         } catch (SAXException | ParserConfigurationException e) {
             return Optional.empty();
         }

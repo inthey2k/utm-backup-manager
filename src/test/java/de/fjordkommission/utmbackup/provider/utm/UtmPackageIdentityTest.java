@@ -83,6 +83,23 @@ class UtmPackageIdentityTest {
     }
 
     @Test
+    void malformedConfigFailsQuietlyWithoutWritingToStderr() throws IOException {
+        Path binary = pkg("binary.utm", "bplist00 not xml at all <");
+        java.io.ByteArrayOutputStream captured = new java.io.ByteArrayOutputStream();
+        java.io.PrintStream original = System.err;
+
+        System.setErr(new java.io.PrintStream(captured, true, java.nio.charset.StandardCharsets.UTF_8));
+        try {
+            assertEquals(Optional.empty(), UtmPackageIdentity.readPackageUuid(binary));
+        } finally {
+            System.setErr(original);
+        }
+
+        assertEquals("", captured.toString(java.nio.charset.StandardCharsets.UTF_8),
+                "expected parser failures must not be printed");
+    }
+
+    @Test
     void containerWithOnePackageReturnsItsUuid() throws IOException {
         Path container = Files.createDirectories(tempDir.resolve("container"));
         Files.createDirectories(container.resolve("Linux.utm"));

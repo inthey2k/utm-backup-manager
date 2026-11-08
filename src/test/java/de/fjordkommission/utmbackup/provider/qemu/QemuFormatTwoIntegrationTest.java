@@ -67,8 +67,8 @@ class QemuFormatTwoIntegrationTest {
     private static final String UTM_PACKAGE = "Linux.utm";
 
     /** Generated ids of the QEMU VMs, resolved by name once the VMs exist. */
-    private VmId ARCH;
-    private VmId FREEBSD;
+    private VmId archId;
+    private VmId freeBsdId;
     private static final VmId UTM_LINUX = new VmId("utm", UTM_PACKAGE);
 
     @TempDir
@@ -116,8 +116,8 @@ class QemuFormatTwoIntegrationTest {
         backupService = new BackupService(scanner, stableRepository, guard, new BackupStateWriter());
         retentionService = new RetentionService(scanner, backupService, guard);
 
-        ARCH = qemuIdOf(ARCH_NAME);
-        FREEBSD = qemuIdOf("FreeBSD");
+        archId = qemuIdOf(ARCH_NAME);
+        freeBsdId = qemuIdOf("FreeBSD");
     }
 
     /** The generated id of the QEMU VM with this directory name. */
@@ -131,7 +131,7 @@ class QemuFormatTwoIntegrationTest {
 
     /** Container directory of the ArchLinux VM, named after its generated id. */
     private String containerName() {
-        return "qemu__" + ARCH.localId();
+        return "qemu__" + archId.localId();
     }
 
     // ------------------------------------------------------------------
@@ -140,13 +140,13 @@ class QemuFormatTwoIntegrationTest {
 
     @Test
     void stoppedQemuVmIsWrittenAsFormatTwoContainerWithCanonicalIdentity() throws IOException {
-        CreateBackupService.Result result = createService.create(List.of(stopped(ARCH)), "qemu backup");
+        CreateBackupService.Result result = createService.create(List.of(stopped(archId)), "qemu backup");
 
         BackupManifest manifest = manifestOf(result.backupDirectory());
         assertEquals(BackupFormat.PROVIDER_AWARE, manifest.formatVersion());
         assertEquals(1, manifest.vms().size());
         BackupManifest.VmEntry entry = manifest.vms().getFirst();
-        assertEquals(ARCH, entry.id());
+        assertEquals(archId, entry.id());
         assertEquals(ARCH_NAME, entry.name());
         assertEquals(containerName(), entry.directory());
 
@@ -156,15 +156,15 @@ class QemuFormatTwoIntegrationTest {
 
     @Test
     void successfulBackupAcknowledgesTheCanonicalQemuId() {
-        createService.create(List.of(stopped(ARCH)), null);
+        createService.create(List.of(stopped(archId)), null);
 
-        verify(stateRepository).save(eq(ARCH), anyLong(), eq(VmStateRepository.Acknowledgement.BACKED_UP));
+        verify(stateRepository).save(eq(archId), anyLong(), eq(VmStateRepository.Acknowledgement.BACKED_UP));
     }
 
     @Test
     void runningQemuVmIsRejectedBeforeAnythingIsCopied() {
         runningProcesses = List.of(processReferencing(qemuRoot.resolve(ARCH_NAME)));
-        ManagedVm running = inventory().build().find(ARCH).orElseThrow();
+        ManagedVm running = inventory().build().find(archId).orElseThrow();
         assertEquals(VmStatus.RUNNING, running.status());
 
         List<ManagedVm> batch = List.of(running);
@@ -177,7 +177,7 @@ class QemuFormatTwoIntegrationTest {
     @Test
     void unknownQemuVmIsRejectedBeforeAnythingIsCopied() {
         runningProcesses = List.of(new QemuProcess("/opt/homebrew/bin/qemu-system-aarch64", null));
-        ManagedVm unknown = inventory().build().find(ARCH).orElseThrow();
+        ManagedVm unknown = inventory().build().find(archId).orElseThrow();
         assertEquals(VmStatus.UNKNOWN, unknown.status());
 
         List<ManagedVm> batch = List.of(unknown);
@@ -190,10 +190,10 @@ class QemuFormatTwoIntegrationTest {
     @Test
     void utmAndQemuVmsShareOneBatchWithSeparateContainers() {
         CreateBackupService.Result result = createService.create(
-                List.of(stopped(UTM_LINUX), stopped(ARCH)), null);
+                List.of(stopped(UTM_LINUX), stopped(archId)), null);
 
         BackupManifest manifest = manifestOf(result.backupDirectory());
-        assertEquals(List.of(UTM_LINUX, ARCH),
+        assertEquals(List.of(UTM_LINUX, archId),
                 manifest.vms().stream().map(BackupManifest.VmEntry::id).toList());
         String utmContainer = manifest.vms().getFirst().directory();
         assertTrue(Files.isRegularFile(result.backupDirectory().resolve("VMs").resolve(utmContainer).resolve("Linux.utm/config.plist")));
@@ -207,9 +207,9 @@ class QemuFormatTwoIntegrationTest {
 
     @Test
     void backupIsScannedAsTheLocalQemuVmOfTheEnabledProvider() {
-        createService.create(List.of(stopped(ARCH)), null);
+        createService.create(List.of(stopped(archId)), null);
 
-        VmOverview vm = find(scanner.scan(), ARCH);
+        VmOverview vm = find(scanner.scan(), archId);
 
         assertTrue(vm.local());
         assertEquals("QEMU", vm.providerName());
@@ -220,10 +220,10 @@ class QemuFormatTwoIntegrationTest {
 
     @Test
     void qemuBackupStaysVisibleWhenTheQemuProviderIsDisabled() {
-        createService.create(List.of(stopped(ARCH)), null);
+        createService.create(List.of(stopped(archId)), null);
 
         BackupScanner utmOnly = scannerFor(List.of(utmProvider()), mock(SettingsRepository.class));
-        VmOverview vm = find(utmOnly.scan(), ARCH);
+        VmOverview vm = find(utmOnly.scan(), archId);
 
         assertFalse(vm.local());
         assertEquals("qemu", vm.providerName());
@@ -233,18 +233,18 @@ class QemuFormatTwoIntegrationTest {
 
     @Test
     void changeTrackingUsesTheCanonicalIdAndTheQemuSourceDirectory() throws IOException {
-        createService.create(List.of(stopped(ARCH)), null);
+        createService.create(List.of(stopped(archId)), null);
         ArgumentCaptor<Long> acknowledged = ArgumentCaptor.forClass(Long.class);
-        verify(stateRepository).save(eq(ARCH), acknowledged.capture(), any());
-        when(stateRepository.find(ARCH)).thenReturn(Optional.of(
+        verify(stateRepository).save(eq(archId), acknowledged.capture(), any());
+        when(stateRepository.find(archId)).thenReturn(Optional.of(
                 new VmStateRepository.State(acknowledged.getValue(), VmStateRepository.Acknowledgement.BACKED_UP, "")));
 
-        assertEquals(VmChangeStatus.UNCHANGED, find(scanner.scan(), ARCH).changeStatus());
+        assertEquals(VmChangeStatus.UNCHANGED, find(scanner.scan(), archId).changeStatus());
 
         Path disk = qemuRoot.resolve(ARCH_NAME).resolve("arch-linux-disk.qcow2");
         Files.setLastModifiedTime(disk, FileTime.from(Instant.now().plusSeconds(3600)));
 
-        assertEquals(VmChangeStatus.CHANGED, find(scanner.scan(), ARCH).changeStatus());
+        assertEquals(VmChangeStatus.CHANGED, find(scanner.scan(), archId).changeStatus());
     }
 
     // ------------------------------------------------------------------
@@ -253,14 +253,14 @@ class QemuFormatTwoIntegrationTest {
 
     @Test
     void stableQemuBackupStoresItsStateInTheContainerAndBlocksDelete() {
-        CreateBackupService.Result result = createService.create(List.of(stopped(ARCH)), null);
-        String id = backupIdOf(scanner.scan(), ARCH);
+        CreateBackupService.Result result = createService.create(List.of(stopped(archId)), null);
+        String id = backupIdOf(scanner.scan(), archId);
 
         backupService.stable(id, true);
 
         Path container = result.backupDirectory().resolve("VMs/" + containerName());
         assertTrue(Files.isRegularFile(container.resolve("BACKUP-STATE.properties")));
-        assertTrue(find(scanner.scan(), ARCH).backups().getFirst().stable());
+        assertTrue(find(scanner.scan(), archId).backups().getFirst().stable());
         IllegalStateException error = assertThrows(IllegalStateException.class, () -> backupService.delete(id));
         assertTrue(error.getMessage().contains("Stable backups cannot be deleted"), error.getMessage());
         assertTrue(Files.isDirectory(container));
@@ -268,8 +268,8 @@ class QemuFormatTwoIntegrationTest {
 
     @Test
     void noteOfQemuBackupIsStoredInItsStateFile() {
-        CreateBackupService.Result result = createService.create(List.of(stopped(ARCH)), null);
-        String id = backupIdOf(scanner.scan(), ARCH);
+        CreateBackupService.Result result = createService.create(List.of(stopped(archId)), null);
+        String id = backupIdOf(scanner.scan(), archId);
 
         backupService.note(id, "before the kernel update");
 
@@ -282,17 +282,17 @@ class QemuFormatTwoIntegrationTest {
 
     @Test
     void retentionRemovesOnlyTheUnprotectedQemuBackup() {
-        createService.create(List.of(stopped(ARCH)), null);
-        createService.create(List.of(stopped(ARCH)), null);
-        createService.create(List.of(stopped(ARCH)), null);
-        List<String> backups = backupIdsOldestFirst(scanner.scan(), ARCH);
+        createService.create(List.of(stopped(archId)), null);
+        createService.create(List.of(stopped(archId)), null);
+        createService.create(List.of(stopped(archId)), null);
+        List<String> backups = backupIdsOldestFirst(scanner.scan(), archId);
         backupService.stable(backups.getFirst(), true);
 
-        retentionService.deleteBackupsExceedingRetention(List.of(ARCH));
+        retentionService.deleteBackupsExceedingRetention(List.of(archId));
 
-        List<String> remaining = backupIdsOldestFirst(scanner.scan(), ARCH);
+        List<String> remaining = backupIdsOldestFirst(scanner.scan(), archId);
         assertEquals(List.of(backups.getFirst(), backups.getLast()), remaining);
-        assertEquals(2, find(scanner.scan(), ARCH).backupCount());
+        assertEquals(2, find(scanner.scan(), archId).backupCount());
     }
 
     // ------------------------------------------------------------------
@@ -301,7 +301,7 @@ class QemuFormatTwoIntegrationTest {
 
     @Test
     void missingQemuRootDoesNotBreakUtmOrExistingQemuBackups() {
-        createService.create(List.of(stopped(ARCH)), null);
+        createService.create(List.of(stopped(archId)), null);
         BackupScanner broken = scannerFor(List.of(
                 utmProvider(),
                 new QemuVmProvider(tempDir.resolve("no-such-qemu-root"), List::of)
@@ -312,7 +312,7 @@ class QemuFormatTwoIntegrationTest {
         assertTrue(overview.providerHealthy("utm"));
         assertFalse(overview.providerHealthy("qemu"));
         assertEquals(VmStatus.STOPPED, find(overview, UTM_LINUX).status());
-        assertEquals(1, find(overview, ARCH).backupCount());
+        assertEquals(1, find(overview, archId).backupCount());
     }
 
     @Test
@@ -327,8 +327,8 @@ class QemuFormatTwoIntegrationTest {
         BackupOverview overview = inspectionFails.scan();
 
         assertEquals(VmStatus.STOPPED, find(overview, UTM_LINUX).status());
-        assertEquals(VmStatus.UNKNOWN, find(overview, ARCH).status());
-        assertEquals(VmStatus.UNKNOWN, find(overview, FREEBSD).status());
+        assertEquals(VmStatus.UNKNOWN, find(overview, archId).status());
+        assertEquals(VmStatus.UNKNOWN, find(overview, freeBsdId).status());
         assertFalse(overview.providerHealthy("qemu"));
     }
 

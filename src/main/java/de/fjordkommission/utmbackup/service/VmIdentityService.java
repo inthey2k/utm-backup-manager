@@ -79,7 +79,7 @@ public class VmIdentityService {
     }
 
     /** Records observations in one write. */
-    public void record(List<VmIdentityRegistry.Observation> observations) {
+    public void recordObservations(List<VmIdentityRegistry.Observation> observations) {
         if (observations.isEmpty()) {
             return;
         }

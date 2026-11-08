@@ -118,7 +118,7 @@ public class BackupScanner {
 
         // One write for the whole scan, before change status is determined, so the
         // change status can use the aliases of this scan.
-        identities.record(attribution.observations());
+        identities.recordObservations(attribution.observations());
 
         Map<VmId, ManagedVm> localVmsById = new HashMap<>();
         inventory.vms().forEach(vm -> localVmsById.put(vm.id(), vm));
@@ -431,16 +431,19 @@ public class BackupScanner {
     ) {
         String batchName = directory.getFileName().toString();
 
-        LocalDateTime backupTime = manifest.backupTime().orElseThrow()
-                .atZoneSameInstant(ZoneId.systemDefault())
-                .toLocalDateTime();
+        FormatTwoBatch batch = new FormatTwoBatch(
+                batchName,
+                manifest.backupTime().orElseThrow()
+                        .atZoneSameInstant(ZoneId.systemDefault())
+                        .toLocalDateTime(),
+                manifest.comment()
+        );
 
         for (BackupManifest.VmEntry entry : manifest.vms()) {
             Path container = vmDirectory.resolve(entry.directory());
 
             if (Files.isDirectory(container)) {
-                addFormatTwoBackup(batchName, entry, container, backupTime, manifest.comment(),
-                        backupsByVm, batchIssues, attribution);
+                addFormatTwoBackup(batch, entry, container, backupsByVm, batchIssues, attribution);
             } else {
                 batchIssues.add(new BackupBatchIssue(
                         batchName,
@@ -450,16 +453,22 @@ public class BackupScanner {
         }
     }
 
+    /** The batch-level facts shared by every VM entry of one format-2 batch. */
+    private record FormatTwoBatch(String name, LocalDateTime backupTime, String comment) {
+    }
+
     private void addFormatTwoBackup(
-            String batchName,
+            FormatTwoBatch batch,
             BackupManifest.VmEntry entry,
             Path container,
-            LocalDateTime backupTime,
-            String comment,
             Map<VmId, List<VmBackup>> backupsByVm,
             List<BackupBatchIssue> batchIssues,
             Attribution attribution
     ) {
+        String batchName = batch.name();
+        LocalDateTime backupTime = batch.backupTime();
+        String comment = batch.comment();
+
         String id = BackupIdentity.formatTwoId(batchName, entry.id());
         BackupState state = formatTwoState(batchName, entry, container, batchIssues);
 
@@ -587,7 +596,7 @@ public class BackupScanner {
                         stored.providerId());
             }
 
-            return registry.flatMap(identities -> identities.canonicalOf(stored)).orElse(stored);
+            return registry.flatMap(current -> current.canonicalOf(stored)).orElse(stored);
         }
 
         /**
