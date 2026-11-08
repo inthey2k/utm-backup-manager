@@ -2,6 +2,7 @@ package de.fjordkommission.utmbackup.provider;
 
 import de.fjordkommission.utmbackup.provider.qemu.QemuProperties;
 import de.fjordkommission.utmbackup.provider.qemu.QemuVmProvider;
+import de.fjordkommission.utmbackup.provider.utm.UtmConfigFixture;
 import de.fjordkommission.utmbackup.provider.utm.UtmProperties;
 import de.fjordkommission.utmbackup.provider.utm.UtmVmProvider;
 import org.junit.jupiter.api.Assumptions;
@@ -124,10 +125,6 @@ class VmProviderIdentityContractTest {
     }
 
     private static String plist(String uuid) {
-        return """
-                <?xml version="1.0" encoding="UTF-8"?>
-                <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-                <plist version="1.0"><dict><key>UUID</key><string>%s</string></dict></plist>
-                """.formatted(uuid);
+        return UtmConfigFixture.config("Foreign", uuid);
     }
 }

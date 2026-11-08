@@ -63,7 +63,7 @@ providers and their configuration.
   abstract, so the decision is required to compile. Rules are listed in
   `StableIdentityRules`, and a test enforces the listing. See the
   [integration guide](../hypervisor-provider-integration-guide.md#stable-identity-required).
-- **UTM.** The local id is the native UUID from the package's `config.plist`. A
+- **UTM.** The local id is the native UUID in `Information` → `UUID` of the package's `config.plist`. A
   package whose UUID cannot be read keeps its folder name as id and a warning is
   logged. Renaming a package does not change its identity; see
   [VM identity registry](backup-format.md#vm-identity-registry).

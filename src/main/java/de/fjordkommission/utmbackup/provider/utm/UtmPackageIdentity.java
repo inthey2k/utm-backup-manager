@@ -22,7 +22,8 @@ import java.util.stream.Stream;
 /**
  * Reads the native UTM identity from a package's {@code config.plist}.
  *
- * <p>The top-level {@code UUID} key is the stable identity of a UTM VM. Package names
+ * <p>The {@code UUID} key inside the root {@code Information} dictionary is the stable
+ * identity of a UTM VM. Package names
  * are not, because the user can rename a VM, so a rename never changes this value. Only
  * XML property lists are read. A binary or otherwise unreadable file yields empty, and the
  * caller must then keep the existing identity rather than guess one.
@@ -30,6 +31,10 @@ import java.util.stream.Stream;
 public final class UtmPackageIdentity {
 
     static final String CONFIG_FILE = "config.plist";
+
+    /** UTM keeps the VM identity in the {@code Information} dictionary of the root. */
+    static final String INFORMATION_KEY = "Information";
+    static final String UUID_KEY = "UUID";
 
     /** Larger files are not configuration files, so they are not parsed. */
     private static final long MAX_CONFIG_BYTES = 4L * 1024 * 1024;
@@ -56,7 +61,7 @@ public final class UtmPackageIdentity {
                 return Optional.empty();
             }
 
-            return topLevelString(config, "UUID")
+            return stringAt(config, INFORMATION_KEY, UUID_KEY)
                     .map(String::trim)
                     .filter(value -> UUID.matcher(value).matches())
                     .map(value -> value.toUpperCase(Locale.ROOT));
@@ -94,9 +99,11 @@ public final class UtmPackageIdentity {
     }
 
     /**
-     * Returns the string value of a top-level key of the plist root dictionary.
+     * Returns the string at a key path below the root dictionary. Every step must be a
+     * dictionary key whose value is either the next dictionary or, for the last step, a
+     * string. Any other shape yields empty.
      */
-    private static Optional<String> topLevelString(Path config, String key) throws IOException {
+    private static Optional<String> stringAt(Path config, String... keyPath) throws IOException {
         Document document;
 
         try {
@@ -120,25 +127,39 @@ public final class UtmPackageIdentity {
             return Optional.empty();
         }
 
-        Element dictionary = firstChildElement(root, "dict");
+        Element current = firstChildElement(root, "dict");
 
-        if (dictionary == null) {
-            return Optional.empty();
+        for (int step = 0; step < keyPath.length && current != null; step++) {
+            Element value = valueOf(current, keyPath[step]);
+            boolean last = step == keyPath.length - 1;
+
+            if (value == null) {
+                return Optional.empty();
+            }
+
+            if (last) {
+                return "string".equals(value.getTagName())
+                        ? Optional.of(value.getTextContent())
+                        : Optional.empty();
+            }
+
+            current = "dict".equals(value.getTagName()) ? value : null;
         }
 
+        return Optional.empty();
+    }
+
+    /** The value element that follows {@code key} in a dictionary, or null. */
+    private static Element valueOf(Element dictionary, String key) {
         // A plist dictionary alternates key and value elements.
         for (Node node = dictionary.getFirstChild(); node != null; node = node.getNextSibling()) {
             if (node instanceof Element element && "key".equals(element.getTagName())
                     && key.equals(element.getTextContent())) {
-                Element value = nextElement(element);
-
-                return value != null && "string".equals(value.getTagName())
-                        ? Optional.of(value.getTextContent())
-                        : Optional.empty();
+                return nextElement(element);
             }
         }
 
-        return Optional.empty();
+        return null;
     }
 
     private static Element firstChildElement(Element parent, String tagName) {

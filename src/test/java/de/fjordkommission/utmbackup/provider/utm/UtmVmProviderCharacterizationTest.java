@@ -115,7 +115,7 @@ class UtmVmProviderCharacterizationTest {
         Files.writeString(doctypeEntity.resolve("config.plist"), """
                 <?xml version="1.0" encoding="UTF-8"?>
                 <!DOCTYPE plist [<!ENTITY id SYSTEM "file:///etc/hostname">]>
-                <plist version="1.0"><dict><key>UUID</key><string>&id;</string></dict></plist>
+                <plist version="1.0"><dict><key>Information</key><dict><key>UUID</key><string>&id;</string></dict></dict></plist>
                 """);
         Path notAUuid = Files.createDirectories(vmDirectory.resolve("Short.utm"));
         Files.writeString(notAUuid.resolve("config.plist"), plist("not-a-uuid"));
@@ -295,18 +295,7 @@ class UtmVmProviderCharacterizationTest {
     }
 
     private static String plist(String uuid) {
-        return """
-                <?xml version="1.0" encoding="UTF-8"?>
-                <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-                <plist version="1.0">
-                <dict>
-                \t<key>Name</key>
-                \t<string>Test VM</string>
-                \t<key>UUID</key>
-                \t<string>%s</string>
-                </dict>
-                </plist>
-                """.formatted(uuid);
+        return UtmConfigFixture.config("Test VM", uuid);
     }
 
     private static UtmVmProvider provider(Path vmDirectory, Path utmctl) {

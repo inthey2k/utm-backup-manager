@@ -6,6 +6,7 @@ import org.junit.jupiter.api.io.TempDir;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Locale;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -22,18 +23,7 @@ class UtmPackageIdentityTest {
     Path tempDir;
 
     private static String plist(String uuid) {
-        return """
-                <?xml version="1.0" encoding="UTF-8"?>
-                <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-                <plist version="1.0">
-                <dict>
-                    <key>Name</key>
-                    <string>Linux</string>
-                    <key>UUID</key>
-                    <string>%s</string>
-                </dict>
-                </plist>
-                """.formatted(uuid);
+        return UtmConfigFixture.config("Linux", uuid);
     }
 
     private Path pkg(String name, String content) throws IOException {
@@ -49,14 +39,39 @@ class UtmPackageIdentityTest {
     }
 
     @Test
-    void nestedUuidIsNotTheTopLevelIdentity() throws IOException {
-        Path nested = pkg("nested.utm", """
+    void readsTheUuidOfTheInformationDictionaryOfARealConfiguration() throws IOException {
+        Path pkg = pkg("Linux Mint 23.utm", plist(UUID));
+
+        assertEquals(Optional.of(UUID.toUpperCase(Locale.ROOT)), UtmPackageIdentity.readPackageUuid(pkg));
+    }
+
+    @Test
+    void aTopLevelUuidOrAUuidInsideAnotherDictionaryIsNotTheIdentity() throws IOException {
+        Path topLevel = pkg("top.utm", """
                 <plist version="1.0"><dict>
-                    <key>Drive</key><dict><key>UUID</key><string>%s</string></dict>
+                    <key>UUID</key><string>%s</string>
+                </dict></plist>
+                """.formatted(UUID));
+        Path drive = pkg("drive.utm", """
+                <plist version="1.0"><dict>
+                    <key>Information</key><dict><key>Name</key><string>Linux</string></dict>
+                    <key>Drive</key><array><dict><key>Identifier</key><string>%s</string></dict></array>
                 </dict></plist>
                 """.formatted(UUID));
 
-        assertEquals(Optional.empty(), UtmPackageIdentity.readPackageUuid(nested));
+        assertEquals(Optional.empty(), UtmPackageIdentity.readPackageUuid(topLevel));
+        assertEquals(Optional.empty(), UtmPackageIdentity.readPackageUuid(drive));
+    }
+
+    @Test
+    void informationUuidThatIsNotAStringIsIgnored() throws IOException {
+        Path pkg = pkg("integer.utm", """
+                <plist version="1.0"><dict>
+                    <key>Information</key><dict><key>UUID</key><integer>42</integer></dict>
+                </dict></plist>
+                """);
+
+        assertEquals(Optional.empty(), UtmPackageIdentity.readPackageUuid(pkg));
     }
 
     @Test

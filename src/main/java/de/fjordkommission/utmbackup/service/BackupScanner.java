@@ -103,20 +103,25 @@ public class BackupScanner {
         Map<String, StableRepository.Meta> metadata = repo.findAll();
         Map<VmId, List<VmBackup>> backupsByVm = new HashMap<>();
         List<BackupBatchIssue> batchIssues = new ArrayList<>();
-        Attribution attribution = new Attribution(identities.current());
 
         if (!Files.isDirectory(root)) {
             throw new BackupRootUnavailableException(root);
         }
 
+        // Order matters: current local identities enter the working registry before any
+        // backup is attributed, so a historical id can resolve to a VM found in this scan.
+        VmInventory.Inventory inventory = vmInventory.build();
+        Attribution attribution = new Attribution(identities.current());
+        attribution.observeLocal(inventory.vms());
+
         scanBackupDirectories(backupsByVm, metadata, batchIssues, attribution);
 
-        VmInventory.Inventory inventory = vmInventory.build();
+        // One write for the whole scan, before change status is determined, so the
+        // change status can use the aliases of this scan.
+        identities.record(attribution.observations());
 
         Map<VmId, ManagedVm> localVmsById = new HashMap<>();
         inventory.vms().forEach(vm -> localVmsById.put(vm.id(), vm));
-        attribution.observeLocal(inventory.vms());
-        identities.record(attribution.observations());
 
         // Include backup-only VMs so historical backups remain manageable.
         Set<VmId> vmIds = new TreeSet<>(overviewOrder(inventory));
@@ -544,11 +549,17 @@ public class BackupScanner {
      */
     private static final class Attribution {
 
-        private final Optional<VmIdentityRegistry> registry;
+        /** The persisted registry plus this scan's observations, applied as they are made. */
+        private Optional<VmIdentityRegistry> registry;
         private final List<VmIdentityRegistry.Observation> observations = new ArrayList<>();
 
         Attribution(Optional<VmIdentityRegistry> registry) {
             this.registry = registry;
+        }
+
+        private void observe(VmIdentityRegistry.Observation observation) {
+            observations.add(observation);
+            registry = registry.map(current -> current.observe(observation));
         }
 
         /**
@@ -560,7 +571,7 @@ public class BackupScanner {
             if (identity.isPresent()) {
                 VmId canonical = new VmId(stored.providerId(), identity.get().id());
 
-                observations.add(new VmIdentityRegistry.Observation(
+                observe(new VmIdentityRegistry.Observation(
                         canonical,
                         identity.get().source(),
                         stored.localId(),
@@ -593,7 +604,7 @@ public class BackupScanner {
                 Optional<StableIdentityRule.Identity> identity = StableIdentityRules.ofPackage(vm.providerId(), source);
 
                 if (identity.isPresent() && identity.get().id().equals(vm.id().localId())) {
-                    observations.add(new VmIdentityRegistry.Observation(
+                    observe(new VmIdentityRegistry.Observation(
                             vm.id(),
                             identity.get().source(),
                             source.getFileName().toString(),

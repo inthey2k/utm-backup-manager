@@ -13,6 +13,7 @@ import de.fjordkommission.utmbackup.provider.FakeVmProvider;
 import de.fjordkommission.utmbackup.provider.VmProvider;
 import de.fjordkommission.utmbackup.provider.VmIdentitySidecar;
 import de.fjordkommission.utmbackup.provider.VmProviderRegistry;
+import de.fjordkommission.utmbackup.provider.utm.UtmConfigFixture;
 import de.fjordkommission.utmbackup.repository.SettingsRepository;
 import de.fjordkommission.utmbackup.repository.StableRepository;
 import de.fjordkommission.utmbackup.storage.BackupFormat;
@@ -203,6 +204,26 @@ class VmIdentityScanningTest {
                 "the old directory name is not a separate VM");
     }
 
+    @Test
+    void aSingleScanAttributesAnExistingQemuBackupToTheGeneratedIdOfTheCurrentVm() throws IOException {
+        // No VM-IDENTITIES.json yet: the first scan after the upgrade must resolve everything.
+        Path qemuDir = Files.createDirectories(tempDir.resolve("qemu").resolve("ArchLinux"));
+        Files.writeString(qemuDir.resolve("arch-linux-disk.qcow2"), "disk");
+        String generated = VmIdentitySidecar.readOrCreate(qemuDir, "qemu").orElseThrow();
+        formatTwoBatch("2026-09-05_1200", new BackupManifest.VmEntry(
+                new VmId("qemu", "ArchLinux"), "ArchLinux", "qemu__ArchLinux"), "ArchLinux", null);
+        assertFalse(Files.exists(root.resolve(VmIdentityFile.FILE_NAME)));
+
+        BackupOverview overview = scanner(3, qemuVm(generated, "ArchLinux", qemuDir)).scan();
+
+        assertTrue(overview.vms().stream().noneMatch(vm -> vm.id().equals(new VmId("qemu", "ArchLinux"))),
+                "no backup-only ArchLinux entry may remain after one scan");
+        VmOverview vm = find(overview, new VmId("qemu", generated));
+        assertTrue(vm.local());
+        assertEquals(1, vm.backupCount(), "the existing backup belongs to the current VM in the same scan");
+        assertTrue(Files.exists(root.resolve(VmIdentityFile.FILE_NAME)), "the final registry is persisted once");
+    }
+
     private static FakeVmProvider qemuVm(String generatedId, String name, Path directory) {
         return FakeVmProvider.of("qemu",
                 List.of(new LocalVm(generatedId, name, List.of(directory))),
@@ -340,11 +361,7 @@ class VmIdentityScanningTest {
     }
 
     private static String plist(String uuid) {
-        return """
-                <?xml version="1.0" encoding="UTF-8"?>
-                <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-                <plist version="1.0"><dict><key>UUID</key><string>%s</string></dict></plist>
-                """.formatted(uuid);
+        return UtmConfigFixture.config("Linux Mint", uuid);
     }
 
     /** Relative paths of every file and directory under the backup root. */

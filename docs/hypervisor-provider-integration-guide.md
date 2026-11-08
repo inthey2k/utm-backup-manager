@@ -161,7 +161,7 @@ The ID must therefore remain stable across application restarts.
 
 Good examples are:
 
-- a hypervisor UUID (UTM uses the UUID from `config.plist`),
+- a hypervisor UUID (UTM uses `Information` → `UUID` from `config.plist`),
 - another persistent provider-specific identifier.
 
 A provider without a native identifier must still return a stable id. See
@@ -188,7 +188,7 @@ The rules are the provider's own decisions:
 
 | Provider | Rule | Source |
 |----------|------|--------|
-| UTM | the `UUID` key of `config.plist` | `PROVIDER_NATIVE` |
+| UTM | the `UUID` key inside the `Information` dictionary of `config.plist` | `PROVIDER_NATIVE` |
 | QEMU | the id in the hidden file `.utm-backup-manager-identity` | `GENERATED` |
 
 Requirements for a new provider:
