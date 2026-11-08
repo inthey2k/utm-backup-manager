@@ -251,6 +251,26 @@ class VmInventoryTest {
             }
 
             @Override
+            public de.fjordkommission.utmbackup.provider.StableIdentityRule stableIdentity() {
+                return new de.fjordkommission.utmbackup.provider.StableIdentityRule() {
+                    @Override
+                    public String providerId() {
+                        return "qemu";
+                    }
+
+                    @Override
+                    public java.util.Optional<Identity> ofPackage(java.nio.file.Path packageDirectory) {
+                        return java.util.Optional.empty();
+                    }
+
+                    @Override
+                    public java.util.Optional<Identity> ofContainer(java.nio.file.Path container) {
+                        return java.util.Optional.empty();
+                    }
+                };
+            }
+
+            @Override
             public String displayName() {
                 throw new IllegalStateException("name lookup failed");
             }

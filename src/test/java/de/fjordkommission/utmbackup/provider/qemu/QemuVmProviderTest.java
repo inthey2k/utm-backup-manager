@@ -45,15 +45,17 @@ class QemuVmProviderTest {
     }
 
     @Test
-    void eachDirectoryWithADiskImageIsOneVmWithItsNameAsLocalId() throws IOException {
+    void eachDirectoryWithADiskImageIsOneVmWithAGeneratedIdAndItsDirectoryNameAsName() throws IOException {
         vm(FREEBSD, "FreeBSD-15.1.qcow2");
         vm(ARCH, ARCH_DISK);
 
         List<LocalVm> vms = new QemuVmProvider(root, List::of).findAll();
 
-        assertEquals(List.of(ARCH, FREEBSD), vms.stream().map(LocalVm::id).toList());
+        assertEquals(List.of(ARCH, FREEBSD), vms.stream().map(LocalVm::name).toList());
+        assertEquals(2, vms.stream().map(LocalVm::id).distinct().count());
+        assertTrue(vms.stream().allMatch(vm -> vm.id().matches(UUID_PATTERN)),
+                "the local id is a generated UUID, not the directory name");
         LocalVm arch = vms.getFirst();
-        assertEquals(ARCH, arch.name());
         assertEquals(List.of(root.resolve(ARCH)), arch.backupSources());
     }
 
@@ -63,7 +65,8 @@ class QemuVmProviderTest {
 
         LocalVm arch = new QemuVmProvider(root, List::of).findAll().getFirst();
 
-        assertEquals(ARCH, arch.id());
+        assertTrue(arch.id().matches(UUID_PATTERN));
+        assertEquals(ARCH, arch.name());
     }
 
     @Test
@@ -73,7 +76,7 @@ class QemuVmProviderTest {
 
         assertEquals(
                 List.of("Raw", "Upper"),
-                new QemuVmProvider(root, List::of).findAll().stream().map(LocalVm::id).toList()
+                new QemuVmProvider(root, List::of).findAll().stream().map(LocalVm::name).toList()
         );
     }
 
@@ -96,7 +99,7 @@ class QemuVmProviderTest {
 
         assertEquals(
                 List.of("Real"),
-                new QemuVmProvider(root, List::of).findAll().stream().map(LocalVm::id).toList()
+                new QemuVmProvider(root, List::of).findAll().stream().map(LocalVm::name).toList()
         );
     }
 
@@ -167,7 +170,7 @@ class QemuVmProviderTest {
         ));
 
         assertEquals(
-                Map.of(ARCH, VmStatus.RUNNING, FREEBSD, VmStatus.STOPPED),
+                Map.of(idOf(ARCH), VmStatus.RUNNING, idOf(FREEBSD), VmStatus.STOPPED),
                 provider.findStatuses()
         );
     }
@@ -184,7 +187,7 @@ class QemuVmProviderTest {
                 ))
         ));
 
-        assertEquals(Map.of(ARCH, VmStatus.RUNNING), provider.findStatuses());
+        assertEquals(Map.of(idOf(provider, ARCH), VmStatus.RUNNING), provider.findStatuses());
     }
 
     @Test
@@ -201,7 +204,23 @@ class QemuVmProviderTest {
                 ))
         ));
 
-        assertEquals(Map.of(ARCH, VmStatus.RUNNING), provider.findStatuses());
+        assertEquals(Map.of(idOf(provider, ARCH), VmStatus.RUNNING), provider.findStatuses());
+    }
+
+    private static final String UUID_PATTERN =
+            "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}";
+
+    /** The generated id of the VM in the given directory, looked up by name. */
+    private String idOf(String name) {
+        return idOf(new QemuVmProvider(root, List::of), name);
+    }
+
+    private static String idOf(QemuVmProvider provider, String name) {
+        return provider.findAll().stream()
+                .filter(vm -> vm.name().equals(name))
+                .findFirst()
+                .orElseThrow()
+                .id();
     }
 
     private Path vm(String name, String diskName) throws IOException {

@@ -3,6 +3,8 @@ package de.fjordkommission.utmbackup.service;
 import de.fjordkommission.utmbackup.config.BackupProperties;
 import de.fjordkommission.utmbackup.model.*;
 import de.fjordkommission.utmbackup.repository.SettingsRepository;
+import de.fjordkommission.utmbackup.provider.StableIdentityRule;
+import de.fjordkommission.utmbackup.provider.StableIdentityRules;
 import de.fjordkommission.utmbackup.repository.StableRepository;
 import de.fjordkommission.utmbackup.storage.BackupFormat;
 import de.fjordkommission.utmbackup.storage.BackupManifest;
@@ -14,7 +16,11 @@ import de.fjordkommission.utmbackup.storage.BackupState;
 import de.fjordkommission.utmbackup.storage.BackupStateReader;
 import de.fjordkommission.utmbackup.storage.BackupStateResult;
 import de.fjordkommission.utmbackup.storage.BackupStorageReadOnlyException;
+import de.fjordkommission.utmbackup.storage.VmIdentityRegistry;
 import de.fjordkommission.utmbackup.storage.LegacyBackupTime;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.io.IOException;
@@ -30,11 +36,15 @@ import java.util.stream.Stream;
  * Browses the folder on the backup drive for VM backup files in order
  * to display them in the overview page.
  * Local VMs come from {@link VmInventory}, so all enabled providers appear.
- * Format-1 backups are associated with their UTM VM through
- * {@link LegacyBackupLayout}. Their backup ids are unchanged.
+ * Backups are grouped by canonical VM identity. A native id stored with the backup
+ * (the UTM UUID in {@code config.plist}) takes precedence; otherwise a historical alias
+ * recorded in {@code VM-IDENTITIES.json} is used, and otherwise the id as stored. Backup
+ * ids are never derived from the identity, so they stay unchanged.
  */
 @Service
 public class BackupScanner {
+
+    private static final Logger log = LoggerFactory.getLogger(BackupScanner.class);
 
     private final Path root;
     private final StableRepository repo;
@@ -42,6 +52,7 @@ public class BackupScanner {
     private final VmInventory vmInventory;
     private final VmChangeStatusService vmChangeStatusService;
     private final BackupStorageGuard storageGuard;
+    private final VmIdentityService identities;
     private final BackupManifestReader manifestReader = new BackupManifestReader();
     private final BackupStateReader stateReader = new BackupStateReader();
 
@@ -54,12 +65,27 @@ public class BackupScanner {
             VmChangeStatusService vmChangeStatusService,
             BackupStorageGuard storageGuard
     ) {
+        this(backupProperties, repo, settings, vmInventory, vmChangeStatusService, storageGuard,
+                new VmIdentityService(backupProperties, storageGuard));
+    }
+
+    @Autowired
+    public BackupScanner(
+            BackupProperties backupProperties,
+            StableRepository repo,
+            SettingsRepository settings,
+            VmInventory vmInventory,
+            VmChangeStatusService vmChangeStatusService,
+            BackupStorageGuard storageGuard,
+            VmIdentityService identities
+    ) {
         this.root = backupProperties.root();
         this.repo = repo;
         this.settings = settings;
         this.vmInventory = vmInventory;
         this.vmChangeStatusService = vmChangeStatusService;
         this.storageGuard = storageGuard;
+        this.identities = identities;
     }
     public Path root() {
         return root;
@@ -77,17 +103,20 @@ public class BackupScanner {
         Map<String, StableRepository.Meta> metadata = repo.findAll();
         Map<VmId, List<VmBackup>> backupsByVm = new HashMap<>();
         List<BackupBatchIssue> batchIssues = new ArrayList<>();
+        Attribution attribution = new Attribution(identities.current());
 
         if (!Files.isDirectory(root)) {
             throw new BackupRootUnavailableException(root);
         }
 
-        scanBackupDirectories(backupsByVm, metadata, batchIssues);
+        scanBackupDirectories(backupsByVm, metadata, batchIssues, attribution);
 
         VmInventory.Inventory inventory = vmInventory.build();
 
         Map<VmId, ManagedVm> localVmsById = new HashMap<>();
         inventory.vms().forEach(vm -> localVmsById.put(vm.id(), vm));
+        attribution.observeLocal(inventory.vms());
+        identities.record(attribution.observations());
 
         // Include backup-only VMs so historical backups remain manageable.
         Set<VmId> vmIds = new TreeSet<>(overviewOrder(inventory));
@@ -240,7 +269,8 @@ public class BackupScanner {
     private void scanBackupDirectories(
             Map<VmId, List<VmBackup>> backupsByVm,
             Map<String, StableRepository.Meta> metadata,
-            List<BackupBatchIssue> batchIssues
+            List<BackupBatchIssue> batchIssues,
+            Attribution attribution
     ) {
         try (Stream<Path> directories = Files.list(root)) {
             directories
@@ -253,7 +283,8 @@ public class BackupScanner {
                                     directory,
                                     backupsByVm,
                                     metadata,
-                                    batchIssues
+                                    batchIssues,
+                                    attribution
                             )
                     );
 
@@ -274,7 +305,8 @@ public class BackupScanner {
             Path directory,
             Map<VmId, List<VmBackup>> backupsByVm,
             Map<String, StableRepository.Meta> metadata,
-            List<BackupBatchIssue> batchIssues
+            List<BackupBatchIssue> batchIssues,
+            Attribution attribution
     ) {
         Path vmDirectory = directory.resolve("VMs");
 
@@ -288,7 +320,7 @@ public class BackupScanner {
 
         if (manifestResult instanceof BackupManifestResult.Parsed(BackupManifest parsed)
                 && parsed.formatVersion() == BackupFormat.PROVIDER_AWARE) {
-            scanFormatTwoBatch(directory, vmDirectory, parsed, backupsByVm, batchIssues);
+            scanFormatTwoBatch(directory, vmDirectory, parsed, backupsByVm, batchIssues, attribution);
             return;
         }
 
@@ -344,11 +376,14 @@ public class BackupScanner {
                                 note
                         );
 
+                        VmId owner = attribution.attribute(
+                                LegacyBackupLayout.vmIdForFolder(vmFolder),
+                                StableIdentityRules.ofPackage(LegacyBackupLayout.PROVIDER_ID, path),
+                                vmFolder
+                        );
+
                         backupsByVm
-                                .computeIfAbsent(
-                                        LegacyBackupLayout.vmIdForFolder(vmFolder),
-                                        ignored -> new ArrayList<>()
-                                )
+                                .computeIfAbsent(owner, ignored -> new ArrayList<>())
                                 .add(backup);
                     });
 
@@ -386,7 +421,8 @@ public class BackupScanner {
             Path vmDirectory,
             BackupManifest manifest,
             Map<VmId, List<VmBackup>> backupsByVm,
-            List<BackupBatchIssue> batchIssues
+            List<BackupBatchIssue> batchIssues,
+            Attribution attribution
     ) {
         String batchName = directory.getFileName().toString();
 
@@ -398,7 +434,8 @@ public class BackupScanner {
             Path container = vmDirectory.resolve(entry.directory());
 
             if (Files.isDirectory(container)) {
-                addFormatTwoBackup(batchName, entry, container, backupTime, manifest.comment(), backupsByVm, batchIssues);
+                addFormatTwoBackup(batchName, entry, container, backupTime, manifest.comment(),
+                        backupsByVm, batchIssues, attribution);
             } else {
                 batchIssues.add(new BackupBatchIssue(
                         batchName,
@@ -415,7 +452,8 @@ public class BackupScanner {
             LocalDateTime backupTime,
             String comment,
             Map<VmId, List<VmBackup>> backupsByVm,
-            List<BackupBatchIssue> batchIssues
+            List<BackupBatchIssue> batchIssues,
+            Attribution attribution
     ) {
         String id = BackupIdentity.formatTwoId(batchName, entry.id());
         BackupState state = formatTwoState(batchName, entry, container, batchIssues);
@@ -431,7 +469,13 @@ public class BackupScanner {
                 state.note().isEmpty() ? null : state.note()
         );
 
-        backupsByVm.computeIfAbsent(entry.id(), ignored -> new ArrayList<>()).add(backup);
+        VmId owner = attribution.attribute(
+                entry.id(),
+                StableIdentityRules.ofContainer(entry.id().providerId(), container),
+                entry.name()
+        );
+
+        backupsByVm.computeIfAbsent(owner, ignored -> new ArrayList<>()).add(backup);
     }
 
     /**
@@ -491,5 +535,77 @@ public class BackupScanner {
                 yield Optional.empty();
             }
         };
+    }
+
+    /**
+     * Resolves the canonical identity of each backup and collects the identities seen during
+     * one scan. Observations are recorded once, after the scan, so a scan writes at most one
+     * registry update. The registry snapshot is read once, so one scan sees one state.
+     */
+    private static final class Attribution {
+
+        private final Optional<VmIdentityRegistry> registry;
+        private final List<VmIdentityRegistry.Observation> observations = new ArrayList<>();
+
+        Attribution(Optional<VmIdentityRegistry> registry) {
+            this.registry = registry;
+        }
+
+        /**
+         * Returns the canonical id of a backup entry. A native id wins. Without one, a
+         * recorded alias is used, and otherwise the stored id is kept unchanged. An ambiguous
+         * alias also keeps the stored id, so no backup is attributed by guessing.
+         */
+        VmId attribute(VmId stored, Optional<StableIdentityRule.Identity> identity, String displayName) {
+            if (identity.isPresent()) {
+                VmId canonical = new VmId(stored.providerId(), identity.get().id());
+
+                observations.add(new VmIdentityRegistry.Observation(
+                        canonical,
+                        identity.get().source(),
+                        stored.localId(),
+                        displayName,
+                        false
+                ));
+
+                return canonical;
+            }
+
+            if (StableIdentityRules.forProvider(stored.providerId()).isEmpty()) {
+                log.warn("Provider '{}' has no registered stable identity rule; its backups keep their stored ids",
+                        stored.providerId());
+            }
+
+            return registry.flatMap(identities -> identities.canonicalOf(stored)).orElse(stored);
+        }
+
+        /**
+         * Records the current local VMs whose identity is verified from their package, so the
+         * registry links every locator the VM had, such as a renamed directory.
+         */
+        void observeLocal(List<ManagedVm> vms) {
+            for (ManagedVm vm : vms) {
+                if (vm.localVm().backupSources().isEmpty()) {
+                    continue;
+                }
+
+                Path source = vm.localVm().backupSources().getFirst();
+                Optional<StableIdentityRule.Identity> identity = StableIdentityRules.ofPackage(vm.providerId(), source);
+
+                if (identity.isPresent() && identity.get().id().equals(vm.id().localId())) {
+                    observations.add(new VmIdentityRegistry.Observation(
+                            vm.id(),
+                            identity.get().source(),
+                            source.getFileName().toString(),
+                            vm.name(),
+                            true
+                    ));
+                }
+            }
+        }
+
+        List<VmIdentityRegistry.Observation> observations() {
+            return List.copyOf(observations);
+        }
     }
 }

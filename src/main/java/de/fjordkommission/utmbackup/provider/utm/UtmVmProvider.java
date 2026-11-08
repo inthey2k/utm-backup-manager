@@ -3,8 +3,12 @@ package de.fjordkommission.utmbackup.provider.utm;
 import de.fjordkommission.utmbackup.model.LocalVm;
 import de.fjordkommission.utmbackup.model.VmStatus;
 import de.fjordkommission.utmbackup.provider.ConditionalOnVmProvider;
+import de.fjordkommission.utmbackup.provider.StableIdentityRule;
 import de.fjordkommission.utmbackup.provider.VmProvider;
+import de.fjordkommission.utmbackup.storage.VmIdentityRegistry.IdentitySource;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Component;
 
@@ -18,6 +22,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Optional;
 import java.util.concurrent.TimeUnit;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -27,13 +32,26 @@ import java.util.stream.Stream;
 /**
  * Integrates UTM with the backup manager.
  * UTM stores each VM as a .utm package directory. The complete package is
- * therefore exposed as the backup source for that VM.
+ * therefore exposed as the backup source for that VM. The local id is the native
+ * UUID from {@code config.plist}, so renaming a package keeps the VM's identity.
  */
 @Component
 @Profile("!test")
 @ConditionalOnVmProvider("utm")
 public class UtmVmProvider implements VmProvider {
 
+    /** Provider id used in {@code vm.providers} and in canonical VM ids. */
+    public static final String PROVIDER_ID = "utm";
+
+    private static final Logger log = LoggerFactory.getLogger(UtmVmProvider.class);
+
+    /**
+     * Stable identity of UTM: the native UUID in {@code config.plist}. Packages and
+     * containers without a readable UUID carry no identity.
+     */
+    public static final StableIdentityRule STABLE_IDENTITY = new NativeUuidRule();
+
+    /** Groups: 1 = UUID, 2 = state, 3 = display name (not used for identity). */
     private static final Pattern LIST_ROW =
             Pattern.compile("^([0-9A-Fa-f-]{36})\\s++(\\S++)\\s++(.+)$");
 
@@ -57,12 +75,18 @@ public class UtmVmProvider implements VmProvider {
 
     @Override
     public String providerId() {
-        return "utm";
+        return PROVIDER_ID;
     }
 
     @Override
     public String displayName() {
         return "UTM";
+    }
+
+    /** Identity decision of UTM. See {@link #STABLE_IDENTITY}. */
+    @Override
+    public StableIdentityRule stableIdentity() {
+        return STABLE_IDENTITY;
     }
 
     @Override
@@ -78,7 +102,7 @@ public class UtmVmProvider implements VmProvider {
                             .toString()
                             .endsWith(packageSuffix))
                     .map(path -> new LocalVm(
-                            path.getFileName().toString(),
+                            localId(path),
                             displayName(path),
                             List.of(path)
                     ))
@@ -125,12 +149,10 @@ public class UtmVmProvider implements VmProvider {
 
 
     /**
-     * Returns the runtime state of each local VM, keyed by its package folder
-     * name (the local id). utmctl reports display names, which are resolved
-     * against the discovered packages here and never leave this class.
-     * A VM is reported UNKNOWN when its display name matches several local
-     * packages or several utmctl rows. A VM without any utmctl row is omitted,
-     * which also counts as UNKNOWN.
+     * Returns the runtime state of each local VM, keyed by its local id (the native
+     * UUID). utmctl rows are matched by UUID, never by display name. A VM is reported
+     * UNKNOWN when several utmctl rows carry its UUID. A VM without any utmctl row is
+     * omitted, which also counts as UNKNOWN.
      */
     @Override
     public Map<String, VmStatus> findStatuses() {
@@ -146,18 +168,19 @@ public class UtmVmProvider implements VmProvider {
     }
 
     /**
-     * Resolves utmctl entries against local VMs by display name.
+     * Resolves utmctl entries against local VMs by UUID. A UUID reported by several
+     * utmctl rows, or shared by several local packages, is ambiguous and yields UNKNOWN.
      */
     static Map<String, VmStatus> resolveStatuses(
             List<LocalVm> localVms,
             List<UtmctlEntry> entries
     ) {
-        Map<String, Long> localCountByName = localVms.stream()
-                .collect(Collectors.groupingBy(LocalVm::name, Collectors.counting()));
+        Map<String, Long> localCountById = localVms.stream()
+                .collect(Collectors.groupingBy(LocalVm::id, Collectors.counting()));
 
-        Map<String, List<VmStatus>> statusesByName = entries.stream()
+        Map<String, List<VmStatus>> statusesByUuid = entries.stream()
                 .collect(Collectors.groupingBy(
-                        UtmctlEntry::name,
+                        entry -> entry.uuid().toUpperCase(Locale.ROOT),
                         Collectors.mapping(
                                 entry -> mapStatus(entry.state()),
                                 Collectors.toList()
@@ -167,13 +190,16 @@ public class UtmVmProvider implements VmProvider {
         Map<String, VmStatus> statuses = new HashMap<>();
 
         for (LocalVm vm : localVms) {
-            List<VmStatus> candidates = statusesByName.getOrDefault(vm.name(), List.of());
+            List<VmStatus> candidates = statusesByUuid.getOrDefault(
+                    vm.id().toUpperCase(Locale.ROOT),
+                    List.of()
+            );
 
             if (candidates.isEmpty()) {
                 continue;
             }
 
-            boolean ambiguous = localCountByName.get(vm.name()) > 1
+            boolean ambiguous = localCountById.get(vm.id()) > 1
                     || candidates.size() > 1;
 
             statuses.put(
@@ -220,7 +246,7 @@ public class UtmVmProvider implements VmProvider {
                     .map(LIST_ROW::matcher)
                     .filter(Matcher::matches)
                     .map(matcher -> new UtmctlEntry(
-                            matcher.group(3).trim(),
+                            matcher.group(1),
                             matcher.group(2)
                     ))
                     .toList();
@@ -232,10 +258,31 @@ public class UtmVmProvider implements VmProvider {
         }
     }
 
+    /** Reads the native UUID of UTM packages and of the packages inside containers. */
+    private static final class NativeUuidRule implements StableIdentityRule {
+
+        @Override
+        public String providerId() {
+            return PROVIDER_ID;
+        }
+
+        @Override
+        public Optional<Identity> ofPackage(Path packageDirectory) {
+            return UtmPackageIdentity.readPackageUuid(packageDirectory)
+                    .map(id -> new Identity(id, IdentitySource.PROVIDER_NATIVE));
+        }
+
+        @Override
+        public Optional<Identity> ofContainer(Path container) {
+            return UtmPackageIdentity.readContainerUuid(container)
+                    .map(id -> new Identity(id, IdentitySource.PROVIDER_NATIVE));
+        }
+    }
+
     /**
-     * One row of {@code utmctl list}: the display name and the raw state text.
+     * One row of {@code utmctl list}: the UUID and the raw state text.
      */
-    record UtmctlEntry(String name, String state) {
+    record UtmctlEntry(String uuid, String state) {
     }
 
     /**
@@ -251,6 +298,21 @@ public class UtmVmProvider implements VmProvider {
             case "STARTED", "STARTING", "PAUSED", "STOPPING" -> VmStatus.RUNNING;
             default -> VmStatus.UNKNOWN;
         };
+    }
+
+    /**
+     * The stable local id: the native UUID of the package. A package whose
+     * {@code config.plist} cannot be read keeps its folder name, the 1.5.1 identity, and
+     * a warning is logged. Identity is never guessed from anything else.
+     */
+    private static String localId(Path path) {
+        String folderName = path.getFileName().toString();
+
+        return UtmPackageIdentity.readPackageUuid(path).orElseGet(() -> {
+            log.warn("No readable UUID in {}/config.plist; the VM keeps its folder name as id",
+                    folderName);
+            return folderName;
+        });
     }
 
     /**

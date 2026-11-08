@@ -61,6 +61,9 @@ public interface VmProvider {
 
     Map<String, VmStatus> findStatuses();
 
+    /** Required: the provider's stable identity rule. See "Stable identity" below. */
+    StableIdentityRule stableIdentity();
+
     void stop(LocalVm vm);
 
     record ConfigurationEntry(
@@ -72,7 +75,8 @@ public interface VmProvider {
 }
 ```
 
-A new hypervisor provider must implement this interface.
+A new hypervisor provider must implement this interface. `stableIdentity()` is abstract,
+so a provider that does not state its identity decision does not compile.
 
 The existing UTM implementation can be used as a reference:
 
@@ -157,11 +161,55 @@ The ID must therefore remain stable across application restarts.
 
 Good examples are:
 
-- a hypervisor UUID,
-- a stable configuration directory name,
+- a hypervisor UUID (UTM uses the UUID from `config.plist`),
 - another persistent provider-specific identifier.
 
+A provider without a native identifier must still return a stable id. See
+"Stable identity" below for how to obtain one.
+
 Do **not** use a temporary process ID or another value that changes between runs.
+
+## Stable identity (required)
+
+Every provider states how its VMs obtain a stable identity, through
+`VmProvider.stableIdentity()`. The method returns a `StableIdentityRule`, which
+answers two questions without the provider being enabled:
+
+- `ofPackage(Path)`: the identity carried by a VM directory (a current local VM, or a
+  format-1 folder),
+- `ofContainer(Path)`: the identity of the VM directory stored inside a format-2
+  backup container.
+
+Each answer is an `Identity(id, source)`, where `source` is `PROVIDER_NATIVE` (the
+provider reports the id) or `GENERATED` (the id was generated and stored with the VM).
+Both methods return empty when they cannot tell; they never guess.
+
+The rules are the provider's own decisions:
+
+| Provider | Rule | Source |
+|----------|------|--------|
+| UTM | the `UUID` key of `config.plist` | `PROVIDER_NATIVE` |
+| QEMU | the id in the hidden file `.utm-backup-manager-identity` | `GENERATED` |
+
+Requirements for a new provider:
+
+1. **Choose the identity source.** Use a native id when the hypervisor has one.
+   Otherwise generate a UUID and store it with the VM, in a file that moves with the
+   VM directory, is created once and atomically, and is never written over an
+   existing file. `VmIdentitySidecar` provides these operations and can be reused.
+2. **Use the same identity in `findAll()`.** When a rule finds an identity, the
+   `LocalVm.id()` of that VM must be the same value.
+3. **Keep compatibility fallbacks inside the provider.** If no identity can be read
+   at runtime, `findAll()` may use the directory name as in UTM and QEMU. That choice
+   belongs to the provider and must be logged. It is never a generic fallback.
+4. **Register the rule.** Add the rule to `StableIdentityRules.RULES`.
+   `VmProviderIdentityContractTest` fails the build when a provider class is not
+   listed, or when its instance rule is not the registered one. The provider class must
+   also declare a `public static final String PROVIDER_ID` equal to its `providerId()`.
+
+Rules are used for historical backups as well. A backup of a provider that is currently
+disabled is still attributed through its registered rule. A backup whose provider has no
+registered rule keeps the id it was stored with. It is never merged by name.
 
 ## `name`
 
@@ -600,8 +648,12 @@ displayName()
 configuration()
 findAll()
 findStatuses()
+stableIdentity()
 stop()
 ```
+
+`stableIdentity()` is described in "Stable identity (required)". It is the decision
+point for identity and must not be left to convention.
 
 Keep hypervisor-specific code inside the provider package.
 

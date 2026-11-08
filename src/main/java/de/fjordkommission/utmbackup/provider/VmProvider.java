@@ -55,6 +55,19 @@ public interface VmProvider {
     Map<String, VmStatus> findStatuses();
 
     /**
+     * Returns the rule that reads the stable identity of this provider's VMs and of their
+     * backups. This method is abstract, so every provider must make an explicit identity
+     * decision to compile.
+     *
+     * <p>The rule must read the same identity that {@link #findAll()} uses as
+     * {@link LocalVm#id()} whenever it finds one. A provider may use a compatibility
+     * fallback when no identity can be read, but only inside {@code findAll()}, and the
+     * fallback must be the provider's own deliberate choice. The rule must also be listed
+     * in {@code StableIdentityRules}. Its unit test checks this.
+     */
+    StableIdentityRule stableIdentity();
+
+    /**
      * Requests a clean shutdown of a VM.
      *
      * The method only initiates the shutdown. Waiting for the VM to stop,

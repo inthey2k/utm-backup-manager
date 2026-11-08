@@ -75,6 +75,11 @@ public class FakeVmProvider implements VmProvider {
     }
 
     @Override
+    public StableIdentityRule stableIdentity() {
+        return new NoStableIdentity(providerId());
+    }
+
+    @Override
     public String providerId() {
         return providerId;
     }

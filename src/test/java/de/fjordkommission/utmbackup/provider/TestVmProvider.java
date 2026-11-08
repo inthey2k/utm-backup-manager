@@ -25,6 +25,11 @@ public class TestVmProvider implements VmProvider {
      * under the test profile.
      */
     @Override
+    public StableIdentityRule stableIdentity() {
+        return new NoStableIdentity(providerId());
+    }
+
+    @Override
     public String providerId() {
         return "utm";
     }

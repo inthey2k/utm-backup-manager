@@ -5,6 +5,8 @@ import de.fjordkommission.utmbackup.model.LocalVm;
 import de.fjordkommission.utmbackup.model.VmChangeStatus;
 import de.fjordkommission.utmbackup.model.VmId;
 import de.fjordkommission.utmbackup.service.VmChangeStatusService;
+import de.fjordkommission.utmbackup.service.VmIdentityService;
+import de.fjordkommission.utmbackup.storage.BackupStorageGuard;
 import de.fjordkommission.utmbackup.service.VmStateImporter;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -199,7 +201,8 @@ class VmStateKeyMigrationTest {
         Path source = Files.createDirectories(tempDir.resolve("vms").resolve("Linux.utm"));
         Files.writeString(source.resolve("config.plist"), "configuration");
         LocalVm vm = new LocalVm("Linux.utm", "Linux", List.of(source));
-        VmChangeStatusService service = new VmChangeStatusService(repository);
+        VmChangeStatusService service = new VmChangeStatusService(repository,
+                new VmIdentityService(properties, new BackupStorageGuard(properties)));
         VmId id = new VmId("utm", "Linux.utm");
 
         service.acknowledgeBackup(id, vm);

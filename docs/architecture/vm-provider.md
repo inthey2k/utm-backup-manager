@@ -55,11 +55,21 @@ providers and their configuration.
 ## Runtime aggregation
 
 - **Identity.** Generic code uses `VmId`, that is `providerId:localId`, for example
-  `utm:ArchLinux 02.27.utm` and `qemu:ArchLinux`. `LocalVm.id()` stays
-  provider-local. The same local id in two providers yields two distinct VMs.
-  Display names are never used for identity.
-- **Status.** `findStatuses()` is keyed by the provider-local id. A VM without an
-  entry is `UNKNOWN`.
+  `utm:6C1F2A3B-…` and `qemu:ArchLinux`. `LocalVm.id()` stays provider-local. The same
+  local id in two providers yields two distinct VMs. Display names are never used for
+  identity.
+- **Stable identity.** Each provider implements `stableIdentity()`, returning the
+  `StableIdentityRule` that reads its VMs' and backups' identity. The method is
+  abstract, so the decision is required to compile. Rules are listed in
+  `StableIdentityRules`, and a test enforces the listing. See the
+  [integration guide](../hypervisor-provider-integration-guide.md#stable-identity-required).
+- **UTM.** The local id is the native UUID from the package's `config.plist`. A
+  package whose UUID cannot be read keeps its folder name as id and a warning is
+  logged. Renaming a package does not change its identity; see
+  [VM identity registry](backup-format.md#vm-identity-registry).
+- **Status.** `findStatuses()` is keyed by the provider-local id. UTM matches
+  `utmctl list` rows by UUID, never by display name. A VM without an entry is
+  `UNKNOWN`.
 - **Failures are isolated.** If `findAll()` fails, that provider contributes no
   local VMs, and its error is recorded in its `ProviderSnapshot`. If `findStatuses()`
   fails, its VMs are kept and reported as `UNKNOWN`. Other providers and existing
@@ -142,7 +152,13 @@ it. This is the fail-safe default.
   unusable root is reported as a provider error and does not stop UTM.
 - **Discovery (`findAll`)**: each immediate subdirectory of the root is one VM when it
   contains a top-level regular file ending in `.qcow2` or `.raw` (case-insensitive).
-  - `id` and `name` are the directory name. The disk file name need not match it.
+  - `name` is the directory name. The disk file name need not match it.
+  - `id` is a generated UUID kept in the hidden file `.utm-backup-manager-identity`
+    inside the VM directory (see [VM identity registry](backup-format.md#vm-identity-registry)).
+    It is created on first discovery, survives restarts and renames of the directory,
+    and never touches the disk images. If the file cannot be created (for example a
+    read-only directory) or is unreadable, the directory name is used as the id, as in
+    1.5.1, and a warning is logged.
   - `backupSources` contains the VM directory, so the whole directory is copied.
   - Ordinary files in the root, hidden entries (names starting with `.`, including
     macOS `._` files), directories without a top-level disk, and nested directories
@@ -170,7 +186,8 @@ it. This is the fail-safe default.
     not `qemu-system-*` are not inspected. Verify on the target Mac before relying on
     this, especially for VMs started with sudo.
 - **Backup**: uses the format-2 writer unchanged. The manifest records
-  `Provider: qemu`, `VM-ID: <directory name>`, and the container `qemu__<name>`.
+  `Provider: qemu`, `VM-ID: <generated id>`, and the container `qemu__<generated id>`.
+  The identity file is copied with the directory, so the backup carries the id.
   Only `STOPPED` QEMU VMs can be backed up. Live QEMU snapshots and QMP are not used.
 - **Change tracking**: keyed by `qemu:<localId>`. The newest modification time across
   the VM directory is compared with the acknowledged state, exactly as for UTM.

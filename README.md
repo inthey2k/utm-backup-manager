@@ -27,6 +27,8 @@ Planned features and upcoming improvements are listed in the
 -   Displays backup progress and allows a running backup job to be
     cancelled
 -   Detects whether a stopped VM has changed since its latest backup
+-   Identifies UTM VMs by their UTM UUID, so renaming a VM keeps its backup
+    history together
 -   Displays the logical size of local VMs
 -   Shows existing backups in a VM-by-backup overview
 -   Supports batch comments and notes for individual VM backups

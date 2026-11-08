@@ -21,6 +21,7 @@ import de.fjordkommission.utmbackup.service.BackupService;
 import de.fjordkommission.utmbackup.service.CreateBackupService;
 import de.fjordkommission.utmbackup.service.RetentionService;
 import de.fjordkommission.utmbackup.service.VmChangeStatusService;
+import de.fjordkommission.utmbackup.service.VmIdentityService;
 import de.fjordkommission.utmbackup.service.VmInventory;
 import de.fjordkommission.utmbackup.storage.BackupFormat;
 import de.fjordkommission.utmbackup.storage.BackupManifest;
@@ -65,8 +66,9 @@ class QemuFormatTwoIntegrationTest {
     private static final String ARCH_NAME = "ArchLinux";
     private static final String UTM_PACKAGE = "Linux.utm";
 
-    private static final VmId ARCH = new VmId("qemu", ARCH_NAME);
-    private static final VmId FREEBSD = new VmId("qemu", "FreeBSD");
+    /** Generated ids of the QEMU VMs, resolved by name once the VMs exist. */
+    private VmId ARCH;
+    private VmId FREEBSD;
     private static final VmId UTM_LINUX = new VmId("utm", UTM_PACKAGE);
 
     @TempDir
@@ -104,7 +106,8 @@ class QemuFormatTwoIntegrationTest {
         when(settings.getRetentionLimit()).thenReturn(1);
 
         stateRepository = mock(VmStateRepository.class);
-        changeStatus = new VmChangeStatusService(stateRepository);
+        changeStatus = new VmChangeStatusService(stateRepository,
+                new VmIdentityService(properties, guard));
 
         BuildProperties buildProperties = mock(BuildProperties.class);
         createService = new CreateBackupService(properties, changeStatus, guard, buildProperties);
@@ -112,6 +115,23 @@ class QemuFormatTwoIntegrationTest {
         scanner = scannerFor(List.of(utmProvider(), qemuProvider(() -> runningProcesses)), settings);
         backupService = new BackupService(scanner, stableRepository, guard, new BackupStateWriter());
         retentionService = new RetentionService(scanner, backupService, guard);
+
+        ARCH = qemuIdOf(ARCH_NAME);
+        FREEBSD = qemuIdOf("FreeBSD");
+    }
+
+    /** The generated id of the QEMU VM with this directory name. */
+    private VmId qemuIdOf(String name) {
+        return inventory().build().vms().stream()
+                .filter(vm -> vm.providerId().equals("qemu") && vm.name().equals(name))
+                .findFirst()
+                .orElseThrow()
+                .id();
+    }
+
+    /** Container directory of the ArchLinux VM, named after its generated id. */
+    private String containerName() {
+        return "qemu__" + ARCH.localId();
     }
 
     // ------------------------------------------------------------------
@@ -128,9 +148,9 @@ class QemuFormatTwoIntegrationTest {
         BackupManifest.VmEntry entry = manifest.vms().getFirst();
         assertEquals(ARCH, entry.id());
         assertEquals(ARCH_NAME, entry.name());
-        assertEquals("qemu__ArchLinux", entry.directory());
+        assertEquals(containerName(), entry.directory());
 
-        Path copiedDisk = result.backupDirectory().resolve("VMs/qemu__ArchLinux/ArchLinux/arch-linux-disk.qcow2");
+        Path copiedDisk = result.backupDirectory().resolve("VMs/" + containerName() + "/ArchLinux/arch-linux-disk.qcow2");
         assertEquals("arch disk", Files.readString(copiedDisk));
     }
 
@@ -177,8 +197,8 @@ class QemuFormatTwoIntegrationTest {
                 manifest.vms().stream().map(BackupManifest.VmEntry::id).toList());
         String utmContainer = manifest.vms().getFirst().directory();
         assertTrue(Files.isRegularFile(result.backupDirectory().resolve("VMs").resolve(utmContainer).resolve("Linux.utm/config.plist")));
-        assertTrue(Files.isRegularFile(result.backupDirectory().resolve("VMs/qemu__ArchLinux/ArchLinux/arch-linux-disk.qcow2")));
-        assertEquals("qemu__ArchLinux", manifest.vms().get(1).directory());
+        assertTrue(Files.isRegularFile(result.backupDirectory().resolve("VMs/" + containerName() + "/ArchLinux/arch-linux-disk.qcow2")));
+        assertEquals(containerName(), manifest.vms().get(1).directory());
     }
 
     // ------------------------------------------------------------------
@@ -238,7 +258,7 @@ class QemuFormatTwoIntegrationTest {
 
         backupService.stable(id, true);
 
-        Path container = result.backupDirectory().resolve("VMs/qemu__ArchLinux");
+        Path container = result.backupDirectory().resolve("VMs/" + containerName());
         assertTrue(Files.isRegularFile(container.resolve("BACKUP-STATE.properties")));
         assertTrue(find(scanner.scan(), ARCH).backups().getFirst().stable());
         IllegalStateException error = assertThrows(IllegalStateException.class, () -> backupService.delete(id));
@@ -253,7 +273,7 @@ class QemuFormatTwoIntegrationTest {
 
         backupService.note(id, "before the kernel update");
 
-        Path container = result.backupDirectory().resolve("VMs/qemu__ArchLinux");
+        Path container = result.backupDirectory().resolve("VMs/" + containerName());
         assertEquals(
                 new BackupStateReader().read(container),
                 new BackupStateResult.Parsed(new BackupState(false, "before the kernel update"))

@@ -443,6 +443,81 @@ Format 1 is unchanged: Stable and notes are read and written in SQLite, and no
   a backup-only entry with the manifest name.
 - Legacy batches are never rewritten, moved, or renamed.
 
+## VM identity registry
+
+The backup root may contain `VM-IDENTITIES.json`. It maps every known provider-local id
+of a VM, such as its current package name and its historical package names, to one
+canonical stable id. It is maintained by the scanner and is not part of any batch.
+
+```json
+{
+  "schemaVersion": 1,
+  "identities": [
+    {
+      "providerId": "utm",
+      "stableLocalId": "6C1F2A3B-…",
+      "source": "PROVIDER_NATIVE",
+      "aliases": ["Linux Mint 23.utm", "Linux Mint 27.utm"],
+      "currentLocator": "Linux Mint 27.utm",
+      "currentName": "Linux Mint 27",
+      "historicalNames": ["Linux Mint 23"],
+      "fingerprint": null
+    }
+  ]
+}
+```
+
+- `source` is `PROVIDER_NATIVE` when the provider reports the id (UTM: the UUID in
+  `config.plist`) or `GENERATED` when the id is a generated one stored in the VM
+  directory (QEMU: `.utm-backup-manager-identity`, see below).
+- Canonical ids are never changed. A rename adds the old locator to `aliases` and moves
+  the old display name to `historicalNames`; it never creates a second identity.
+- An alias resolves only when exactly one identity of the same provider claims it.
+  Providers are isolated, so `utm:X` and `qemu:X` never match each other.
+- Reading never fails the scan. A missing file is an empty registry. A file that is
+  invalid JSON, uses a newer `schemaVersion`, has unknown properties or contains a
+  duplicate identity is **unusable**: it is left unchanged, the scan falls back to the
+  stored ids, and the reason is logged.
+- Writes are atomic and happen only when the content changes, so repeated scans do not
+  rewrite the file. On read-only media nothing is written.
+- Identity bookkeeping never moves, renames or deletes backup data.
+
+### Generated identities (QEMU)
+
+A VM without a native id gets a generated UUID in a hidden file inside its directory,
+`.utm-backup-manager-identity`:
+
+```
+format=1
+provider=qemu
+id=3f1c0a2e-…
+```
+
+- Created once, atomically. The content goes to a temporary file which is then linked to
+  the target; the link fails if the target exists, so an existing file is never replaced.
+- Read exactly. A file with other content, another provider's id, an invalid UUID or an
+  unreadable state is ignored, the provider falls back to the directory name, and the
+  file is left as it is.
+- Only this file is written into the VM directory. Disk images are not changed.
+- It moves with the directory and is copied with it into format-2 containers. A backup
+  therefore carries the id of its VM.
+- A copied VM directory carries the same id. Two live copies are then ambiguous, and the
+  inventory hides both until one copy's identity file is removed. The scanner never
+  picks one of them.
+- Backups made before the identity existed carry no file. They are attributed when the
+  VM was seen under the same directory name as the backup, because the registry then
+  records that name as an alias. Historical directory names that were never seen while
+  the identity existed are not linked.
+
+### Attribution of existing backups
+
+- Format-2 batch: the container's `config.plist` UUID identifies the VM. If that is not
+  readable, a recorded alias of the manifest id is used. Otherwise the manifest id is
+  kept, so the backup is never attributed by guessing.
+- Format-1 batch: the UUID of the `VMs/<folder>/config.plist` is used in the same way.
+- Backup ids are derived from the batch and the stored id, so they do not change when
+  the attribution does.
+
 ## Change-tracking state
 
 The `vm_state` table stores the acknowledged state of each VM, keyed by the
@@ -465,6 +540,11 @@ the legacy state-file import:
 The migration runs in one transaction with a marker in the `settings` table, and a
 second run changes nothing. Backup files, backup ids and Stable or note state are not
 touched.
+
+Since the UTM local id became the native UUID, a state stored under a historical
+package name is still found: when no state exists under the canonical id, the states of
+the identity's recorded aliases are used. Saves always write the canonical key, so no
+row is rewritten and the lookup is repeatable.
 
 ## Not yet defined here
 

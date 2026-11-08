@@ -3,8 +3,13 @@ package de.fjordkommission.utmbackup.provider.qemu;
 import de.fjordkommission.utmbackup.model.LocalVm;
 import de.fjordkommission.utmbackup.model.VmStatus;
 import de.fjordkommission.utmbackup.provider.ConditionalOnVmProvider;
+import de.fjordkommission.utmbackup.provider.StableIdentityRule;
+import de.fjordkommission.utmbackup.provider.VmIdentitySidecar;
 import de.fjordkommission.utmbackup.provider.VmProvider;
+import de.fjordkommission.utmbackup.storage.VmIdentityRegistry.IdentitySource;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Component;
@@ -17,13 +22,15 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Optional;
 import java.util.function.Supplier;
 import java.util.stream.Stream;
 
 /**
  * Integrates QEMU with the backup manager.
- * Each immediate subdirectory of the configured VM root is one VM. Its directory
- * name is the local id and the complete directory is the backup source. A
+ * Each immediate subdirectory of the configured VM root is one VM and the complete
+ * directory is the backup source. Its local id is a generated id kept in the
+ * {@link VmIdentitySidecar} inside the directory, so a rename keeps the identity. A
  * directory without a top-level disk image is not a VM and is not listed.
  */
 @Component
@@ -31,6 +38,16 @@ import java.util.stream.Stream;
 @ConditionalOnVmProvider("qemu")
 public class QemuVmProvider implements VmProvider {
 
+    /** Provider id used in {@code vm.providers} and in canonical VM ids. */
+    public static final String PROVIDER_ID = "qemu";
+
+    private static final Logger log = LoggerFactory.getLogger(QemuVmProvider.class);
+
+    /**
+     * Stable identity of QEMU: the generated id in the VM's {@link VmIdentitySidecar}.
+     * QEMU has no native id, so the sidecar is the only source.
+     */
+    public static final StableIdentityRule STABLE_IDENTITY = new SidecarRule();
     private static final List<String> DISK_SUFFIXES = List.of(".qcow2", ".raw");
 
     private final Path vmRoot;
@@ -52,12 +69,39 @@ public class QemuVmProvider implements VmProvider {
 
     @Override
     public String providerId() {
-        return "qemu";
+        return PROVIDER_ID;
     }
 
     @Override
     public String displayName() {
         return "QEMU";
+    }
+
+    /** Identity decision of QEMU. See {@link #STABLE_IDENTITY}. */
+    @Override
+    public StableIdentityRule stableIdentity() {
+        return STABLE_IDENTITY;
+    }
+
+    /** Reads the generated id from the sidecar of a VM directory or of a container's VM. */
+    private static final class SidecarRule implements StableIdentityRule {
+
+        @Override
+        public String providerId() {
+            return PROVIDER_ID;
+        }
+
+        @Override
+        public Optional<Identity> ofPackage(Path packageDirectory) {
+            return VmIdentitySidecar.read(packageDirectory, PROVIDER_ID)
+                    .map(id -> new Identity(id, IdentitySource.GENERATED));
+        }
+
+        @Override
+        public Optional<Identity> ofContainer(Path container) {
+            return VmIdentitySidecar.readContainer(container, PROVIDER_ID)
+                    .map(id -> new Identity(id, IdentitySource.GENERATED));
+        }
     }
 
     @Override
@@ -98,7 +142,7 @@ public class QemuVmProvider implements VmProvider {
                     .map(path -> {
                         String name = path.getFileName().toString();
 
-                        return new LocalVm(name, name, List.of(path));
+                        return new LocalVm(localId(path, name), name, List.of(path));
                     })
                     .sorted(Comparator.comparing(LocalVm::name, String.CASE_INSENSITIVE_ORDER))
                     .toList();
@@ -108,6 +152,19 @@ public class QemuVmProvider implements VmProvider {
                     e
             );
         }
+    }
+
+    /**
+     * The stable local id: the id in the VM's identity sidecar, created on first
+     * discovery. When the sidecar cannot be read or written, the directory name is used,
+     * as in 1.5.1, and a warning is logged. That identity is not stable across a rename.
+     */
+    private String localId(Path vmDirectory, String directoryName) {
+        return VmIdentitySidecar.readOrCreate(vmDirectory, PROVIDER_ID).orElseGet(() -> {
+            log.warn("No usable identity file in QEMU VM {}; its directory name is used as id",
+                    directoryName);
+            return directoryName;
+        });
     }
 
     /**

@@ -10,6 +10,7 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.attribute.FileTime;
+import java.util.List;
 import java.util.Optional;
 import java.util.stream.Stream;
 
@@ -20,9 +21,11 @@ import java.util.stream.Stream;
 public class VmChangeStatusService {
 
     private final VmStateRepository repository;
+    private final VmIdentityService identities;
 
-    public VmChangeStatusService(VmStateRepository repository) {
+    public VmChangeStatusService(VmStateRepository repository, VmIdentityService identities) {
         this.repository = repository;
+        this.identities = identities;
     }
 
     /**
@@ -42,8 +45,7 @@ public class VmChangeStatusService {
             return VmChangeStatus.NEVER_BACKED_UP;
         }
 
-        Optional<VmStateRepository.State> stored =
-                repository.find(vmId);
+        Optional<VmStateRepository.State> stored = findState(vmId);
 
         if (stored.isEmpty()) {
             return VmChangeStatus.UNKNOWN;
@@ -58,6 +60,33 @@ public class VmChangeStatusService {
         } catch (IOException e) {
             return VmChangeStatus.UNKNOWN;
         }
+    }
+
+    /**
+     * Returns the acknowledged state under the canonical id. States recorded before the
+     * VM had its stable id are still stored under its historical ids, so those are used
+     * as a fallback. Nothing is rewritten, so the lookup is repeatable.
+     */
+    private Optional<VmStateRepository.State> findState(VmId vmId) {
+        Optional<VmStateRepository.State> direct = repository.find(vmId);
+
+        if (direct.isPresent()) {
+            return direct;
+        }
+
+        List<VmId> aliases = identities.current()
+                .map(registry -> registry.aliasesOf(vmId))
+                .orElse(List.of());
+
+        for (VmId alias : aliases) {
+            Optional<VmStateRepository.State> historical = repository.find(alias);
+
+            if (historical.isPresent()) {
+                return historical;
+            }
+        }
+
+        return Optional.empty();
     }
 
     /**
