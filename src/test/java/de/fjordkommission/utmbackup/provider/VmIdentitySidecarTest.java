@@ -16,11 +16,11 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
+import static java.util.concurrent.Executors.newFixedThreadPool;
 import static org.junit.jupiter.api.Assertions.*;
 
 /**
@@ -67,7 +67,7 @@ class VmIdentitySidecarTest {
 
     @Test
     void concurrentCreationYieldsOneIdForEveryCaller() throws Exception {
-        ExecutorService pool = Executors.newFixedThreadPool(8);
+        ExecutorService pool = newFixedThreadPool(8);
 
         try {
             List<Callable<Optional<String>>> callers = IntStream.range(0, 8)

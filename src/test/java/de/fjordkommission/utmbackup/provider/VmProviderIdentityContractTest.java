@@ -2,7 +2,6 @@ package de.fjordkommission.utmbackup.provider;
 
 import de.fjordkommission.utmbackup.provider.qemu.QemuProperties;
 import de.fjordkommission.utmbackup.provider.qemu.QemuVmProvider;
-import de.fjordkommission.utmbackup.provider.utm.UtmPackageIdentity;
 import de.fjordkommission.utmbackup.provider.utm.UtmProperties;
 import de.fjordkommission.utmbackup.provider.utm.UtmVmProvider;
 import org.junit.jupiter.api.Assumptions;
@@ -55,7 +54,7 @@ class VmProviderIdentityContractTest {
     }
 
     @Test
-    void theRuleOfEachProviderInstanceIsTheCatalogRule() throws IOException {
+    void theRuleOfEachProviderInstanceIsTheCatalogRule() {
         UtmVmProvider utm = new UtmVmProvider(new UtmProperties(tempDir, ".utm", tempDir.resolve("utmctl")));
         QemuVmProvider qemu = new QemuVmProvider(new QemuProperties(tempDir));
 
@@ -72,9 +71,9 @@ class VmProviderIdentityContractTest {
         Files.writeString(vm.resolve(VmIdentitySidecar.FILE_NAME),
                 "format=1\nprovider=qemu\nid=" + QEMU_ID + "\n");
 
-        assertEquals(Optional.of(UUID), StableIdentityRules.ofPackage("utm", vm).map(i -> i.id()),
+        assertEquals(Optional.of(UUID), StableIdentityRules.ofPackage("utm", vm).map(StableIdentityRule.Identity::id),
                 "UTM reads its native UUID");
-        assertEquals(Optional.of(QEMU_ID), StableIdentityRules.ofPackage("qemu", vm).map(i -> i.id()),
+        assertEquals(Optional.of(QEMU_ID), StableIdentityRules.ofPackage("qemu", vm).map(StableIdentityRule.Identity::id),
                 "QEMU reads only its own sidecar");
         assertEquals(Optional.empty(), StableIdentityRules.ofPackage("utm", tempDir.resolve("none")));
     }

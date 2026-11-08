@@ -8,13 +8,10 @@ import java.util.Map;
 
 /**
  * Integrates a VM hypervisor with the backup manager.
- *
  * A provider is responsible only for discovering VMs, determining their
  * running state and requesting a clean shutdown.
- *
  * Backup creation, retention, metadata and change tracking are handled by
  * the backup manager itself.
- *
  * Implementations should expose all files and directories required to restore
  * a VM through the LocalVm backup sources.
  */
@@ -44,7 +41,6 @@ public interface VmProvider {
 
     /**
      * Returns the runtime states of the locally available VMs.
-     *
      * The map is keyed by the provider-local {@link LocalVm#id()}, never by the
      * display name. Missing entries are treated as UNKNOWN. A provider must
      * report UNKNOWN, or omit the VM, whenever its state cannot be matched to
@@ -69,7 +65,6 @@ public interface VmProvider {
 
     /**
      * Requests a clean shutdown of a VM.
-     *
      * The method only initiates the shutdown. Waiting for the VM to stop,
      * including timeout handling, is the responsibility of the backup manager.
      */

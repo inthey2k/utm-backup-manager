@@ -275,8 +275,8 @@ class QemuFormatTwoIntegrationTest {
 
         Path container = result.backupDirectory().resolve("VMs/" + containerName());
         assertEquals(
-                new BackupStateReader().read(container),
-                new BackupStateResult.Parsed(new BackupState(false, "before the kernel update"))
+                new BackupStateResult.Parsed(new BackupState(false, "before the kernel update")),
+                new BackupStateReader().read(container)
         );
     }
 

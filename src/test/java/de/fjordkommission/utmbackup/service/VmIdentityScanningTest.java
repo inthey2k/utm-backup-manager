@@ -174,8 +174,10 @@ class VmIdentityScanningTest {
         BackupOverview overview = scanner(3, qemu).scan();
 
         assertEquals(1, find(overview, new VmId("qemu", "Ubuntu")).backupCount());
-        boolean qemuRecorded = VmIdentityFile.read(root) instanceof VmIdentityFile.ReadResult.Loaded loaded
-                && loaded.registry().identities().stream().anyMatch(entry -> entry.providerId().equals("qemu"));
+        boolean qemuRecorded = VmIdentityFile.read(root) instanceof VmIdentityFile.ReadResult.Loaded(
+                VmIdentityRegistry registry
+        )
+                && registry.identities().stream().anyMatch(entry -> entry.providerId().equals("qemu"));
         assertFalse(qemuRecorded, "without a native id nothing is recorded, so QEMU behaviour is unchanged");
     }
 

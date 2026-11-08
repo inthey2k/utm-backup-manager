@@ -11,7 +11,6 @@ import java.util.Map;
 
 /**
  * VM provider used by integration tests.
- *
  * It keeps tests independent of an installed hypervisor and prevents access
  * to real local VMs.
  */
