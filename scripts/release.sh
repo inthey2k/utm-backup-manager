@@ -116,14 +116,47 @@ fi
 BRANCH="$(git branch --show-current)"
 
 if [[ "$BRANCH" != "main" ]]; then
-    echo "Release must be created from main."
+    echo
+    echo "Current branch: $BRANCH"
+    read -r -p "Switch to main and merge $BRANCH? [y/N]: " MERGE_BRANCH
+
+    if [[ "$MERGE_BRANCH" != "y" && "$MERGE_BRANCH" != "Y" ]]; then
+        echo "Release cancelled."
+        exit 0
+    fi
+
+    echo
+    echo "Fetching origin/main..."
+    git fetch origin main
+
+    echo "Switching to main..."
+    git switch main
+
+    echo "Updating main..."
+    git pull --ff-only origin main
+
+    echo "Merging $BRANCH into main..."
+    if ! git merge "$BRANCH"; then
+        echo
+        echo "Merge failed. Resolve the conflicts manually, commit the merge, and rerun the release script."
+        exit 1
+    fi
+
+    echo
+    echo "Branch $BRANCH merged into main."
+fi
+
+if [[ -n "$(git status --porcelain)" ]]; then
+    echo "Working tree is not clean after switching/merging."
+    echo "Please resolve or commit the remaining changes before releasing."
     exit 1
 fi
 
 git fetch origin main
 
-if [[ "$(git rev-parse HEAD)" != "$(git rev-parse origin/main)" ]]; then
-    echo "Local main is not synchronized with origin/main."
+if ! git merge-base --is-ancestor origin/main HEAD; then
+    echo "Local main does not contain the current origin/main."
+    echo "Please synchronize main with origin/main before releasing."
     exit 1
 fi
 
