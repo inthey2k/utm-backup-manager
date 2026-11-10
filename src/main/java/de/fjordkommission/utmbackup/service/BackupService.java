@@ -12,6 +12,8 @@ import de.fjordkommission.utmbackup.storage.BackupStateReader;
 import de.fjordkommission.utmbackup.storage.BackupStateResult;
 import de.fjordkommission.utmbackup.storage.BackupStateWriter;
 import de.fjordkommission.utmbackup.storage.BackupStorageGuard;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
 import java.io.IOException;
@@ -27,6 +29,8 @@ import java.util.function.UnaryOperator;
 
 @Service
 public class BackupService {
+
+ private static final Logger log = LoggerFactory.getLogger(BackupService.class);
 
  private final BackupScanner scanner;
  private final StableRepository repo;
@@ -122,6 +126,7 @@ public class BackupService {
    targets.add(backup);
   }
 
+  log.info("Deleting {} selected backup(s)", targets.size());
   targets.forEach(this::deleteBackup);
   return targets.size();
  }
@@ -161,6 +166,8 @@ public class BackupService {
   Path vmDirectory = path.getParent();
   Path batchDirectory = requireSafeLocation(backup);
 
+  log.info("Deleting backup {} at {}", id, path);
+
   BackupManifestResult manifestResult = manifestReader.read(batchDirectory);
 
   if (manifestResult instanceof BackupManifestResult.Parsed(BackupManifest manifest)
@@ -178,14 +185,20 @@ public class BackupService {
 
   try {
    deleteRecursively(path);
+   // The VM is gone, so its metadata goes too, even if the batch cleanup below fails.
+   repo.delete(id);
+   log.info("Deleted VM backup {} at {}", id, path);
 
-   if (isDirectoryEmpty(vmDirectory)) {
+   // Other VM folders keep the batch. Only the batch is removed when none is left.
+   // Stray files next to them, such as .DS_Store, do not count as VM backups and do not
+   // keep the batch; Shared Folder content is removed with the batch.
+   if (!hasVmDirectories(vmDirectory)) {
     deleteRecursively(batchDirectory);
+    log.info("Removed batch {} after its last VM backup was deleted", batchDirectory);
    }
 
-   repo.delete(id);
-
   } catch (IOException e) {
+   log.error("Deletion of backup {} at {} failed", id, path, e);
    throw new IllegalStateException(
            "Backup could not be deleted: " + path,
            e
@@ -228,14 +241,16 @@ public class BackupService {
    ));
 
    deleteRecursively(container);
+   repo.delete(id);
+   log.info("Deleted format-2 VM backup {} at {}", id, container);
 
    if (remaining.isEmpty()) {
     deleteRecursively(batchDirectory);
+    log.info("Removed batch {} after its last VM backup was deleted", batchDirectory);
    }
 
-   repo.delete(id);
-
   } catch (IOException e) {
+   log.error("Deletion of backup {} at {} failed", id, container, e);
    throw new IllegalStateException(
            "Backup could not be deleted: " + container,
            e
@@ -243,9 +258,10 @@ public class BackupService {
   }
  }
 
- private boolean isDirectoryEmpty(Path directory) throws IOException {
-  try (var entries = Files.list(directory)) {
-   return entries.findAny().isEmpty();
+ /** True when a VM backup folder remains below {@code VMs}, as the scanner counts them. */
+ private boolean hasVmDirectories(Path vmDirectory) throws IOException {
+  try (var entries = Files.list(vmDirectory)) {
+   return entries.anyMatch(Files::isDirectory);
   }
  }
 
