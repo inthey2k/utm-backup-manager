@@ -40,6 +40,40 @@
                     Create backup
                 </button>
 
+                <!-- Manual cleanup: deletes the current retention candidates after confirmation -->
+                <button type="submit"
+                        form="retention-cleanup-form"
+                        class="secondary"
+                        id="cleanup-backups-button"
+                        th:disabled="${!backupRootAvailable or backupJobRunning or !storageStatus.writable}"
+                        th:title="${storageStatus.writable ? null : #messages.msg('storage.notWritable')}"
+                        th:attr="data-storage-blocked=${!storageStatus.writable}"
+                        th:text="#{cleanup.button}">
+                    Clean up backups
+                </button>
+
+                <!-- Manual selection: first enters selection mode, then deletes the selected backups -->
+                <button type="button"
+                        class="secondary"
+                        id="selection-mode-button"
+                        th:disabled="${!backupRootAvailable or backupJobRunning or !storageStatus.writable}"
+                        th:title="${storageStatus.writable ? null : #messages.msg('storage.notWritable')}"
+                        th:attr="data-storage-blocked=${!storageStatus.writable},
+                                 data-label-select=#{selection.enter},
+                                 data-label-delete=#{selection.delete},
+                                 data-message-none=#{selection.none}"
+                        th:text="#{selection.enter}">
+                    Select backups to delete
+                </button>
+
+                <button type="button"
+                        class="secondary"
+                        id="selection-cancel-button"
+                        hidden
+                        th:text="#{selection.cancel}">
+                    Cancel
+                </button>
+
                 <button type="button"
                         class="header-menu-button"
                         id="header-menu-button"
@@ -148,6 +182,24 @@
         <span th:text="${error}"></span>
         <button type="button"
                 class="flash-close"
+                th:aria-label="#{dialog.close}">×</button>
+    </div>
+    <!-- informational messages, for example when no backup is a deletion candidate -->
+    <div class="info flash-message"
+         th:if="${info}"
+         data-timeout="5000">
+        <span th:text="${info}"></span>
+        <button type="button"
+                class="flash-close"
+                th:aria-label="#{dialog.close}">×</button>
+    </div>
+    <!-- hints of the selection mode, shown without a page reload and hidden by script -->
+    <div class="err selection-notice hidden"
+         id="selection-notice"
+         hidden>
+        <span id="selection-notice-text"></span>
+        <button type="button"
+                class="flash-close selection-notice-close"
                 th:aria-label="#{dialog.close}">×</button>
     </div>
     <!-- summary after backup is finished -->
@@ -406,7 +458,26 @@
                 <div th:each="backup : ${vm.backups()}"
                      class="card"
                      th:classappend="${backup.stable()} ? ' stable' : ''"
-                     th:attr="data-backup-id=${backup.id}">
+                     th:attr="data-backup-id=${backup.id},
+                              data-retention-candidate=${overview.retentionCandidatesForDeletion().contains(backup.id()) ? 'true' : 'false'},
+                              data-vm-name=${vm.name()},
+                              data-provider-name=${vm.providerName()},
+                              data-backup-date=${#temporals.format(backup.backupTime(), 'dd.MM.yyyy HH:mm:ss')}">
+
+                    <!-- Manual selection: Stable backups get no checkbox, so they cannot be selected -->
+                    <label class="backup-select"
+                           th:if="${!backup.stable()}"
+                           th:with="writable=${storageStatus.writable}">
+                        <input type="checkbox"
+                               class="backup-select-checkbox"
+                               name="backupIds"
+                               form="bulk-delete-form"
+                               th:value="${backup.id()}"
+                               th:disabled="${!writable}">
+                        <span th:text="#{selection.checkbox}">
+                            Select for deletion
+                        </span>
+                    </label>
 
                     <!-- Retention candidate -->
                     <div class="retention-pending-deletion hidden"
@@ -889,6 +960,104 @@
                     id="retention-confirmation-start"
                     th:text="#{retention.cleanup.warning.confirm}">
                 Start
+            </button>
+        </div>
+    </dialog>
+
+    <!-- Forms of the manual cleanup. Buttons and checkboxes refer to them by id. -->
+    <form id="retention-cleanup-form"
+          method="post"
+          action="/retention/delete-candidates"
+          hidden></form>
+    <form id="bulk-delete-form"
+          method="post"
+          action="/backups/delete-selected"
+          hidden></form>
+
+    <!-- Confirmation for all current retention deletion candidates -->
+    <dialog class="backup-dialog deletion-dialog" id="cleanup-dialog">
+        <div class="dialog-header">
+            <div>
+                <small th:text="#{cleanup.dialog.title}">
+                    Retention cleanup
+                </small>
+                <h2 th:text="#{cleanup.dialog.heading}">
+                    Delete retention candidates?
+                </h2>
+            </div>
+            <button type="button"
+                    class="dialog-close"
+                    th:aria-label="#{dialog.close}">
+                ×
+            </button>
+        </div>
+
+        <p th:text="#{cleanup.dialog.message}">
+            These backups exceed the retention limit. They will be permanently deleted:
+        </p>
+
+        <ul class="deletion-list" id="cleanup-list"></ul>
+
+        <p class="deletion-warning" th:text="#{cleanup.dialog.warning}">
+            This cannot be undone. Stable backups are never deleted.
+        </p>
+
+        <div class="dialog-actions">
+            <button type="button"
+                    class="secondary dialog-cancel"
+                    th:text="#{dialog.cancel}">
+                Cancel
+            </button>
+            <button type="submit"
+                    form="retention-cleanup-form"
+                    class="confirm-delete"
+                    id="cleanup-confirm"
+                    th:text="#{cleanup.dialog.confirm}">
+                Delete permanently
+            </button>
+        </div>
+    </dialog>
+
+    <!-- Confirmation for the backups selected manually. Cancel keeps the selection. -->
+    <dialog class="backup-dialog deletion-dialog" id="bulk-delete-dialog">
+        <div class="dialog-header">
+            <div>
+                <small th:text="#{selection.dialog.title}">
+                    Delete selected backups
+                </small>
+                <h2 th:text="#{selection.dialog.heading}">
+                    Permanently delete the selected backups?
+                </h2>
+            </div>
+            <button type="button"
+                    class="dialog-close"
+                    th:aria-label="#{dialog.close}">
+                ×
+            </button>
+        </div>
+
+        <p th:text="#{selection.dialog.message}">
+            The following backups will be permanently deleted:
+        </p>
+
+        <ul class="deletion-list" id="bulk-delete-list"></ul>
+
+        <p class="deletion-warning" th:text="#{selection.dialog.warning}">
+            This cannot be undone. Only the listed backups are removed.
+        </p>
+
+        <div class="dialog-actions">
+            <button type="button"
+                    class="secondary dialog-cancel"
+                    th:text="#{dialog.cancel}">
+                Cancel
+            </button>
+            <button type="submit"
+                    form="bulk-delete-form"
+                    class="confirm-delete"
+                    id="bulk-delete-confirm"
+                    th:text="#{selection.dialog.confirm}">
+                Delete permanently
             </button>
         </div>
     </dialog>

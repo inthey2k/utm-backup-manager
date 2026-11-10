@@ -17,14 +17,18 @@ Read the relevant code, tests, `README.md`, and `ROADMAP.md` before making subst
 - Distinguish confirmed defects from hypothetical risks and do not overstate non-critical issues.
 - Never weaken backup integrity, retention, Stable-backup protection, or other existing safety guards.
 
-## Working tree and Git
+## Git working branch
 
-- You operate on the original Git working tree shared from the macOS host. Changes are immediately visible in IntelliJ IDEA.
-- The project owner handles Git operations.
-- Do not create branches/worktrees, stage, commit, push, reset, revert, tag, release, or run release/deployment scripts unless explicitly requested.
-- Preserve user changes and untracked files. Never clean, overwrite, or discard them without explicit approval.
-- Leave implementation changes uncommitted for review.
-- Do not modify files outside this repository without permission.
+- Development tasks must be performed in the local clone, not directly on `/mnt/host`.
+- Before starting work, fetch the latest state from `origin`.
+- The user-owned release branch is the source branch, for example `release/1.5.3`, provided with the prompt.
+- Update it only with:
+  `git pull --ff-only origin <branch>`
+- Create a dedicated Claude work branch from that state, for example:
+  `claude/1.5.3-<short-task-name>`
+- Never commit, push, merge, rebase, reset, or delete branches unless explicitly requested by the user.
+- Never make changes directly on `main`.
+- If the source branch has diverged from `origin`, stop and report it instead of resolving it automatically.
 
 ## Data and credentials
 

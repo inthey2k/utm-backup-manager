@@ -87,6 +87,8 @@ class FormatTwoStateTest {
         );
         backupService = new BackupService(scanner, repo, guard, new BackupStateWriter());
         VmIdentityService vmIdentityService = mock(VmIdentityService.class);
+        // No alias registry in this test: every id is already canonical.
+        when(vmIdentityService.resolveCanonicalId(any(VmId.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
         retentionService = new RetentionService(
                 scanner,

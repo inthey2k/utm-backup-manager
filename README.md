@@ -39,6 +39,8 @@ Planned features and upcoming improvements are listed in the
 -   Provides a configurable retention limit per VM
 -   Marks retention candidates but **never deletes them automatically**
 -   Allows individual VM backups to be deleted after confirmation
+-   Deletes all current retention candidates in one confirmed step, or a
+    manually selected set of backups
 -   Stores supplemental metadata in SQLite
 -   Provides German, English, and Spanish user interfaces
 -   Shows the effective application configuration in the web interface
@@ -235,6 +237,31 @@ containing several VMs without deleting the other VM backups in that
 batch. Stable backups are protected from deletion. When the last VM
 backup is removed from a batch, the now-empty batch directory and its
 batch metadata are removed as well.
+
+### Manual cleanup
+
+The backup overview has two buttons next to **Create backup**:
+
+-   **Clean up backups** permanently deletes the backups that are
+    currently retention deletion candidates. The server determines these
+    candidates when the action runs, from the canonical VM histories of
+    the current scan. The browser does not supply them. Stable backups are
+    never included. If no backup is a candidate, the page says so and
+    deletes nothing. The "would be deleted after the next backup" marker
+    is not used for this action.
+-   **Select backups to delete** enters a selection mode with a checkbox
+    on each normal backup. Stable backups have no checkbox. **Delete
+    selected backups permanently** asks for confirmation and lists every
+    selected backup. **Cancel** leaves the mode and clears the selection.
+    Choosing *Cancel* in the confirmation keeps the selection.
+
+Both actions are disabled while a backup runs, and manual deletion is
+refused while the automatic retention cleanup after a backup is still
+running. The server validates the complete selection before it deletes
+anything: an unknown backup or a Stable backup rejects the whole request.
+Read-only backup storage blocks both actions. A failure while a deletion
+is in progress can still leave the earlier removals in effect, and the
+error message names the backup concerned.
 
 ## VM state and change detection
 

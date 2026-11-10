@@ -14,7 +14,11 @@ import java.util.List;
 import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyCollection;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -34,14 +38,17 @@ class RetentionServiceTest {
     @Mock
     private VmIdentityService vmIdentityService;
 
+    private BackupStorageGuard storageGuard;
+
     private RetentionService retentionService;
 
     @BeforeEach
     void setUp() {
+        storageGuard = mock(BackupStorageGuard.class);
         retentionService = new RetentionService(
                 scanner,
                 backupService,
-                mock(BackupStorageGuard.class),
+                storageGuard,
                 vmIdentityService
         );
     }
@@ -173,6 +180,7 @@ class RetentionServiceTest {
 
     @Test
     void cleanupDeletesOldestNormalBackup() {
+        useIdentityPassThrough();
         VmId vmId = vmId("vm-1");
 
         VmBackup oldest = normalBackup("backup-1", 1);
@@ -203,6 +211,7 @@ class RetentionServiceTest {
 
     @Test
     void cleanupDeletesAllNormalBackupsExceedingLimit() {
+        useIdentityPassThrough();
         VmId vmId = vmId("vm-1");
 
         VmBackup oldest = normalBackup("backup-1", 1);
@@ -240,6 +249,7 @@ class RetentionServiceTest {
 
     @Test
     void cleanupNeverDeletesStableBackups() {
+        useIdentityPassThrough();
         VmId vmId = vmId("vm-1");
 
         VmBackup oldestNormal = normalBackup("backup-1", 1);
@@ -273,6 +283,7 @@ class RetentionServiceTest {
 
     @Test
     void cleanupDoesNothingWhenRetentionLimitIsNotExceeded() {
+        useIdentityPassThrough();
         VmId vmId = vmId("vm-1");
 
         VmOverview vm = vmOverview(
@@ -348,6 +359,186 @@ class RetentionServiceTest {
                 Set.of("backup-1", "backup-2"),
                 result
         );
+    }
+
+    // ------------------------------------------------------------------
+    // Current deletion candidates (manual cleanup) versus pending after the next backup
+    // ------------------------------------------------------------------
+
+    @Test
+    void currentCandidatesAreTheOldestNormalBackupsBeyondTheLimit() {
+        VmOverview vm = vmOverview(
+                "vm-1",
+                normalBackup("backup-1", 1),
+                normalBackup("backup-2", 2),
+                normalBackup("backup-3", 3),
+                normalBackup("backup-4", 4),
+                normalBackup("backup-5", 5)
+        );
+        when(scanner.scan()).thenReturn(overview(vm));
+
+        assertEquals(List.of("backup-1", "backup-2"), retentionService.findCurrentDeletionCandidates());
+    }
+
+    @Test
+    void backupsOnlyPendingAfterTheNextBackupAreNotCurrentCandidates() {
+        // At the limit: nothing is a candidate now, but the next backup would make the oldest one one.
+        VmOverview vm = vmOverview(
+                "vm-1",
+                normalBackup("backup-1", 1),
+                normalBackup("backup-2", 2),
+                normalBackup("backup-3", 3)
+        );
+        when(scanner.scan()).thenReturn(overview(vm));
+
+        assertEquals(List.of(), retentionService.findCurrentDeletionCandidates());
+        assertEquals(Set.of("backup-1"), retentionService.findBackupsPendingDeletion(List.of(vmId("vm-1"))));
+    }
+
+    @Test
+    void stableBackupsAreNeverCurrentCandidates() {
+        VmOverview vm = vmOverview(
+                "vm-1",
+                stableBackup("stable-1", 1),
+                normalBackup("backup-2", 2),
+                normalBackup("backup-3", 3),
+                normalBackup("backup-4", 4),
+                normalBackup("backup-5", 5)
+        );
+        when(scanner.scan()).thenReturn(overview(vm));
+
+        // Four normal backups, limit three: the oldest normal backup is the candidate, not the older Stable one.
+        assertEquals(List.of("backup-2"), retentionService.findCurrentDeletionCandidates());
+    }
+
+    @Test
+    void mergedCanonicalHistoryIsEvaluatedAsOneVm() {
+        // The scanner merges the histories of one VM under its canonical id, so the limit counts across them.
+        VmOverview merged = vmOverview(
+                "canonical-1",
+                normalBackup("legacy-a", 1),
+                normalBackup("legacy-b", 2),
+                normalBackup("backup-3", 3),
+                normalBackup("backup-4", 4)
+        );
+        when(scanner.scan()).thenReturn(overview(merged));
+
+        assertEquals(List.of("legacy-a"), retentionService.findCurrentDeletionCandidates());
+    }
+
+    @Test
+    void currentCandidatesAreCalculatedPerVm() {
+        VmOverview first = vmOverview(
+                "vm-1",
+                normalBackup("a-1", 1),
+                normalBackup("a-2", 2),
+                normalBackup("a-3", 3),
+                normalBackup("a-4", 4)
+        );
+        VmOverview second = vmOverview(
+                "vm-2",
+                normalBackup("b-1", 1),
+                normalBackup("b-2", 2)
+        );
+        VmOverview third = vmOverview(
+                "vm-3",
+                normalBackup("c-1", 1),
+                normalBackup("c-2", 2),
+                normalBackup("c-3", 3),
+                normalBackup("c-4", 4),
+                normalBackup("c-5", 5)
+        );
+        when(scanner.scan()).thenReturn(overview(first, second, third));
+
+        assertEquals(List.of("a-1", "c-1", "c-2"), retentionService.findCurrentDeletionCandidates());
+    }
+
+    @Test
+    void noCurrentCandidatesDeletesNothing() {
+        VmOverview vm = vmOverview(
+                "vm-1",
+                normalBackup("backup-1", 1),
+                normalBackup("backup-2", 2)
+        );
+        when(scanner.scan()).thenReturn(overview(vm));
+
+        assertEquals(0, retentionService.deleteCurrentDeletionCandidates());
+
+        verify(backupService, never()).deleteAll(anyCollection());
+        verify(backupService, never()).delete(anyString());
+    }
+
+    @Test
+    void deleteCurrentCandidatesHandsTheCandidatesToTheValidatedBulkDeletion() {
+        VmOverview vm = vmOverview(
+                "vm-1",
+                normalBackup("backup-1", 1),
+                normalBackup("backup-2", 2),
+                normalBackup("backup-3", 3),
+                normalBackup("backup-4", 4)
+        );
+        when(scanner.scan()).thenReturn(overview(vm));
+        when(backupService.deleteAll(List.of("backup-1"))).thenReturn(1);
+
+        assertEquals(1, retentionService.deleteCurrentDeletionCandidates());
+
+        verify(storageGuard).assertWritable();
+        verify(backupService).deleteAll(List.of("backup-1"));
+        verify(backupService, never()).delete(anyString());
+    }
+
+    @Test
+    void readOnlyStorageStopsCurrentCleanupBeforeAnythingIsLooked() {
+        doThrow(new IllegalStateException("read-only")).when(storageGuard).assertWritable();
+
+        assertThrows(IllegalStateException.class, () -> retentionService.deleteCurrentDeletionCandidates());
+
+        verify(scanner, never()).scan();
+        verify(backupService, never()).deleteAll(anyCollection());
+    }
+
+    // ------------------------------------------------------------------
+    // Canonical ids: a local (legacy) id must resolve to the canonical history
+    // ------------------------------------------------------------------
+
+    @Test
+    void legacyLocalIdOfAMergedVmIsResolvedForAutomaticCleanup() {
+        VmId legacy = vmId("Old Name.utm");
+        VmId canonical = vmId("canonical-1");
+        when(vmIdentityService.resolveCanonicalId(legacy)).thenReturn(canonical);
+
+        VmOverview vm = vmOverview(
+                "canonical-1",
+                normalBackup("backup-1", 1),
+                normalBackup("backup-2", 2),
+                normalBackup("backup-3", 3),
+                normalBackup("backup-4", 4)
+        );
+        when(scanner.scan()).thenReturn(overview(vm));
+
+        retentionService.deleteBackupsExceedingRetention(List.of(legacy));
+
+        verify(backupService).delete("backup-1");
+        verify(backupService, never()).delete("backup-2");
+    }
+
+    @Test
+    void legacyLocalIdOfAMergedVmRequiresCleanupUnderItsCanonicalId() {
+        VmId legacy = vmId("Old Name.utm");
+        VmId canonical = vmId("canonical-1");
+        useIdentityPassThrough();
+        when(vmIdentityService.resolveCanonicalId(legacy)).thenReturn(canonical);
+
+        VmOverview vm = vmOverview(
+                "canonical-1",
+                normalBackup("backup-1", 1),
+                normalBackup("backup-2", 2),
+                normalBackup("backup-3", 3),
+                normalBackup("backup-4", 4)
+        );
+        when(scanner.scan()).thenReturn(overview(vm));
+
+        assertEquals(List.of(canonical), retentionService.findVmsRequiringRetentionCleanup(List.of(legacy)));
     }
 
     private void useIdentityPassThrough() {

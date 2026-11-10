@@ -47,6 +47,21 @@ const configurationButton = document.getElementById("configuration-button");
 const configurationDialog = document.getElementById("configuration-dialog");
 const configurationClose = document.getElementById("configuration-close");
 
+// Manual backup cleanup and selection. The state lives here, because the
+// create-backup button reads it during the initial page setup.
+const cleanupBackupsButton = document.getElementById("cleanup-backups-button");
+const cleanupDialog = document.getElementById("cleanup-dialog");
+const cleanupList = document.getElementById("cleanup-list");
+const selectionModeButton = document.getElementById("selection-mode-button");
+const selectionCancelButton = document.getElementById("selection-cancel-button");
+const bulkDeleteDialog = document.getElementById("bulk-delete-dialog");
+const bulkDeleteList = document.getElementById("bulk-delete-list");
+const selectionNotice = document.getElementById("selection-notice");
+const selectionNoticeText = document.getElementById("selection-notice-text");
+const selectionNoticeClose = document.querySelector(".selection-notice-close");
+let backupSelectionMode = false;
+let selectionNoticeTimer = null;
+
 document.querySelectorAll(".note-button").forEach(button => {
     button.addEventListener("click", () => {
         const dialog = document.getElementById(button.dataset.dialogId);
@@ -417,14 +432,18 @@ function updateCreateBackupButton() {
     }
 
     // Read-only storage is rendered server-side; the backend guard still rejects the job.
+    // Selection mode blocks creating a backup, so the two operations never overlap.
     createBackupButton.disabled =
         backupJobRunning
         || !backupDialog
+        || backupSelectionMode
         || createBackupButton.dataset.storageBlocked === "true";
 
     createBackupButton.textContent = backupJobRunning
         ? createBackupButton.dataset.labelRunning
         : createBackupButton.dataset.labelReady;
+
+    updateBulkActionControls();
 }
 
 function updateBackupProgress(job) {
@@ -1155,6 +1174,153 @@ document.querySelectorAll(".delete-dialog").forEach(dialog => {
             dialog.close();
         }
     });
+});
+
+// ---------------------------------------------------------------------------
+// Manual backup cleanup and selection
+// ---------------------------------------------------------------------------
+// Unavailable storage and a running backup disable the entry points. The server
+// checks every request again, so the page state is only a convenience.
+function updateBulkActionControls() {
+    const storageBlocked = selectionModeButton?.dataset.storageBlocked === "true";
+    const unavailable = !backupDialog || storageBlocked || backupJobRunning;
+
+    if (cleanupBackupsButton) {
+        cleanupBackupsButton.disabled = unavailable || backupSelectionMode;
+    }
+
+    if (selectionModeButton) {
+        selectionModeButton.disabled = unavailable;
+    }
+
+    if (selectionCancelButton) {
+        selectionCancelButton.hidden = !backupSelectionMode;
+    }
+}
+
+function setSelectionMode(active) {
+    backupSelectionMode = active;
+    document.body.classList.toggle("backup-selection-mode", active);
+
+    selectionModeButton.textContent = active
+        ? selectionModeButton.dataset.labelDelete
+        : selectionModeButton.dataset.labelSelect;
+    selectionModeButton.classList.toggle("selection-delete-button", active);
+
+    if (!active) {
+        clearBackupSelection();
+        hideSelectionNotice();
+    }
+
+    updateCreateBackupButton();
+}
+
+// Real backup cards only; carousel ghosts are copies with disabled controls.
+function backupCards() {
+    return Array.from(
+        document.querySelectorAll(".vm-column:not(.vm-column-ghost) .card[data-backup-id]")
+    );
+}
+
+function selectedBackupCards() {
+    return backupCards().filter(card =>
+        card.querySelector(".backup-select-checkbox")?.checked
+    );
+}
+
+function retentionCandidateCards() {
+    return backupCards().filter(card =>
+        card.dataset.retentionCandidate === "true"
+    );
+}
+
+function clearBackupSelection() {
+    backupCards().forEach(card => {
+        card.classList.remove("selected");
+
+        const checkbox = card.querySelector(".backup-select-checkbox");
+
+        if (checkbox) {
+            checkbox.checked = false;
+        }
+    });
+}
+
+function fillDeletionList(list, cards) {
+    list.replaceChildren(...cards.map(card => {
+        const item = document.createElement("li");
+        item.textContent = [
+            card.dataset.vmName,
+            card.dataset.backupDate,
+            card.dataset.providerName
+        ].join(" · ");
+        return item;
+    }));
+}
+
+function showSelectionNotice(text) {
+    selectionNoticeText.textContent = text;
+    selectionNotice.hidden = false;
+    selectionNotice.classList.remove("hidden");
+
+    clearTimeout(selectionNoticeTimer);
+    selectionNoticeTimer = setTimeout(hideSelectionNotice, 5000);
+}
+
+function hideSelectionNotice() {
+    clearTimeout(selectionNoticeTimer);
+    selectionNotice.hidden = true;
+    selectionNotice.classList.add("hidden");
+}
+
+selectionModeButton?.addEventListener("click", () => {
+    if (!backupSelectionMode) {
+        setSelectionMode(true);
+        return;
+    }
+
+    const selected = selectedBackupCards();
+
+    // Nothing selected: no confirmation dialog, only a hint on the page.
+    if (selected.length === 0) {
+        showSelectionNotice(selectionModeButton.dataset.messageNone);
+        return;
+    }
+
+    fillDeletionList(bulkDeleteList, selected);
+    bulkDeleteDialog.showModal();
+    bulkDeleteDialog.querySelector(".dialog-cancel").focus();
+});
+
+// Leaves selection mode and clears the selection.
+selectionCancelButton?.addEventListener("click", () => {
+    setSelectionMode(false);
+});
+
+selectionNoticeClose?.addEventListener("click", hideSelectionNotice);
+
+document.addEventListener("change", event => {
+    const checkbox = event.target;
+
+    if (!checkbox.classList?.contains("backup-select-checkbox")) {
+        return;
+    }
+
+    checkbox.closest(".card")?.classList.toggle("selected", checkbox.checked);
+});
+
+cleanupBackupsButton?.addEventListener("click", event => {
+    const candidates = retentionCandidateCards();
+
+    // Without candidates the form is submitted as it is; the server reports that nothing is due.
+    if (candidates.length === 0) {
+        return;
+    }
+
+    event.preventDefault();
+    fillDeletionList(cleanupList, candidates);
+    cleanupDialog.showModal();
+    cleanupDialog.querySelector(".dialog-cancel").focus();
 });
 
 // ---------------------------------------------------------------------------

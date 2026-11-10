@@ -17,7 +17,12 @@ import org.springframework.stereotype.Service;
 import java.io.IOException;
 import java.nio.file.*;
 import java.nio.file.attribute.BasicFileAttributes;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.HashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.function.UnaryOperator;
 
 @Service
@@ -74,8 +79,55 @@ public class BackupService {
 
  public void delete(String id) {
   storageGuard.assertWritable();
-  VmBackup backup = require(id);
+  deleteBackup(require(id));
+ }
 
+ /**
+  * Deletes several backups of one request and returns how many were removed. Every id is
+  * checked before the first removal: an unknown id, a Stable backup or a backup outside the
+  * expected directory layout rejects the whole request, so a faulty selection removes
+  * nothing. Duplicate ids are removed once. Each removal is the one used by {@link #delete}.
+  *
+  * <p>Only a failure during a removal can stop the request part way. The error then names
+  * the backup concerned, and the removals before it stay in effect.
+  */
+ public int deleteAll(Collection<String> ids) {
+  storageGuard.assertWritable();
+
+  if (ids == null || ids.isEmpty()) {
+   throw new IllegalArgumentException("No backups were selected.");
+  }
+
+  Map<String, VmBackup> known = new HashMap<>();
+  scanner.scan().vms().forEach(vm -> vm.backups().forEach(backup -> known.put(backup.id(), backup)));
+
+  List<VmBackup> targets = new ArrayList<>();
+
+  for (String id : new LinkedHashSet<>(ids)) {
+   VmBackup backup = known.get(id);
+
+   if (backup == null) {
+    throw new IllegalArgumentException(
+            "A selected backup does not exist. Nothing was deleted."
+    );
+   }
+
+   if (backup.stable()) {
+    throw new IllegalStateException(
+            "Stable backups cannot be deleted. Remove stable protection first. Nothing was deleted."
+    );
+   }
+
+   requireSafeLocation(backup);
+   targets.add(backup);
+  }
+
+  targets.forEach(this::deleteBackup);
+  return targets.size();
+ }
+
+ /** Checks that the backup lies in the expected layout below the root. Returns its batch directory. */
+ private Path requireSafeLocation(VmBackup backup) {
   Path path = backup.vmPath().normalize();
   Path root = scanner.root().normalize();
 
@@ -98,6 +150,16 @@ public class BackupService {
            "Invalid backup directory structure. Deletion aborted."
    );
   }
+
+  return batchDirectory;
+ }
+
+ /** Removes one backup after the caller has checked the write guard. */
+ private void deleteBackup(VmBackup backup) {
+  String id = backup.id();
+  Path path = backup.vmPath().normalize();
+  Path vmDirectory = path.getParent();
+  Path batchDirectory = requireSafeLocation(backup);
 
   BackupManifestResult manifestResult = manifestReader.read(batchDirectory);
 

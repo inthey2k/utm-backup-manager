@@ -53,11 +53,49 @@ public class RetentionService {
                 .map(identityService::resolveCanonicalId)
                 .filter(affectedVmIds::contains)
                 .distinct()
-                .toList();    }
+                .toList();
+    }
+
+    /**
+     * Returns the backups that are CURRENTLY deletion candidates: for each VM of the current
+     * scan, the oldest normal backups beyond the retention limit. Stable backups are never
+     * included. The histories are the canonical VM histories produced by {@link BackupScanner}.
+     *
+     * <p>This is not the set of {@link #findBackupsPendingDeletion} (which asks what the next
+     * backup would make a candidate), so the manual cleanup must not use that calculation.
+     */
+    public List<String> findCurrentDeletionCandidates() {
+        var overview = scanner.scan();
+
+        return overview.vms().stream()
+                .flatMap(vm -> currentDeletionCandidates(vm, overview.retentionLimit()).stream())
+                .map(VmBackup::id)
+                .toList();
+    }
+
+    /**
+     * Deletes all backups that are currently deletion candidates, through the same validated
+     * bulk deletion as the manual selection. Returns how many backups were removed; with no
+     * candidates nothing is deleted and 0 is returned.
+     */
+    public int deleteCurrentDeletionCandidates() {
+        storageGuard.assertWritable();
+
+        List<String> candidates = findCurrentDeletionCandidates();
+
+        if (candidates.isEmpty()) {
+            return 0;
+        }
+
+        return backupService.deleteAll(candidates);
+    }
 
     /**
      * Determine VMs, which would be cleaned up after the current backup job
-     * because they are beyond the retention limit
+     * because they are beyond the retention limit.
+     *
+     * <p>These are the backups that WOULD become deletion candidates after one more backup.
+     * They are not the current candidates; see {@link #findCurrentDeletionCandidates}.
      */
     public Set<String> findBackupsPendingDeletion(Collection<VmId> vmIds) {
         var overview = scanner.scan();
@@ -87,7 +125,8 @@ public class RetentionService {
 
     /**
      * Deletes the oldest normal backups until the retention limit
-     * is satisfied for the supplied VMs.
+     * is satisfied for the supplied VMs. The supplied ids may be local
+     * or canonical; they are resolved to canonical ids before matching.
      */
     public void deleteBackupsExceedingRetention(Collection<VmId> vmIds) {
         storageGuard.assertWritable();
@@ -95,23 +134,33 @@ public class RetentionService {
         var overview = scanner.scan();
         int retentionLimit = overview.retentionLimit();
 
+        Set<VmId> canonicalVmIds = vmIds.stream()
+                .map(identityService::resolveCanonicalId)
+                .collect(Collectors.toSet());
+
         for (VmOverview vm : overview.vms()) {
-            if (!vmIds.contains(vm.id())) {
+            if (!canonicalVmIds.contains(vm.id())) {
                 continue;
             }
 
-            List<VmBackup> normalBackups = vm.backups().stream()
-                    .filter(backup -> !backup.stable())
-                    .sorted(Comparator.comparing(VmBackup::backupTime))
-                    .toList();
-
-            int excess = normalBackups.size() - retentionLimit;
-
-            normalBackups.stream()
-                    .limit(Math.max(0, excess))
+            currentDeletionCandidates(vm, retentionLimit).stream()
                     .map(VmBackup::id)
                     .forEach(backupService::delete);
         }
+    }
+
+    /** The oldest normal backups of one VM that exceed the limit, oldest first. */
+    private static List<VmBackup> currentDeletionCandidates(VmOverview vm, int retentionLimit) {
+        List<VmBackup> normalBackups = vm.backups().stream()
+                .filter(backup -> !backup.stable())
+                .sorted(Comparator.comparing(VmBackup::backupTime))
+                .toList();
+
+        int excess = normalBackups.size() - retentionLimit;
+
+        return normalBackups.stream()
+                .limit(Math.max(0, excess))
+                .toList();
     }
 
     private long normalBackupCount(VmOverview vm) {

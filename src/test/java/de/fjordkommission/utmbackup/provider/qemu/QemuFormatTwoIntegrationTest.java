@@ -116,6 +116,8 @@ class QemuFormatTwoIntegrationTest {
         backupService = new BackupService(scanner, stableRepository, guard, new BackupStateWriter());
 
         VmIdentityService vmIdentityService = mock(VmIdentityService.class);
+        // Only ids are passed through here; this test has no alias registry.
+        when(vmIdentityService.resolveCanonicalId(any(VmId.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
         retentionService = new RetentionService(
                 scanner,

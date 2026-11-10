@@ -1422,3 +1422,86 @@ button:disabled {
         min-width: 220px;
     }
 }
+
+/* ---------- Manual backup cleanup and selection ---------- */
+
+/* Informational banner, styled like the success and error banners. */
+.info {
+    padding: 9px 12px;
+    margin: 12px 0;
+    border: 1px solid #315e6e;
+    border-radius: 8px;
+    color: var(--accent);
+    font-size: .85rem;
+}
+
+/* Hidden by default; the checkbox only appears in selection mode. */
+.backup-select {
+    display: none;
+    align-items: center;
+    gap: 6px;
+    margin-bottom: 6px;
+    color: var(--text-muted);
+    font-size: .78rem;
+    cursor: pointer;
+}
+
+.backup-selection-mode .backup-select {
+    display: flex;
+}
+
+.backup-select input {
+    width: 16px;
+    height: 16px;
+    margin: 0;
+    accent-color: var(--danger);
+    cursor: pointer;
+}
+
+.backup-select input:disabled {
+    cursor: not-allowed;
+}
+
+.card.selected {
+    background: rgba(251, 113, 133, .12);
+    box-shadow: inset 3px 0 0 var(--danger);
+}
+
+.selection-delete-button {
+    background: var(--danger);
+    color: #1b080d;
+}
+
+.selection-notice {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    font-size: .85rem;
+}
+
+.selection-notice.hidden {
+    display: none;
+}
+
+.deletion-dialog {
+    padding: 20px;
+}
+
+.deletion-list {
+    max-height: 240px;
+    overflow: auto;
+    margin: 12px 0;
+    padding-left: 20px;
+    font-size: .9rem;
+}
+
+.deletion-list li {
+    margin: 4px 0;
+    overflow-wrap: anywhere;
+}
+
+.deletion-warning {
+    color: var(--danger);
+    font-size: .9rem;
+}

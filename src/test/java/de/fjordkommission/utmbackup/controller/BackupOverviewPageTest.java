@@ -168,6 +168,101 @@ class BackupOverviewPageTest extends AbstractIntegrationTest {
         assertTrue(buttonDisabled(html, "icon-button delete delete-button"));
         assertTrue(buttonDisabled(html, "icon-button pin"));
         assertTrue(checkboxDisabled(html, UTM_VM.toString()));
+        // Manual cleanup and selection are blocked as well, and the backup checkbox cannot be used.
+        assertTrue(buttonDisabled(html, "id=\"cleanup-backups-button\""));
+        assertTrue(buttonDisabled(html, "id=\"selection-mode-button\""));
+        assertTrue(checkboxDisabled(html, backup(UTM_VM).id()));
+    }
+
+    @Test
+    void manualCleanupButtonsSitDirectlyRightOfCreateBackup() throws Exception {
+        stubOverview(
+                List.of(localVm(UTM_VM, UTM_NAME, VmStatus.STOPPED, backup(UTM_VM))),
+                List.of(healthy(UTM, "UTM")),
+                List.of()
+        );
+
+        String html = render();
+
+        int create = html.indexOf("id=\"create-backup-button\"");
+        int cleanup = html.indexOf("id=\"cleanup-backups-button\"");
+        int selection = html.indexOf("id=\"selection-mode-button\"");
+        int menu = html.indexOf("id=\"header-menu-button\"");
+
+        assertTrue(create > 0 && create < cleanup && cleanup < selection && selection < menu,
+                "buttons must follow the order: create, cleanup, selection, menu");
+        // Same action group: no closing tag of the group between the buttons.
+        assertFalse(html.substring(create, menu).contains("</div>"));
+        assertThat(html, containsString("Clean up backups"));
+        assertThat(html, containsString("Select backups to delete"));
+        assertThat(tagContaining(html, "<button", "id=\"selection-cancel-button\""), containsString("hidden"));
+    }
+
+    @Test
+    void normalBackupsExposeTheSelectionCheckboxAndDataHooks() throws Exception {
+        stubOverview(
+                List.of(localVm(UTM_VM, UTM_NAME, VmStatus.STOPPED, backup(UTM_VM))),
+                List.of(healthy(UTM, "UTM")),
+                List.of()
+        );
+
+        String html = render();
+        String checkbox = tagContaining(html, "<input", "value=\"" + backup(UTM_VM).id() + "\"");
+        String card = tagContaining(html, "<div", "data-backup-id=\"" + backup(UTM_VM).id() + "\"");
+
+        assertThat(checkbox, containsString("class=\"backup-select-checkbox\""));
+        assertThat(checkbox, containsString("name=\"backupIds\""));
+        assertThat(checkbox, containsString("form=\"bulk-delete-form\""));
+        assertFalse(checkbox.contains("disabled"));
+        assertThat(card, containsString("data-retention-candidate=\"false\""));
+        assertThat(card, containsString("data-vm-name=\"" + UTM_NAME + "\""));
+        assertThat(card, containsString("data-provider-name=\"UTM\""));
+        assertThat(card, containsString("data-backup-date=\"20.10.2026 12:00:00\""));
+    }
+
+    @Test
+    void stableBackupsAreNotSelectable() throws Exception {
+        VmBackup stable = new VmBackup(
+                "backup-stable",
+                BATCH,
+                UTM_NAME,
+                Path.of("VMs", UTM_NAME),
+                LocalDateTime.of(2026, 10, 20, 12, 0),
+                "",
+                true,
+                null
+        );
+        stubOverview(
+                List.of(localVm(UTM_VM, UTM_NAME, VmStatus.STOPPED, stable, backup(UTM_VM))),
+                List.of(healthy(UTM, "UTM")),
+                List.of()
+        );
+
+        String html = render();
+
+        // Only the normal backup has a checkbox; the Stable backup has none at all.
+        assertFalse(html.contains("value=\"backup-stable\""));
+        assertTrue(html.contains("value=\"" + backup(UTM_VM).id() + "\""));
+        assertThat(tagContaining(html, "<div", "data-backup-id=\"backup-stable\""), containsString("data-retention-candidate=\"false\""));
+    }
+
+    @Test
+    void currentRetentionCandidatesAreMarkedForTheManualCleanup() throws Exception {
+        Files.createDirectories(TEST_BACKUP_ROOT);
+        VmBackup candidate = backup(UTM_VM);
+        when(scanner.scan()).thenReturn(new BackupOverview(
+                List.of(localVm(UTM_VM, UTM_NAME, VmStatus.STOPPED, candidate)),
+                Set.of(UTM_VM),
+                Set.of(candidate.id()),
+                3,
+                List.of(healthy(UTM, "UTM")),
+                List.of()
+        ));
+
+        String html = render();
+
+        assertThat(tagContaining(html, "<div", "data-backup-id=\"" + candidate.id() + "\""),
+                containsString("data-retention-candidate=\"true\""));
     }
 
     @Test
