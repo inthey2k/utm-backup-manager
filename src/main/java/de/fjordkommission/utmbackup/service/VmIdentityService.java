@@ -1,6 +1,7 @@
 package de.fjordkommission.utmbackup.service;
 
 import de.fjordkommission.utmbackup.config.BackupProperties;
+import de.fjordkommission.utmbackup.model.VmId;
 import de.fjordkommission.utmbackup.storage.BackupStorageGuard;
 import de.fjordkommission.utmbackup.storage.VmIdentityFile;
 import de.fjordkommission.utmbackup.storage.VmIdentityRegistry;
@@ -36,7 +37,7 @@ public class VmIdentityService {
     public VmIdentityService(BackupProperties backupProperties, BackupStorageGuard storageGuard) {
         this.root = backupProperties.root();
         this.storageGuard = storageGuard;
-    }
+   }
 
     /**
      * The current registry. An absent file is an empty registry. An unusable file is empty
@@ -85,5 +86,12 @@ public class VmIdentityService {
         }
 
         update(registry -> registry.observeAll(observations));
+    }
+
+    /** Make sure to return the canonical ID even for legacy VM IDs **/
+    public VmId resolveCanonicalId(VmId vmId) {
+        return current()
+                .flatMap(registry -> registry.canonicalOf(vmId))
+                .orElse(vmId);
     }
 }

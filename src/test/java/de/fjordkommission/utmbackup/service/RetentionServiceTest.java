@@ -14,6 +14,7 @@ import java.util.List;
 import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -30,6 +31,9 @@ class RetentionServiceTest {
     @Mock
     private BackupService backupService;
 
+    @Mock
+    private VmIdentityService vmIdentityService;
+
     private RetentionService retentionService;
 
     @BeforeEach
@@ -37,12 +41,15 @@ class RetentionServiceTest {
         retentionService = new RetentionService(
                 scanner,
                 backupService,
-                mock(BackupStorageGuard.class)
+                mock(BackupStorageGuard.class),
+                vmIdentityService
         );
     }
 
     @Test
     void vmBelowRetentionLimitDoesNotRequireCleanup() {
+        useIdentityPassThrough();
+
         VmId vmId = vmId("vm-1");
 
         VmOverview vm = vmOverview(
@@ -64,6 +71,8 @@ class RetentionServiceTest {
 
     @Test
     void vmAtRetentionLimitRequiresCleanup() {
+        useIdentityPassThrough();
+
         VmId vmId = vmId("vm-1");
 
         VmOverview vm = vmOverview(
@@ -86,6 +95,8 @@ class RetentionServiceTest {
 
     @Test
     void stableBackupsDoNotCountTowardsRetentionLimit() {
+        useIdentityPassThrough();
+
         VmId vmId = vmId("vm-1");
 
         VmOverview vm = vmOverview(
@@ -108,6 +119,8 @@ class RetentionServiceTest {
 
     @Test
     void onlySelectedVmsAreReportedForCleanup() {
+        useIdentityPassThrough();
+
         VmId selectedVm = vmId("vm-1");
 
         VmOverview selected = vmOverview(
@@ -135,6 +148,8 @@ class RetentionServiceTest {
 
     @Test
     void sameLocalIdInAnotherProviderIsNotAffectedByRetention() {
+        useIdentityPassThrough();
+
         // A qemu VM with the same local id must not inherit utm retention decisions.
         VmId utmVm = new VmId("utm", "ArchLinux");
         VmId qemuVm = new VmId("qemu", "ArchLinux");
@@ -333,6 +348,11 @@ class RetentionServiceTest {
                 Set.of("backup-1", "backup-2"),
                 result
         );
+    }
+
+    private void useIdentityPassThrough() {
+        when(vmIdentityService.resolveCanonicalId(any(VmId.class)))
+                .thenAnswer(invocation -> invocation.getArgument(0));
     }
 
     private static VmId vmId(String localId) {

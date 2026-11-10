@@ -86,7 +86,14 @@ class FormatTwoStateTest {
                 guard
         );
         backupService = new BackupService(scanner, repo, guard, new BackupStateWriter());
-        retentionService = new RetentionService(scanner, backupService, guard);
+        VmIdentityService vmIdentityService = mock(VmIdentityService.class);
+
+        retentionService = new RetentionService(
+                scanner,
+                backupService,
+                guard,
+                vmIdentityService
+        );
 
         write(root.resolve(BackupStorageMetadataReader.FILE_NAME), MARKER);
     }

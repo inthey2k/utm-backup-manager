@@ -81,7 +81,14 @@ class FormatTwoLifecycleTest {
                 guard
         );
         backupService = new BackupService(scanner, repo, guard, new BackupStateWriter());
-        retentionService = new RetentionService(scanner, backupService, guard);
+        VmIdentityService vmIdentityService = mock(VmIdentityService.class);
+
+        retentionService = new RetentionService(
+                scanner,
+                backupService,
+                guard,
+                vmIdentityService
+        );
     }
 
     /** Writes a supported marker, as production does once a format-2 batch exists. */

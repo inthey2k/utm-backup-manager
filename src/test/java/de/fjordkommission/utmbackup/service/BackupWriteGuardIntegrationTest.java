@@ -120,11 +120,18 @@ class BackupWriteGuardIntegrationTest {
         marker("invalid");
         BackupScanner mockedScanner = mock(BackupScanner.class);
         BackupService backupService = mock(BackupService.class);
-        RetentionService retention = new RetentionService(mockedScanner, backupService, guard);
+        VmIdentityService vmIdentityService = mock(VmIdentityService.class);
+
+        RetentionService retentionService = new RetentionService(
+                scanner,
+                backupService,
+                guard,
+                vmIdentityService
+        );
 
         List<VmId> ids = List.of(new VmId("utm", "Linux.utm"));
 
-        assertThrows(BackupStorageReadOnlyException.class, () -> retention.deleteBackupsExceedingRetention(ids));
+        assertThrows(BackupStorageReadOnlyException.class, () -> retentionService.deleteBackupsExceedingRetention(ids));
 
         verifyNoInteractions(mockedScanner, backupService);
     }

@@ -114,7 +114,15 @@ class QemuFormatTwoIntegrationTest {
 
         scanner = scannerFor(List.of(utmProvider(), qemuProvider(() -> runningProcesses)), settings);
         backupService = new BackupService(scanner, stableRepository, guard, new BackupStateWriter());
-        retentionService = new RetentionService(scanner, backupService, guard);
+
+        VmIdentityService vmIdentityService = mock(VmIdentityService.class);
+
+        retentionService = new RetentionService(
+                scanner,
+                backupService,
+                guard,
+                vmIdentityService
+        );
 
         archId = qemuIdOf(ARCH_NAME);
         freeBsdId = qemuIdOf("FreeBSD");

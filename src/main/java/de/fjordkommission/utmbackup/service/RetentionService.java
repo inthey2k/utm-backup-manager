@@ -19,15 +19,18 @@ public class RetentionService {
     private final BackupScanner scanner;
     private final BackupService backupService;
     private final BackupStorageGuard storageGuard;
+    private final VmIdentityService identityService;
 
     public RetentionService(
             BackupScanner scanner,
             BackupService backupService,
-            BackupStorageGuard storageGuard
+            BackupStorageGuard storageGuard,
+            VmIdentityService identityService
     ) {
         this.scanner = scanner;
         this.backupService = backupService;
         this.storageGuard = storageGuard;
+        this.identityService = identityService;
     }
 
     /**
@@ -43,12 +46,14 @@ public class RetentionService {
         Set<VmId> affectedVmIds = overview.vms().stream()
                 .filter(vm -> normalBackupCount(vm) >= retentionLimit)
                 .map(VmOverview::id)
+                .map(identityService::resolveCanonicalId)
                 .collect(Collectors.toSet());
 
         return selectedVms.stream()
+                .map(identityService::resolveCanonicalId)
                 .filter(affectedVmIds::contains)
-                .toList();
-    }
+                .distinct()
+                .toList();    }
 
     /**
      * Determine VMs, which would be cleaned up after the current backup job
