@@ -235,8 +235,10 @@ Deletion always remains an explicit user action.
 The application can delete an individual VM backup from a batch
 containing several VMs without deleting the other VM backups in that
 batch. Stable backups are protected from deletion. When the last VM
-backup is removed from a batch, the now-empty batch directory and its
-batch metadata are removed as well.
+backup is removed from a batch, the batch directory is removed recursively
+together with its remaining content, such as the legacy `VM Shared Folder`
+of older batches, and its batch metadata. Batches of older backups keep their
+`VM Shared Folder` while other VMs remain in the batch.
 
 ### Manual cleanup
 
