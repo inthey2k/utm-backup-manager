@@ -34,28 +34,30 @@ For a complete list of changes see published GitHub release notes:
 [Release notes for v1.4.0](https://github.com/inthey2k/utm-backup-manager/releases#release-v1.4.0)
 
 
-## 1.5.0 – Multi-provider support and QEMU integration (Released)
+## 1.5.0  Multi-provider support and QEMU integration        
+For a complete list of changes see published GitHub release notes:
+[Release notes for v1.5.0](https://github.com/inthey2k/utm-backup-manager/releases#release-v1.5.0)
 
-- Add support for multiple VM providers in one application instance
-- Add QEMU as a second built-in provider alongside UTM
-- Introduce canonical VM ids in the form `<providerId>:<localId>`
-- Key runtime status by provider-local VM id instead of display name
-- Isolate provider-specific configuration
-  - `UtmProperties` / `UtmProviderConfiguration`
-  - `QemuProperties` / `QemuProviderConfiguration`
-- Keep disabled providers from requiring their configuration
-- Preserve compatibility with historical UTM backups and legacy state
-- Add provider-aware backup layout for new providers
-- Apply the stopped-only backup safety rule globally
-  - `RUNNING` and `UNKNOWN` both block backup creation
-- Add conservative QEMU runtime-state detection based on running processes
-- Handle QEMU paths resolved through symbolic links
-- Group VMs by provider in the overview
-- Add provider-specific horizontal VM carousels with continuous navigation
-- Keep provider rows aligned even when no overflow is present
-- Keep the main page header and backup actions visible while scrolling
-- Extend the hypervisor provider integration documentation
-- Expand automated test coverage for multi-provider and QEMU behavior
+## 1.5.1  UI and provider workflow refinements              Released
+For a complete list of changes see published GitHub release notes:
+[Release notes for v1.5.1](https://github.com/inthey2k/utm-backup-manager/releases#release-v1.5.1)
+
+## 1.5.2  Stable VM identity and history migration          Released
+For a complete list of changes see published GitHub release notes:
+[Release notes for v1.5.2](https://github.com/inthey2k/utm-backup-manager/releases#release-v1.5.2)
+
+## 1.5.3  Manual cleanup and deletion reliability           Released
+For a complete list of changes see published GitHub release notes:
+[Release notes for v1.5.3](https://github.com/inthey2k/utm-backup-manager/releases#release-v1.5.3)
+
+
+## 1.5.4  Backup progress and storage safety
+       - live per-VM transfer progress
+       - free backup-root disk space
+       - selected backup size vs available space
+       - conservative preflight warning/blocking
+       - sparse-aware sizing where possible
+       - backup size/statistics groundwork
 
 ## 1.6.0 – Backup restore
 
@@ -86,10 +88,14 @@ For a complete list of changes see published GitHub release notes:
 - Verify QEMU operation on Linux
 - Extend installation and configuration documentation for Linux
 
-## Later
+## Outlook
 
 - Additional VM providers
 - Improved backup history and statistics
 - More detailed job history
 - Further automation around backup maintenance
 - Investigate platform-specific sparse file preservation during VM backup to minimize file sizes
+- OpenAPI/Swagger reintroduction, after removing it because of security vulnerabilities
+- Toolbar/UI consolidation
+- Browser auto-open upon startup of the application
+- Sparse-file preservation improvements
