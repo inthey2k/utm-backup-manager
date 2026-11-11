@@ -21,12 +21,15 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.stream.Stream;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -157,6 +160,37 @@ class LegacyBackupDeletionTest {
         assertEquals(1, backupService.deleteAll(List.of(id(BATCH_ONE, LINT))));
 
         assertFalse(Files.exists(batch));
+    }
+
+    /**
+     * macOS AppleDouble files such as {@code ._.DS_Store} can disappear while the tree is walked.
+     * The walker lists every entry first and reads its attributes later, so removing the other
+     * listed entries after the first removal makes their attribute reads fail with
+     * NoSuchFileException. That must not stop the batch cleanup.
+     */
+    @Test
+    void recursiveBatchCleanupSucceedsWhenEntriesVanishDuringTraversal() throws IOException {
+        Path batch = legacyBatch(BATCH_ONE, LINT);
+        Path shared = Files.createDirectories(batch.resolve(SHARED_FOLDER));
+        Files.writeString(shared.resolve("._.DS_Store"), "appledouble");
+        Files.writeString(shared.resolve("._notes.txt"), "appledouble");
+        Files.writeString(shared.resolve("notes.txt"), "shared");
+        List<Path> vanished = new ArrayList<>();
+
+        BackupService.deleteTree(batch, removed -> {
+            try (Stream<Path> siblings = Files.list(removed.getParent())) {
+                for (Path sibling : siblings.toList()) {
+                    if (Files.deleteIfExists(sibling)) {
+                        vanished.add(sibling);
+                    }
+                }
+            } catch (IOException e) {
+                throw new UncheckedIOException(e);
+            }
+        });
+
+        assertFalse(Files.exists(batch), "the batch is removed although its entries vanished during the walk");
+        assertEquals(2, vanished.size(), "the simulated race removed the two entries the walker had listed");
     }
 
     @Test

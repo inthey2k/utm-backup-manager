@@ -25,6 +25,7 @@ import java.util.HashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.function.Consumer;
 import java.util.function.UnaryOperator;
 
 @Service
@@ -266,6 +267,14 @@ public class BackupService {
  }
 
  private void deleteRecursively(Path path) throws IOException {
+  deleteTree(path, file -> { });
+ }
+
+ /**
+  * Removes a file tree. {@code afterFileDeleted} runs after each file is removed; it exists so
+  * tests can make entries vanish during traversal, as the file system does on NTFS mounts.
+  */
+ static void deleteTree(Path path, Consumer<Path> afterFileDeleted) throws IOException {
   Files.walkFileTree(path, new SimpleFileVisitor<>() {
 
    @Override
@@ -273,8 +282,26 @@ public class BackupService {
            Path file,
            BasicFileAttributes attributes
    ) throws IOException {
-    Files.delete(file);
+    Files.deleteIfExists(file);
+    afterFileDeleted.accept(file);
     return FileVisitResult.CONTINUE;
+   }
+
+   /**
+    * An entry listed by the walker can disappear before its attributes are read, for example a
+    * macOS AppleDouble file on an NTFS mount. Its removal is then already done. Every other
+    * failure, such as access denied, still stops the deletion.
+    */
+   @Override
+   public FileVisitResult visitFileFailed(
+           Path file,
+           IOException exception
+   ) throws IOException {
+    if (exception instanceof NoSuchFileException) {
+     return FileVisitResult.CONTINUE;
+    }
+
+    throw exception;
    }
 
    @Override
@@ -286,7 +313,7 @@ public class BackupService {
      throw exception;
     }
 
-    Files.delete(directory);
+    Files.deleteIfExists(directory);
     return FileVisitResult.CONTINUE;
    }
   });
