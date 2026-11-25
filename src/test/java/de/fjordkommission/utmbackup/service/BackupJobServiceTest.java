@@ -72,7 +72,9 @@ class BackupJobServiceTest {
                 100,
                 "Test VM",
                 1,
-                1
+                1,
+                25,
+                100
         );
 
         assertEquals(25, job.progressPercent());
@@ -126,7 +128,9 @@ class BackupJobServiceTest {
                     100,
                     "Test VM",
                     1,
-                    1
+                    1,
+                    40,
+                    100
             ));
 
             BackupJob progressJob = service.currentJob().orElseThrow();

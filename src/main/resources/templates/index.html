@@ -4,10 +4,15 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>UTM Backup Manager</title>
+    <link rel="icon" type="image/svg+xml" th:href="@{/favicon.svg}">
     <link rel="stylesheet" th:href="@{/css/backup-manager.css(v=${applicationVersion})}">
 </head>
 
-<body>
+<!-- The labels of the browser tab title. Script changes the title according to the job state. -->
+<body th:attr="data-title-app='UTM Backup Manager',
+               data-title-backup=#{tab.title.backup},
+               data-title-deletion=#{tab.title.deletion},
+               data-title-done=#{tab.title.done}">
 
 <main>
 
@@ -277,6 +282,7 @@
             <span class="progress-percent-block">
                 <span id="backup-progress-percent-inline">0</span>%</span>
                 <span th:text="#{backup.progress.copied}">copied</span>
+                <span class="progress-bytes" id="backup-progress-bytes"></span>
             </span>
             <span class="separator">-</span>
             <span class="progress-time">
@@ -404,6 +410,19 @@
                           th:title="${vm.status().name()}"
                           th:aria-label="${vm.status().name()}">
                     </span>
+                    <!-- Icon: the provider's image when it has one, otherwise a coloured circle with initials -->
+                    <img class="vm-icon"
+                         th:if="${vm.icon().custom()}"
+                         th:src="@{/vm/{id}/icon(id=${vm.id()})}"
+                         alt=""
+                         width="22"
+                         height="22">
+                    <span class="vm-icon vm-icon-fallback"
+                          th:unless="${vm.icon().custom()}"
+                          th:classappend="'vm-icon-color-' + ${vm.icon().colorIndex()}"
+                          th:text="${vm.icon().initials()}"
+                          aria-hidden="true">
+                    </span>
                     <strong th:text="${vm.name()}"></strong>
                     <span class="provider-badge"
                           th:text="${vm.providerBadge()}"
@@ -428,6 +447,14 @@
                         ? ' exceeded'
                         : ''">
                     <span th:text="#{backup.normal}">Normal</span>:<b th:text="${vm.normalCount()}"></b>/<span th:text="${overview.retentionLimit()}"></span>
+                </span>
+
+                <!-- Size of the local VM, shown when it can be read -->
+                <span class="vm-size" th:if="${vm.local()}">
+                    <span th:text="#{vm.size}">VM size</span>:
+                    <b th:text="${vm.localSizeBytes() != null
+                        ? @byteSizeFormatter.gigabytes(vm.localSizeBytes())
+                        : '–'}"></b>
                 </span>
 
                 <div class="vm-change-status"
@@ -525,6 +552,15 @@
                             'dd.MM.yyyy HH:mm:ss'
                             )}">
                         </strong>
+                    </div>
+
+                    <!-- Size of the backup -->
+                    <div class="backup-size"
+                         th:title="#{backup.size}">
+                        <span th:text="#{backup.size}">Size</span>:
+                        <b th:text="${backup.sizeBytes() != null
+                            ? @byteSizeFormatter.gigabytes(backup.sizeBytes())
+                            : '–'}"></b>
                     </div>
 
                     <!-- Action menu -->
@@ -758,11 +794,11 @@
             These values show the currently effective configuration.
         </p>
 
-        <dl class="configuration-list">
-            <th:block th:each="provider : ${configuration.providers()}">
-                <dt th:text="#{config.provider}">VM provider</dt>
-                <dd th:text="${provider.providerName()}"></dd>
-
+        <!-- One section per VM provider, headed by the provider name -->
+        <section class="configuration-section"
+                 th:each="provider : ${configuration.providers()}">
+            <h3 class="configuration-section-title" th:text="${provider.providerName()}">UTM</h3>
+            <dl class="configuration-list">
                 <dt th:text="#{config.providerId}">Provider ID</dt>
                 <dd><code th:text="${provider.providerId()}"></code></dd>
 
@@ -774,20 +810,26 @@
                         <code th:text="${entry.value()}"></code>
                     </dd>
                 </th:block>
-            </th:block>
+            </dl>
+        </section>
 
-            <dt th:text="#{config.backupRoot.label}">Backup directory</dt>
-            <dd><code th:text="${configuration.backupRoot()}"></code></dd>
+        <!-- Settings that apply to every provider -->
+        <section class="configuration-section">
+            <h3 class="configuration-section-title" th:text="#{config.section.global}">Global settings</h3>
+            <dl class="configuration-list">
+                <dt th:text="#{config.backupRoot.label}">Backup directory</dt>
+                <dd><code th:text="${configuration.backupRoot()}"></code></dd>
 
-            <dt th:text="#{config.metadataDb}">Metadata database</dt>
-            <dd><code th:text="${configuration.metadataDb()}"></code></dd>
+                <dt th:text="#{config.metadataDb}">Metadata database</dt>
+                <dd><code th:text="${configuration.metadataDb()}"></code></dd>
 
-            <dt th:text="#{config.legacyStateFile}">Legacy state file</dt>
-            <dd><code th:text="${configuration.legacyStateFile()}"></code></dd>
+                <dt th:text="#{config.legacyStateFile}">Legacy state file</dt>
+                <dd><code th:text="${configuration.legacyStateFile()}"></code></dd>
 
-            <dt th:text="#{config.retentionLimit}">Retention limit</dt>
-            <dd th:text="${configuration.retentionLimit()}"></dd>
-        </dl>
+                <dt th:text="#{config.retentionLimit}">Retention limit</dt>
+                <dd th:text="${configuration.retentionLimit()}"></dd>
+            </dl>
+        </section>
     </dialog>
     <!-- Dialog to select VMs to back up -->
     <dialog class="backup-dialog"
@@ -1012,7 +1054,8 @@
                     form="retention-cleanup-form"
                     class="confirm-delete"
                     id="cleanup-confirm"
-                    th:text="#{cleanup.dialog.confirm}">
+                    th:text="#{cleanup.dialog.confirm}"
+                    th:attr="data-submitting-label=#{cleanup.dialog.submitting}">
                 Delete permanently
             </button>
         </div>
@@ -1056,13 +1099,15 @@
                     form="bulk-delete-form"
                     class="confirm-delete"
                     id="bulk-delete-confirm"
-                    th:text="#{selection.dialog.confirm}">
+                    th:text="#{selection.dialog.confirm}"
+                    th:attr="data-submitting-label=#{selection.dialog.submitting}">
                 Delete permanently
             </button>
         </div>
     </dialog>
 </main>
 
+<script th:src="@{/js/tab-title.js(v=${applicationVersion})}" defer></script>
 <script th:src="@{/js/backup-manager.js(v=${applicationVersion})}" defer></script>
 <div class="application-version-corner">
     UTM Backup Manager v<span th:text="${applicationVersion}">x.x.x</span>

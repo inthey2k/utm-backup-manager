@@ -169,7 +169,8 @@ code { overflow-wrap: anywhere; }
 
 .header-menu {
     position: absolute;
-    z-index: 20;
+    /* Above the sticky page header (z-index 30), which would otherwise cover the menu. */
+    z-index: 40;
     top: 64px;
     right: 20px;
     width: 280px;
@@ -284,6 +285,33 @@ code { overflow-wrap: anywhere; }
     grid-template-columns: 160px minmax(0, 1fr);
     gap: 10px 16px;
     margin: 0;
+}
+
+.configuration-section + .configuration-section {
+    margin-top: 18px;
+    padding-top: 14px;
+    border-top: 1px solid var(--border);
+}
+
+.configuration-section-title {
+    margin: 0 0 10px;
+    color: var(--muted);
+    font-size: .75rem;
+    font-weight: 600;
+    letter-spacing: .06em;
+    text-transform: uppercase;
+}
+
+.progress-bytes {
+    margin-left: .3em;
+    color: var(--muted);
+}
+
+.backup-progress-vm-size {
+    margin-left: 6px;
+    color: var(--muted);
+    font-size: .75rem;
+    white-space: nowrap;
 }
 
 .configuration-list dt,
@@ -776,21 +804,21 @@ code { overflow-wrap: anywhere; }
 }
 
 .vm-column .vm-header {
-    height: 130px;
+    min-height: 130px;
     padding: 12px 10px;
     border-bottom: 1px solid var(--border);
 }
 
 .vm-name {
     display: grid;
-    grid-template-columns: 9px auto auto;
+    grid-template-columns: 9px 22px auto auto;
     align-items: center;
     column-gap: 7px;
     margin-bottom: 3px;
 }
 
 .vm-name .provider-badge {
-    grid-column: 3;
+    grid-column: 4;
     justify-self: start;
     align-self: flex-start;
 }
@@ -802,7 +830,7 @@ code { overflow-wrap: anywhere; }
 }
 
 .vm-name > strong {
-    grid-column: 2;
+    grid-column: 3;
     color: var(--text);
     font-size: .9rem;
     text-align: center;
@@ -819,6 +847,35 @@ code { overflow-wrap: anywhere; }
     color: var(--text);
     font-weight: 600;
 }
+
+/* VM icon: a provider image, or a coloured circle with initials. Both have the same size. */
+.vm-icon {
+    grid-column: 2;
+    box-sizing: border-box;
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    object-fit: cover;
+    justify-self: center;
+}
+
+.vm-icon-fallback {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: .58rem;
+    font-weight: 700;
+    letter-spacing: .02em;
+    line-height: 1;
+    color: var(--bg);
+}
+
+.vm-icon-color-0 { background: var(--accent); }
+.vm-icon-color-1 { background: var(--success); }
+.vm-icon-color-2 { background: var(--stable); }
+.vm-icon-color-3 { background: var(--danger); }
+.vm-icon-color-4 { background: #c4b5fd; }
+.vm-icon-color-5 { background: #5eead4; }
 
 .vm-header .normal-count.exceeded,
 .vm-header .normal-count.exceeded b {
@@ -909,6 +966,17 @@ code { overflow-wrap: anywhere; }
 .backup-date {
     margin: 10px 0 6px;
     font-size: .85rem;
+}
+
+.backup-size {
+    margin: 0 0 6px;
+    color: var(--muted);
+    font-size: .72rem;
+}
+
+.backup-size b {
+    color: var(--text);
+    font-weight: 600;
 }
 
 .no-backups {

@@ -151,7 +151,9 @@ public class CreateBackupService {
             Path vmDirectory = incompleteDirectory.resolve("VMs");
             Files.createDirectories(vmDirectory);
 
-            long totalBytes = determineTotalBytes(vms);
+            // One measurement of every source gives the total and the per-VM totals.
+            long[] vmBytes = determineVmBytes(vms);
+            long totalBytes = sumExact(vmBytes);
 
             ProgressTracker progress = new ProgressTracker(
                     progressListener,
@@ -163,7 +165,7 @@ public class CreateBackupService {
                 checkCancelled(cancellationCheck);
 
                 ManagedVm vm = vms.get(vmIndex);
-                progress.startVm(vm.name(), vmIndex + 1);
+                progress.startVm(vm.name(), vmIndex + 1, vmBytes[vmIndex]);
 
                 // One container per VM: its sources are copied inside it, under their own names.
                 Path container = vmDirectory.resolve(containers.get(vm.id()));
@@ -288,16 +290,27 @@ public class CreateBackupService {
         }
     }
 
-    private long determineTotalBytes(List<ManagedVm> vms) throws IOException {
-        long totalBytes = 0;
+    /** The bytes of each VM, in the order of the given VMs. */
+    private long[] determineVmBytes(List<ManagedVm> vms) throws IOException {
+        long[] vmBytes = new long[vms.size()];
 
-        for (ManagedVm vm : vms) {
-            for (Path source : vm.localVm().backupSources()) {
-                totalBytes = Math.addExact(totalBytes, sizeOf(source));
+        for (int vmIndex = 0; vmIndex < vms.size(); vmIndex++) {
+            for (Path source : vms.get(vmIndex).localVm().backupSources()) {
+                vmBytes[vmIndex] = Math.addExact(vmBytes[vmIndex], sizeOf(source));
             }
         }
 
-        return totalBytes;
+        return vmBytes;
+    }
+
+    private static long sumExact(long[] values) {
+        long total = 0;
+
+        for (long value : values) {
+            total = Math.addExact(total, value);
+        }
+
+        return total;
     }
 
     private long sizeOf(Path source) throws IOException {
@@ -597,12 +610,18 @@ public class CreateBackupService {
         void onProgress(Progress progress);
     }
 
+    /**
+     * A snapshot of the copy progress. The values of the current VM are the same measurement
+     * as the job totals, so the per-VM figures add up to the job figures.
+     */
     public record Progress(
             long copiedBytes,
             long totalBytes,
             String currentVmName,
             int currentVmNumber,
-            int vmCount
+            int vmCount,
+            long currentVmCopiedBytes,
+            long currentVmTotalBytes
     ) {
     }
 
@@ -615,6 +634,8 @@ public class CreateBackupService {
         private long copiedBytes;
         private String currentVmName;
         private int currentVmNumber;
+        private long currentVmCopiedBytes;
+        private long currentVmTotalBytes;
 
         private ProgressTracker(
                 ProgressListener listener,
@@ -626,14 +647,17 @@ public class CreateBackupService {
             this.vmCount = vmCount;
         }
 
-        private void startVm(String vmName, int vmNumber) {
+        private void startVm(String vmName, int vmNumber, long vmTotalBytes) {
             currentVmName = vmName;
             currentVmNumber = vmNumber;
+            currentVmCopiedBytes = 0;
+            currentVmTotalBytes = vmTotalBytes;
             publish();
         }
 
         private void addCopiedBytes(long bytes) {
             copiedBytes += bytes;
+            currentVmCopiedBytes += bytes;
             publish();
         }
 
@@ -643,7 +667,9 @@ public class CreateBackupService {
                     totalBytes,
                     currentVmName,
                     currentVmNumber,
-                    vmCount
+                    vmCount,
+                    currentVmCopiedBytes,
+                    currentVmTotalBytes
             ));
         }
     }

@@ -18,7 +18,9 @@ public record BackupJob(
         long totalBytes,
         String currentVmName,
         int currentVmNumber,
-        int vmCount
+        int vmCount,
+        long currentVmCopiedBytes,
+        long currentVmTotalBytes
 ) {
     /**
      * Calculates the progress from the byte counters so stored state cannot diverge.

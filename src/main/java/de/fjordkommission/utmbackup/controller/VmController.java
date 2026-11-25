@@ -4,9 +4,18 @@ import de.fjordkommission.utmbackup.model.ManagedVm;
 import de.fjordkommission.utmbackup.model.VmId;
 import de.fjordkommission.utmbackup.service.VmInventory;
 import de.fjordkommission.utmbackup.service.VmSizeService;
+import org.springframework.core.io.FileSystemResource;
+import org.springframework.core.io.Resource;
+import org.springframework.http.CacheControl;
+import org.springframework.http.MediaType;
+import org.springframework.http.MediaTypeFactory;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RestController;
+
+import java.nio.file.Path;
+import java.util.Optional;
 
 @RestController
 public class VmController {
@@ -38,6 +47,34 @@ public class VmController {
                 vm.id().toString(),
                 vmSizeService.sizeOf(vm.localVm())
         );
+    }
+
+    /**
+     * Returns the custom icon image of a VM addressed by its canonical id. The file is the one
+     * the provider configured, so the request never supplies a path. A VM without a custom icon,
+     * or whose file is not an image, answers 404 and the page shows the fallback icon.
+     */
+    @GetMapping("/vm/{vmId}/icon")
+    ResponseEntity<Resource> vmIcon(@PathVariable String vmId) {
+        Optional<Path> icon = VmId.tryParse(vmId)
+                .flatMap(vmInventory.build()::find)
+                .flatMap(vmInventory::customIconFile);
+
+        if (icon.isEmpty()) {
+            return ResponseEntity.notFound().build();
+        }
+
+        Optional<MediaType> mediaType = MediaTypeFactory.getMediaType(icon.get().getFileName().toString())
+                .filter(type -> "image".equals(type.getType()));
+
+        if (mediaType.isEmpty()) {
+            return ResponseEntity.notFound().build();
+        }
+
+        return ResponseEntity.ok()
+                .contentType(mediaType.get())
+                .cacheControl(CacheControl.noCache())
+                .body(new FileSystemResource(icon.get()));
     }
 
     record VmSizeResponse(

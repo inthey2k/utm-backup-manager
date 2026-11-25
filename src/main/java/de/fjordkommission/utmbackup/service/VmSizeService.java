@@ -7,6 +7,7 @@ import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.OptionalLong;
 
 @Service
 public class VmSizeService {
@@ -35,6 +36,29 @@ public class VmSizeService {
                     "Could not determine size of VM: " + vm.id(),
                     e
             );
+        }
+    }
+
+    /**
+     * Returns the size of a VM, or empty when a backup source cannot be read. The overview
+     * uses this, so one unreadable VM does not break the page.
+     */
+    public OptionalLong sizeIfReadable(LocalVm vm) {
+        try {
+            return OptionalLong.of(sizeOf(vm));
+        } catch (UncheckedIOException e) {
+            return OptionalLong.empty();
+        }
+    }
+
+    /**
+     * Returns the total size of a file or a directory tree, or empty when it cannot be read.
+     */
+    public OptionalLong sizeOfTreeIfReadable(Path path) {
+        try {
+            return OptionalLong.of(sizeOf(path));
+        } catch (IOException | UncheckedIOException e) {
+            return OptionalLong.empty();
         }
     }
 

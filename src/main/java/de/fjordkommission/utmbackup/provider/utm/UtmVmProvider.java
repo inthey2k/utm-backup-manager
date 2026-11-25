@@ -89,6 +89,19 @@ public class UtmVmProvider implements VmProvider {
         return STABLE_IDENTITY;
     }
 
+    /**
+     * The custom icon stored in the {@code .utm} package, when UTM has one configured. The
+     * package is the only backup source of a UTM VM.
+     */
+    @Override
+    public Optional<Path> customIconFile(LocalVm vm) {
+        if (vm.backupSources().isEmpty()) {
+            return Optional.empty();
+        }
+
+        return UtmPackageIdentity.readCustomIcon(vm.backupSources().getFirst());
+    }
+
     @Override
     public List<LocalVm> findAll() {
         if (!Files.isDirectory(vmDirectory)) {

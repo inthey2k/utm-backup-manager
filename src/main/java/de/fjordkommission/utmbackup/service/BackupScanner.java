@@ -53,6 +53,8 @@ public class BackupScanner {
     private final VmChangeStatusService vmChangeStatusService;
     private final BackupStorageGuard storageGuard;
     private final VmIdentityService identities;
+    private final BackupSizeCache backupSizes;
+    private final VmSizeService vmSizeService;
     private final BackupManifestReader manifestReader = new BackupManifestReader();
     private final BackupStateReader stateReader = new BackupStateReader();
 
@@ -69,7 +71,6 @@ public class BackupScanner {
                 new VmIdentityService(backupProperties, storageGuard));
     }
 
-    @Autowired
     public BackupScanner(
             BackupProperties backupProperties,
             StableRepository repo,
@@ -79,6 +80,21 @@ public class BackupScanner {
             BackupStorageGuard storageGuard,
             VmIdentityService identities
     ) {
+        this(backupProperties, repo, settings, vmInventory, vmChangeStatusService, storageGuard,
+                identities, new VmSizeService());
+    }
+
+    @Autowired
+    public BackupScanner(
+            BackupProperties backupProperties,
+            StableRepository repo,
+            SettingsRepository settings,
+            VmInventory vmInventory,
+            VmChangeStatusService vmChangeStatusService,
+            BackupStorageGuard storageGuard,
+            VmIdentityService identities,
+            VmSizeService vmSizeService
+    ) {
         this.root = backupProperties.root();
         this.repo = repo;
         this.settings = settings;
@@ -86,6 +102,8 @@ public class BackupScanner {
         this.vmChangeStatusService = vmChangeStatusService;
         this.storageGuard = storageGuard;
         this.identities = identities;
+        this.vmSizeService = vmSizeService;
+        this.backupSizes = new BackupSizeCache(vmSizeService);
     }
     public Path root() {
         return root;
@@ -124,8 +142,7 @@ public class BackupScanner {
         inventory.vms().forEach(vm -> localVmsById.put(vm.id(), vm));
 
         // Include backup-only VMs so historical backups remain manageable.
-        Set<VmId> vmIds = new TreeSet<>(overviewOrder(inventory));
-        vmIds.addAll(localVmsById.keySet());
+        Set<VmId> vmIds = new HashSet<>(localVmsById.keySet());
         vmIds.addAll(backupsByVm.keySet());
 
         Set<VmId> retentionExceeded = new HashSet<>();
@@ -188,10 +205,25 @@ public class BackupScanner {
                             localVm != null ? localVm.localVm() : null,
                             List.copyOf(backups),
                             status,
-                            changeStatus
+                            changeStatus,
+                            localVm != null ? localSize(localVm) : null,
+                            localVm != null ? icon(localVm, vmName) : VmIcon.fallback(vmName)
                     )
             );
         }
+
+        // Presentation order: provider order, then display name. The ids never decide it.
+        vms.sort(VmOverviewOrder.forProviders(
+                inventory.providers().stream().map(ProviderSnapshot::providerId).toList()
+        ));
+
+        // Sizes of backups that no longer exist are dropped, so the cache cannot grow without bound.
+        backupSizes.retainOnly(
+                backupsByVm.values().stream()
+                        .flatMap(List::stream)
+                        .map(VmBackup::vmPath)
+                        .toList()
+        );
 
         return new BackupOverview(
                 List.copyOf(vms),
@@ -213,6 +245,25 @@ public class BackupScanner {
                 .flatMap(vm -> vm.backups().stream())
                 .filter(backup -> backup.id().equals(id))
                 .findFirst();
+    }
+
+    /** The size of a local VM, or null when a backup source cannot be read. */
+    private Long localSize(ManagedVm localVm) {
+        OptionalLong size = vmSizeService.sizeIfReadable(localVm.localVm());
+        return size.isPresent() ? size.getAsLong() : null;
+    }
+
+    /** The provider's custom icon when it has one, otherwise the generated fallback. */
+    private VmIcon icon(ManagedVm localVm, String displayName) {
+        return vmInventory.customIconFile(localVm).isPresent()
+                ? VmIcon.customImage()
+                : VmIcon.fallback(displayName);
+    }
+
+    /** The size of a backup directory, or null when it cannot be read. */
+    private Long backupSize(Path directory) {
+        OptionalLong size = backupSizes.sizeOf(directory);
+        return size.isPresent() ? size.getAsLong() : null;
     }
 
     /**
@@ -247,25 +298,6 @@ public class BackupScanner {
         }
 
         return newestFirst.isEmpty() ? vmId.localId() : newestFirst.getFirst().vmName();
-    }
-
-    /**
-     * Orders VMs by provider in configured order, then by name. Unknown providers
-     * come last, ordered by id.
-     */
-    private static Comparator<VmId> overviewOrder(VmInventory.Inventory inventory) {
-        List<String> providerOrder = inventory.providers().stream()
-                .map(ProviderSnapshot::providerId)
-                .toList();
-
-        return Comparator
-                .comparingInt((VmId id) -> {
-                    int rank = providerOrder.indexOf(id.providerId());
-                    return rank < 0 ? Integer.MAX_VALUE : rank;
-                })
-                .thenComparing(VmId::providerId)
-                .thenComparing(VmId::localId, String.CASE_INSENSITIVE_ORDER)
-                .thenComparing(VmId::localId);
     }
 
     /**
@@ -378,7 +410,8 @@ public class BackupScanner {
                                 backupTime,
                                 comment,
                                 stable,
-                                note
+                                note,
+                                backupSize(path)
                         );
 
                         VmId owner = attribution.attribute(
@@ -480,7 +513,8 @@ public class BackupScanner {
                 backupTime,
                 comment,
                 state.stable(),
-                state.note().isEmpty() ? null : state.note()
+                state.note().isEmpty() ? null : state.note(),
+                backupSize(container)
         );
 
         VmId owner = attribution.attribute(

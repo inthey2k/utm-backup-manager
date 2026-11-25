@@ -7,6 +7,7 @@ import de.fjordkommission.utmbackup.model.LocalVm;
 import de.fjordkommission.utmbackup.model.ProviderSnapshot;
 import de.fjordkommission.utmbackup.model.VmBackup;
 import de.fjordkommission.utmbackup.model.VmChangeStatus;
+import de.fjordkommission.utmbackup.model.VmIcon;
 import de.fjordkommission.utmbackup.model.VmId;
 import de.fjordkommission.utmbackup.model.VmOverview;
 import de.fjordkommission.utmbackup.model.VmStatus;
@@ -280,6 +281,121 @@ class BackupOverviewPageTest extends AbstractIntegrationTest {
         assertThat(html, containsString(">BATCH ISSUE</div>"));
     }
 
+    @Test
+    void backupCardsShowTheSizeOfEachBackup() throws Exception {
+        VmBackup large = backupWithSize(UTM_VM, 117_000_000_000L);
+        VmBackup small = new VmBackup(
+                "small-" + UTM_VM.localId(), BATCH, UTM_NAME, Path.of("VMs", "small"),
+                LocalDateTime.of(2026, 10, 19, 12, 0), "", false, null, 1_200_000_000L);
+        VmBackup unknown = new VmBackup(
+                "unknown-" + UTM_VM.localId(), BATCH, UTM_NAME, Path.of("VMs", "unknown"),
+                LocalDateTime.of(2026, 10, 18, 12, 0), "", false, null, null);
+
+        stubOverview(
+                List.of(localVm(UTM_VM, UTM_NAME, VmStatus.STOPPED, large, small, unknown)),
+                List.of(healthy(UTM, "UTM")),
+                List.of()
+        );
+
+        String html = render();
+
+        assertThat(html, containsString("<b>117 GB</b>"));
+        assertThat(html, containsString("<b>1.2 GB</b>"));
+        // A backup whose size cannot be read shows a placeholder instead of a wrong number.
+        assertThat(html, containsString("<b>–</b>"));
+    }
+
+    @Test
+    void vmHeaderShowsTheSizeOfTheLocalVmOnly() throws Exception {
+        VmOverview local = localVmWithSize(UTM_VM, UTM_NAME, 48_000_000_000L);
+        VmOverview backupOnly = backupOnlyVm(RELIC_VM);
+
+        stubOverview(List.of(local, backupOnly), List.of(healthy(UTM, "UTM")), List.of());
+
+        String html = render();
+
+        assertThat(html, containsString("<b>48 GB</b>"));
+        // Backup-only VMs have no local size, so the header line is not rendered for them.
+        assertThat(html, containsString("class=\"vm-size\""));
+        assertThat(html.split("class=\"vm-size\"", -1).length - 1, org.hamcrest.Matchers.is(1));
+    }
+
+    @Test
+    void vmWithoutCustomIconShowsInitialsOfItsDisplayName() throws Exception {
+        VmOverview vm = localVm(UTM_VM, "Windows11 26H2", VmStatus.STOPPED);
+        int color = VmIcon.fallback("Windows11 26H2").colorIndex();
+
+        stubOverview(List.of(vm), List.of(healthy(UTM, "UTM")), List.of());
+
+        String html = render();
+
+        assertThat(html, containsString(
+                "class=\"vm-icon vm-icon-fallback vm-icon-color-" + color + "\""));
+        assertThat(html, containsString(">W2</span>"));
+    }
+
+    @Test
+    void vmWithCustomIconReferencesTheIconOfItsCanonicalId() throws Exception {
+        VmOverview vm = new VmOverview(
+                UTM_VM,
+                VmId.providerBadge(UTM),
+                UTM_NAME,
+                new LocalVm(UTM_VM.localId(), UTM_NAME, List.of()),
+                List.of(),
+                VmStatus.STOPPED,
+                VmChangeStatus.UNKNOWN,
+                null,
+                VmIcon.customImage()
+        );
+
+        stubOverview(List.of(vm), List.of(healthy(UTM, "UTM")), List.of());
+
+        String html = render();
+
+        assertThat(html, containsString("src=\"/vm/utm:Linux.utm/icon\""));
+        assertThat(html, not(containsString("vm-icon-fallback")));
+    }
+
+    @Test
+    void configurationDialogGroupsSettingsUnderProviderHeadings() throws Exception {
+        stubOverview(List.of(), List.of(healthy(UTM, "UTM")), List.of());
+
+        String html = render();
+
+        assertThat(html, containsString("class=\"configuration-section-title\""));
+        assertThat(html, containsString(">UTM (test)</h3>"));
+        assertThat(html, containsString(">Global settings</h3>"));
+        // The provider name is the heading, so the redundant provider row is gone.
+        assertThat(html, not(containsString(">VM provider</dt>")));
+    }
+
+    @Test
+    void deletionConfirmButtonsCarryTheirSubmittingLabel() throws Exception {
+        stubOverview(List.of(), List.of(healthy(UTM, "UTM")), List.of());
+
+        String html = render();
+
+        assertThat(tagContaining(html, "<button", "id=\"cleanup-confirm\""),
+                containsString("data-submitting-label=\"Deleting...\""));
+        assertThat(tagContaining(html, "<button", "id=\"bulk-delete-confirm\""),
+                containsString("data-submitting-label=\"Deleting...\""));
+    }
+
+    @Test
+    void pageProvidesTabTitleLabelsAndFavicon() throws Exception {
+        stubOverview(List.of(), List.of(healthy(UTM, "UTM")), List.of());
+
+        String html = render();
+
+        assertThat(html, containsString("href=\"/favicon.svg\""));
+        assertThat(tagContaining(html, "<body", "data-title-app"),
+                containsString("data-title-backup=\"Backup running\""));
+        assertThat(tagContaining(html, "<body", "data-title-app"),
+                containsString("data-title-deletion=\"Deletion running\""));
+        assertThat(tagContaining(html, "<body", "data-title-app"),
+                containsString("data-title-done=\"Done\""));
+    }
+
     private String render() throws Exception {
         return mockMvc.perform(get("/").param("lang", "en"))
                 .andExpect(status().isOk())
@@ -327,6 +443,34 @@ class BackupOverviewPageTest extends AbstractIntegrationTest {
                 List.of(backup(id)),
                 VmStatus.UNKNOWN,
                 VmChangeStatus.UNKNOWN
+        );
+    }
+
+    private static VmOverview localVmWithSize(VmId id, String name, long sizeBytes) {
+        return new VmOverview(
+                id,
+                VmId.providerBadge(id.providerId()),
+                name,
+                new LocalVm(id.localId(), name, List.of()),
+                List.of(),
+                VmStatus.STOPPED,
+                VmChangeStatus.UNKNOWN,
+                sizeBytes,
+                VmIcon.fallback(name)
+        );
+    }
+
+    private static VmBackup backupWithSize(VmId id, long sizeBytes) {
+        return new VmBackup(
+                "sized-" + id.localId(),
+                BATCH,
+                id.localId(),
+                Path.of("VMs", id.localId()),
+                LocalDateTime.of(2026, 10, 20, 12, 0),
+                "Integration backup",
+                false,
+                null,
+                sizeBytes
         );
     }
 

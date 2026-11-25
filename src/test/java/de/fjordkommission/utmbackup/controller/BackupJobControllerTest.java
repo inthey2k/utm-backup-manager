@@ -31,7 +31,9 @@ class BackupJobControllerTest {
                 100,
                 null,
                 0,
-                2
+                2,
+                0,
+                0
         );
 
         when(backupJobService.currentJob())

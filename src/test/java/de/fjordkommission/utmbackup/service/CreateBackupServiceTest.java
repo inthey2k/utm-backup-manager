@@ -576,6 +576,57 @@ class CreateBackupServiceTest {
         assertFalse(Files.exists(staleIncomplete));
     }
 
+    @Test
+    void progressReportsTheBytesOfTheCurrentVmFromTheSameMeasurementAsTheJobTotals() throws Exception {
+        Path first = tempDirectory.resolve("first/One.utm");
+        Files.createDirectories(first.resolve("Data"));
+        Files.writeString(first.resolve("config.plist"), "0123456789");            // 10 bytes
+        Files.writeString(first.resolve("Data/disk.img"), "01234567890123456789"); // 20 bytes
+
+        Path second = tempDirectory.resolve("second/Two.utm");
+        Files.createDirectories(second);
+        Files.writeString(second.resolve("config.plist"), "01234");                // 5 bytes
+
+        Path backupRoot = tempDirectory.resolve("backups");
+        Files.createDirectories(backupRoot);
+
+        List<ManagedVm> vms = List.of(
+                stoppedUtm(new LocalVm("vm-one", "One", List.of(first))),
+                stoppedUtm(new LocalVm("vm-two", "Two", List.of(second)))
+        );
+
+        List<CreateBackupService.Progress> events = new ArrayList<>();
+
+        createService(backupRoot).create(vms, "", events::add);
+
+        // Start of the first VM: nothing of it is copied yet, and the job total is the sum.
+        CreateBackupService.Progress firstStart = events.getFirst();
+        assertEquals(1, firstStart.currentVmNumber());
+        assertEquals(0, firstStart.currentVmCopiedBytes());
+        assertEquals(30, firstStart.currentVmTotalBytes());
+        assertEquals(35, firstStart.totalBytes());
+
+        // Start of the second VM: the first VM is complete in the job total, and the second starts at zero.
+        CreateBackupService.Progress secondStart = events.stream()
+                .filter(event -> event.currentVmNumber() == 2)
+                .findFirst()
+                .orElseThrow();
+        assertEquals(0, secondStart.currentVmCopiedBytes());
+        assertEquals(5, secondStart.currentVmTotalBytes());
+        assertEquals(30, secondStart.copiedBytes());
+
+        // The last event: every byte is copied, and the per-VM figures match the job figures.
+        CreateBackupService.Progress last = events.getLast();
+        assertEquals(35, last.copiedBytes());
+        assertEquals(35, last.totalBytes());
+        assertEquals(5, last.currentVmCopiedBytes());
+        assertEquals(5, last.currentVmTotalBytes());
+
+        // Per VM, the copied bytes never exceed the VM's own total.
+        events.forEach(event ->
+                assertTrue(event.currentVmCopiedBytes() <= event.currentVmTotalBytes()));
+    }
+
     private CreateBackupService createService(Path backupRoot) {
         BackupProperties properties = new BackupProperties(
                 backupRoot,

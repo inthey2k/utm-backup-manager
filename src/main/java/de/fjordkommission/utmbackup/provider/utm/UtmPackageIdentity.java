@@ -38,6 +38,12 @@ public final class UtmPackageIdentity {
     /** UTM keeps the VM identity in the {@code Information} dictionary of the root. */
     static final String INFORMATION_KEY = "Information";
     static final String UUID_KEY = "UUID";
+    static final String ICON_KEY = "Icon";
+    static final String ICON_CUSTOM_KEY = "IconCustom";
+    static final String DEFAULT_ICON_FILE = "icon.png";
+
+    /** A custom icon is a small image. Larger files are ignored rather than served. */
+    private static final long MAX_ICON_BYTES = 2L * 1024 * 1024;
 
     /** Larger files are not configuration files, so they are not parsed. */
     private static final long MAX_CONFIG_BYTES = 4L * 1024 * 1024;
@@ -92,6 +98,68 @@ public final class UtmPackageIdentity {
     }
 
     /**
+     * Returns the custom icon image of a {@code .utm} package. UTM stores a custom icon in the
+     * package and sets {@code IconCustom} in the {@code Information} dictionary. The file name
+     * comes from {@code Icon} when that is a plain image name, and otherwise {@code icon.png}
+     * is used. Built-in icons, which are named but not stored in the package, yield empty, and
+     * so does a file that is missing, unreadable, too large or not a supported image.
+     */
+    public static Optional<Path> readCustomIcon(Path packageDirectory) {
+        Path config = packageDirectory.resolve(CONFIG_FILE);
+
+        if (!Files.isRegularFile(config)) {
+            return Optional.empty();
+        }
+
+        try {
+            if (Files.size(config) > MAX_CONFIG_BYTES) {
+                return Optional.empty();
+            }
+
+            if (!booleanAt(config, INFORMATION_KEY, ICON_CUSTOM_KEY).orElse(false)) {
+                return Optional.empty();
+            }
+
+            String configured = stringAt(config, INFORMATION_KEY, ICON_KEY)
+                    .map(String::trim)
+                    .orElse("");
+
+            String fileName = isPlainImageName(configured) ? configured : DEFAULT_ICON_FILE;
+            Path icon = packageDirectory.resolve(fileName);
+
+            if (!Files.isRegularFile(icon)
+                    || Files.size(icon) > MAX_ICON_BYTES
+                    || !isSupportedImage(fileName)) {
+                return Optional.empty();
+            }
+
+            return Optional.of(icon);
+        } catch (IOException | RuntimeException e) {
+            return Optional.empty();
+        }
+    }
+
+    /** A file name without a path separator or a parent reference, with a supported image suffix. */
+    private static boolean isPlainImageName(String name) {
+        return !name.isEmpty()
+                && !name.contains("/")
+                && !name.contains("\\")
+                && !name.equals("..")
+                && !name.equals(".")
+                && isSupportedImage(name);
+    }
+
+    /** The image types that the overview can show. */
+    private static boolean isSupportedImage(String fileName) {
+        String lower = fileName.toLowerCase(Locale.ROOT);
+        return lower.endsWith(".png")
+                || lower.endsWith(".jpg")
+                || lower.endsWith(".jpeg")
+                || lower.endsWith(".gif")
+                || lower.endsWith(".webp");
+    }
+
+    /**
      * Returns the UUID of the package(s) inside a backup container. A container without a
      * readable UUID, or with packages that disagree, yields empty so that the historical
      * identity cannot be guessed.
@@ -125,6 +193,28 @@ public final class UtmPackageIdentity {
      * string. Any other shape yields empty.
      */
     private static Optional<String> stringAt(Path config, String... keyPath) throws IOException {
+        return valueAt(config, keyPath)
+                .filter(value -> "string".equals(value.getTagName()))
+                .map(Element::getTextContent);
+    }
+
+    /**
+     * Returns the boolean at a key path below the root dictionary, that is {@code <true/>} or
+     * {@code <false/>} as the last step.
+     */
+    private static Optional<Boolean> booleanAt(Path config, String... keyPath) throws IOException {
+        return valueAt(config, keyPath).flatMap(value -> switch (value.getTagName()) {
+            case "true" -> Optional.of(true);
+            case "false" -> Optional.of(false);
+            default -> Optional.empty();
+        });
+    }
+
+    /**
+     * Returns the value element of the last key of a key path. Intermediate steps must be
+     * dictionaries. The caller checks the tag of the value.
+     */
+    private static Optional<Element> valueAt(Path config, String... keyPath) throws IOException {
         Document document;
 
         try {
@@ -163,9 +253,7 @@ public final class UtmPackageIdentity {
             }
 
             if (last) {
-                return "string".equals(value.getTagName())
-                        ? Optional.of(value.getTextContent())
-                        : Optional.empty();
+                return Optional.of(value);
             }
 
             current = "dict".equals(value.getTagName()) ? value : null;

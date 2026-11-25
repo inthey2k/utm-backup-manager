@@ -105,7 +105,9 @@ public class BackupJobService {
                     0,
                     null,
                     0,
-                    selectedVms.size()
+                    selectedVms.size(),
+                    0,
+                    0
             );
             currentRetentionPendingDeletionIds = pendingDeletionIds;
             currentJob = runningJob;
@@ -206,6 +208,7 @@ public class BackupJobService {
     ) {
         BackupJob latest = currentJob;
         long totalBytes = latest != null ? latest.totalBytes() : 0;
+        long lastVmBytes = currentVmTotalBytes(latest);
 
         currentJob = new BackupJob(
                 BackupJobStatus.COMPLETED,
@@ -217,7 +220,9 @@ public class BackupJobService {
                 totalBytes,
                 latest != null ? latest.currentVmName() : null,
                 vmCount,
-                vmCount
+                vmCount,
+                lastVmBytes,
+                lastVmBytes
         );
         currentRetentionPendingDeletionIds = Set.of();
     }
@@ -235,7 +240,9 @@ public class BackupJobService {
                 totalBytes(latest),
                 currentVmName(latest),
                 currentVmNumber(latest),
-                vmCount
+                vmCount,
+                currentVmCopiedBytes(latest),
+                currentVmTotalBytes(latest)
         );
         currentRetentionPendingDeletionIds = Set.of();
     }
@@ -257,7 +264,9 @@ public class BackupJobService {
                 totalBytes(latest),
                 currentVmName(latest),
                 currentVmNumber(latest),
-                vmCount
+                vmCount,
+                currentVmCopiedBytes(latest),
+                currentVmTotalBytes(latest)
         );
         currentRetentionPendingDeletionIds = Set.of();
     }
@@ -275,6 +284,14 @@ public class BackupJobService {
 
     private int currentVmNumber(BackupJob job) {
         return job != null ? job.currentVmNumber() : 0;
+    }
+
+    private long currentVmCopiedBytes(BackupJob job) {
+        return job != null ? job.currentVmCopiedBytes() : 0;
+    }
+
+    private long currentVmTotalBytes(BackupJob job) {
+        return job != null ? job.currentVmTotalBytes() : 0;
     }
 
     private void updateProgress(
@@ -300,7 +317,9 @@ public class BackupJobService {
                 progress.totalBytes(),
                 progress.currentVmName(),
                 progress.currentVmNumber(),
-                progress.vmCount()
+                progress.vmCount(),
+                progress.currentVmCopiedBytes(),
+                progress.currentVmTotalBytes()
         );
     }
 

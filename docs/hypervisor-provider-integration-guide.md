@@ -433,6 +433,27 @@ return "VirtualBox";
 
 The application uses this value in the UI.
 
+## `customIconFile(LocalVm)` (optional)
+
+Providers that store an icon for each VM can return its image file. The overview then shows this image instead of
+the generated initials. The method is optional: the default returns empty, and that VM uses the fallback icon.
+
+```java
+@Override
+public Optional<Path> customIconFile(LocalVm vm) {
+    return UtmPackageIdentity.readCustomIcon(vm.backupSources().getFirst());
+}
+```
+
+Rules for the returned file:
+
+- It must be a regular file inside the VM's own backup source, and the backup manager serves it only through
+  `/vm/{id}/icon`. Requests never supply a path.
+- Only `png`, `jpg`, `jpeg`, `gif` and `webp` are served. Anything else is treated as "no custom icon".
+- Missing, unreadable or unusually large files must yield empty. Do not throw for them.
+
+Icon metadata is read from the provider's own files here, never in the templates or JavaScript.
+
 ## `configuration()`
 
 Providers can expose their effective configuration as read-only values:

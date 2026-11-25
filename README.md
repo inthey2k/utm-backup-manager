@@ -356,6 +356,10 @@ integration. Version 1.5.0 includes providers for UTM on macOS and QEMU.
 ## Screenshots
 ### Backup Overview
 The main page lists all your existing VMs as columns and their backups as 'cards' below them.
+VMs are grouped by provider and sorted alphabetically by their current name. Each VM header shows
+the size of the local VM, and each backup card shows the size of that backup, for example `117 GB`
+or `1.2 GB`. A VM shows its own icon when its provider supplies one, such as the icon configured in
+UTM. Otherwise a coloured circle with the VM's initials is shown.
 
 ![UTM Backup Manager - Overview](docs/screenshots/01-overview-of-vms.png)
 
@@ -370,7 +374,10 @@ Later, you can add individual notes to a single VM backup (see below).
 ### Backup Progress
 Once the backup has started, no second backup can be initiated until it is finished. The overview
 page shows the current progress of copying the file, indicating the currently backed-up VM with a 
-spinning icon, and the waiting VM(s) with a clock icon.
+spinning icon, and the waiting VM(s) with a clock icon. The progress shows the percentage and the
+copied size, for example `34 % copied (48 of 117 GB)`, and the currently backed-up VM shows its own
+copied and total size, for example `48 / 117 GB`. The browser tab title shows the running backup or
+deletion, and a finished job is shown there until you focus the tab again.
 
 ![UTM Backup Manager - Backup Progress](docs/screenshots/03-backup-progress.png)
 
@@ -384,6 +391,7 @@ German, and Spanish. If you want to add more languages, just copy `messages.prop
 takes effect, immediately.
 
 Lastly, the button "Show configuration" displays the values set in the `application.properties`.
+Provider settings are grouped under the provider's name, and global settings are listed separately.
 
 ![UTM Backup Manager - Settings](docs/screenshots/04-settings-menu.png)
 ![UTM Backup Manager - Configuration Dialog](docs/screenshots/05-configuration-dialog.png)

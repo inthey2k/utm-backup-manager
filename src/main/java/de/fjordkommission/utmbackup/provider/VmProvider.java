@@ -3,8 +3,10 @@ package de.fjordkommission.utmbackup.provider;
 import de.fjordkommission.utmbackup.model.LocalVm;
 import de.fjordkommission.utmbackup.model.VmStatus;
 
+import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 /**
  * Integrates a VM hypervisor with the backup manager.
@@ -62,6 +64,16 @@ public interface VmProvider {
      * in {@code StableIdentityRules}. Its unit test checks this.
      */
     StableIdentityRule stableIdentity();
+
+    /**
+     * Returns the image file that the provider configured as the icon of a VM, or empty when
+     * the VM has none. The file must lie inside the VM's backup sources and must be a regular
+     * image file. The default is empty, so providers without icon metadata use the generated
+     * fallback icon.
+     */
+    default Optional<Path> customIconFile(LocalVm vm) {
+        return Optional.empty();
+    }
 
     /**
      * Requests a clean shutdown of a VM.

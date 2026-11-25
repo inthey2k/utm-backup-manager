@@ -15,6 +15,8 @@ import java.util.List;
  * @param backups      backups associated with this VM
  * @param status       runtime state, UNKNOWN for backup-only VMs
  * @param changeStatus change-tracking result
+ * @param localSizeBytes size of the local VM, or null when it is not a local VM or cannot be read
+ * @param icon         icon metadata for the overview
  */
 public record VmOverview(
         VmId id,
@@ -23,8 +25,23 @@ public record VmOverview(
         LocalVm localVm,
         List<VmBackup> backups,
         VmStatus status,
-        VmChangeStatus changeStatus
+        VmChangeStatus changeStatus,
+        Long localSizeBytes,
+        VmIcon icon
 ) {
+
+    /** An overview without size information, using the fallback icon. */
+    public VmOverview(
+            VmId id,
+            String providerName,
+            String name,
+            LocalVm localVm,
+            List<VmBackup> backups,
+            VmStatus status,
+            VmChangeStatus changeStatus
+    ) {
+        this(id, providerName, name, localVm, backups, status, changeStatus, null, VmIcon.fallback(name));
+    }
 
     public String providerId() {
         return id.providerId();

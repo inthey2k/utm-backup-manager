@@ -418,6 +418,7 @@ const backupProgressVmNumber = document.getElementById("backup-progress-vm-numbe
 const backupProgressPercentInline = document.getElementById("backup-progress-percent-inline");
 const backupProgressElapsed = document.getElementById("backup-progress-elapsed");
 const backupProgressRemaining = document.getElementById("backup-progress-remaining");
+const backupProgressBytes = document.getElementById("backup-progress-bytes");
 const vmSizes = new Map();
 
 let backupJobRunning = createBackupButton?.dataset.jobRunning === "true";
@@ -465,6 +466,13 @@ function updateBackupProgress(job) {
     updateBackupProgressVms(job);
 
     backupProgressPercent.textContent = hasProgress ? percent + " %" : "";
+
+    if (backupProgressBytes) {
+        // Same counters as the percentage, so the figures always agree.
+        backupProgressBytes.textContent = hasProgress
+            ? "(" + formatGigabytes(job.copiedBytes) + " " + backupProgress.dataset.labelOf + " " + formatBytes(job.totalBytes) + ")"
+            : "";
+    }
 
     backupProgressBar.style.width = percent + "%";
     backupProgressTrack.setAttribute("aria-valuenow", String(percent));
@@ -533,6 +541,15 @@ function updateBackupProgressVms(job) {
 
         if (providerBadge.textContent) {
             vmElement.appendChild(providerBadge);
+        }
+
+        // Only the VM being copied shows its transferred and total size.
+        if (vmNumber === job.currentVmNumber && job.currentVmTotalBytes > 0) {
+            const vmBytes = document.createElement("span");
+            vmBytes.className = "backup-progress-vm-size";
+            vmBytes.textContent = formatGigabytes(job.currentVmCopiedBytes)
+                + " / " + formatBytes(job.currentVmTotalBytes);
+            vmElement.appendChild(vmBytes);
         }
 
         backupProgressVms.appendChild(vmElement);
@@ -666,6 +683,7 @@ async function pollBackupJob() {
         updateRetentionPendingDeletions(job);
 
         if (job.status === "RUNNING") {
+            TabTitle.setState("backup");
             return;
         }
 
@@ -680,11 +698,15 @@ async function pollBackupJob() {
         stopBackupTimeTimer();
 
         if (job.status === "COMPLETED") {
+            // Before the reload, so a completion in an unfocused tab survives it.
+            TabTitle.markCompleted();
             storeBackupCompletion(job);
 
             window.location.reload();
             return;
         }
+
+        TabTitle.setState("idle");
 
         if (job.status === "CANCELLED") {
             window.location.reload();
@@ -708,6 +730,8 @@ const RETENTION_CLEANUP_RELOAD_KEY =
     "retentionCleanupReloadedAt";
 
 let retentionCleanupPollTimer = null;
+// True once this page has seen the cleanup job running, so only a real completion is announced.
+let retentionCleanupSeenRunning = false;
 
 function updateRetentionCleanupStatus(job) {
     if (!retentionCleanupStatus || !retentionCleanupStatusText) {
@@ -772,6 +796,18 @@ async function pollRetentionCleanupJob() {
 
         updateRetentionCleanupStatus(job);
 
+        if (job.status === "RUNNING") {
+            retentionCleanupSeenRunning = true;
+            TabTitle.setState("deletion");
+        } else if (retentionCleanupSeenRunning) {
+            retentionCleanupSeenRunning = false;
+            if (job.status === "COMPLETED") {
+                TabTitle.markCompleted();
+            } else {
+                TabTitle.setState("idle");
+            }
+        }
+
         if (job.status === "COMPLETED") {
             const reloadedAt =
                 sessionStorage.getItem(
@@ -821,13 +857,17 @@ function startBackupJobPolling() {
     backupJobPollTimer = window.setInterval(pollBackupJob, 5000);
 }
 
-function formatBytes(bytes) {
-    const gigabytes = bytes / 1_000_000_000;
-
+// Decimal gigabytes with at most one decimal place: "117 GB", "1.2 GB", "0.4 GB".
+// The Java ByteSizeFormatter applies the same rule to the server-rendered sizes.
+function formatGigabytes(bytes) {
     return new Intl.NumberFormat(document.documentElement.lang, {
-        minimumFractionDigits: 1,
+        minimumFractionDigits: 0,
         maximumFractionDigits: 1
-    }).format(gigabytes) + " GB";
+    }).format(bytes / 1_000_000_000);
+}
+
+function formatBytes(bytes) {
+    return formatGigabytes(bytes) + " GB";
 }
 
 function updateBackupSubmitButton() {
@@ -1298,6 +1338,65 @@ selectionCancelButton?.addEventListener("click", () => {
 });
 
 selectionNoticeClose?.addEventListener("click", hideSelectionNotice);
+
+// ---------------------------------------------------------------------------
+// Double-submit protection for deletions
+// ---------------------------------------------------------------------------
+// Once a deletion is submitted, its confirm button is disabled and labelled, as the backup
+// button is after a backup starts. The server still rejects a second run while cleanup runs.
+function lockSubmitButtons(buttons) {
+    buttons.forEach(button => {
+        if (!button) {
+            return;
+        }
+
+        button.dataset.originalLabel = button.dataset.originalLabel || button.textContent;
+        button.disabled = true;
+
+        if (button.dataset.submittingLabel) {
+            button.textContent = button.dataset.submittingLabel;
+        }
+    });
+}
+
+function unlockSubmitButtons(buttons) {
+    buttons.forEach(button => {
+        if (!button) {
+            return;
+        }
+
+        button.disabled = false;
+
+        if (button.dataset.originalLabel) {
+            button.textContent = button.dataset.originalLabel;
+        }
+    });
+}
+
+const retentionCleanupForm = document.getElementById("retention-cleanup-form");
+const bulkDeleteForm = document.getElementById("bulk-delete-form");
+
+[retentionCleanupForm, bulkDeleteForm].forEach(form => {
+    form?.addEventListener("submit", () => {
+        const buttons = form === retentionCleanupForm
+            ? [cleanupBackupsButton, document.getElementById("cleanup-confirm")]
+            : [document.getElementById("bulk-delete-confirm")];
+
+        lockSubmitButtons(buttons);
+        TabTitle.setState("deletion");
+    });
+});
+
+// A page restored from the back/forward cache must not keep the buttons locked.
+window.addEventListener("pageshow", event => {
+    if (event.persisted) {
+        unlockSubmitButtons([
+            cleanupBackupsButton,
+            document.getElementById("cleanup-confirm"),
+            document.getElementById("bulk-delete-confirm")
+        ]);
+    }
+});
 
 document.addEventListener("change", event => {
     const checkbox = event.target;
