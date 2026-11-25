@@ -11,10 +11,10 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class VmIconTest {
 
     @Test
-    void customImageHasNoInitialsAndIsMarkedAsCustom() {
-        VmIcon icon = VmIcon.customImage();
+    void imageIconHasNoInitialsAndIsMarkedAsImage() {
+        VmIcon icon = VmIcon.withImage();
 
-        assertTrue(icon.custom());
+        assertTrue(icon.image());
         assertEquals("", icon.initials());
     }
 
@@ -22,7 +22,7 @@ class VmIconTest {
     void singleWordContributesItsFirstTwoCharacters() {
         VmIcon icon = VmIcon.fallback("Linux");
 
-        assertFalse(icon.custom());
+        assertFalse(icon.image());
         assertEquals("LI", icon.initials());
     }
 

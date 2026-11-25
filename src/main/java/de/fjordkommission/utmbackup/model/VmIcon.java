@@ -6,16 +6,16 @@ import java.util.Locale;
 import java.util.stream.Collectors;
 
 /**
- * Icon metadata of a VM for the overview. A custom icon is served from the provider's
- * image file. Every other VM uses a generated fallback: a coloured circle with initials
- * derived from the display name. The fallback is the same size as a real icon, so both
- * variants lay out identically.
+ * Icon metadata of a VM for the overview. An image icon is served from the provider's image
+ * file, whether it is custom or built-in. Every other VM uses a generated fallback: a coloured
+ * circle with initials derived from the display name. The fallback is the same size as a real
+ * icon, so both variants lay out identically.
  *
- * @param custom     true when the provider supplies an image file for this VM
- * @param initials   the initials of the fallback icon, empty for a custom icon
+ * @param image      true when the provider supplies an image file for this VM
+ * @param initials   the initials of the fallback icon, empty for an image icon
  * @param colorIndex the fallback colour, between 0 and {@link #COLOR_COUNT} - 1
  */
-public record VmIcon(boolean custom, String initials, int colorIndex) {
+public record VmIcon(boolean image, String initials, int colorIndex) {
 
     /** Number of fallback colours. The stylesheet defines one class per colour. */
     public static final int COLOR_COUNT = 6;
@@ -28,7 +28,7 @@ public record VmIcon(boolean custom, String initials, int colorIndex) {
     }
 
     /** The icon of a VM whose provider supplies an image file. */
-    public static VmIcon customImage() {
+    public static VmIcon withImage() {
         return new VmIcon(true, "", 0);
     }
 

@@ -40,12 +40,6 @@ public final class UtmPackageIdentity {
     static final String UUID_KEY = "UUID";
     static final String ICON_KEY = "Icon";
     static final String ICON_CUSTOM_KEY = "IconCustom";
-    /** UTM keeps a custom icon image in the {@code Data} folder of the package. */
-    static final String ICON_DIRECTORY = "Data";
-
-    /** A custom icon is a small image. Larger files are ignored rather than served. */
-    private static final long MAX_ICON_BYTES = 2L * 1024 * 1024;
-
     /** Larger files are not configuration files, so they are not parsed. */
     private static final long MAX_CONFIG_BYTES = 4L * 1024 * 1024;
 
@@ -99,14 +93,21 @@ public final class UtmPackageIdentity {
     }
 
     /**
-     * Returns the custom icon image of a {@code .utm} package. A custom icon is configured by
-     * {@code Information/IconCustom = true} together with {@code Information/Icon}, which names
-     * the image file. On macOS the file lies in {@code <package>/Data/<Icon>}; it is never
-     * searched for in the package root. Empty when the flag is off, the name is absent or not a
-     * plain supported image name, the file is missing, unreadable or too large, or its real path
-     * is not inside the package, for example through a symbolic link.
+     * The icon settings of a {@code .utm} package, as UTM writes them in the {@code Information}
+     * dictionary.
+     *
+     * @param custom true when the icon is an image stored in the package ({@code IconCustom})
+     * @param name   the value of {@code Icon}: an image file name for a custom icon, or the
+     *               name of a built-in icon; null when absent or not text
      */
-    public static Optional<Path> readCustomIcon(Path packageDirectory) {
+    public record IconSetting(boolean custom, String name) {
+    }
+
+    /**
+     * Reads the icon settings of a package. Empty when the configuration cannot be read, so the
+     * caller uses the fallback icon.
+     */
+    public static Optional<IconSetting> readIconSetting(Path packageDirectory) {
         Path config = packageDirectory.resolve(CONFIG_FILE);
 
         if (!Files.isRegularFile(config)) {
@@ -118,53 +119,15 @@ public final class UtmPackageIdentity {
                 return Optional.empty();
             }
 
-            if (!booleanAt(config, INFORMATION_KEY, ICON_CUSTOM_KEY).orElse(false)) {
-                return Optional.empty();
-            }
-
-            String fileName = stringAt(config, INFORMATION_KEY, ICON_KEY)
+            boolean custom = booleanAt(config, INFORMATION_KEY, ICON_CUSTOM_KEY).orElse(false);
+            String name = stringAt(config, INFORMATION_KEY, ICON_KEY)
                     .map(String::trim)
-                    .filter(UtmPackageIdentity::isPlainImageName)
                     .orElse(null);
 
-            if (fileName == null) {
-                return Optional.empty();
-            }
-
-            Path icon = packageDirectory.resolve(ICON_DIRECTORY).resolve(fileName);
-
-            if (!Files.isRegularFile(icon) || Files.size(icon) > MAX_ICON_BYTES) {
-                return Optional.empty();
-            }
-
-            // The real paths must agree, so a symbolic link cannot lead out of the package.
-            Path realPackage = packageDirectory.toRealPath();
-            Path realIcon = icon.toRealPath();
-
-            return realIcon.startsWith(realPackage) ? Optional.of(realIcon) : Optional.empty();
+            return Optional.of(new IconSetting(custom, name));
         } catch (IOException | RuntimeException e) {
             return Optional.empty();
         }
-    }
-
-    /** A file name without a path separator or a parent reference, with a supported image suffix. */
-    private static boolean isPlainImageName(String name) {
-        return !name.isEmpty()
-                && !name.contains("/")
-                && !name.contains("\\")
-                && !name.equals("..")
-                && !name.equals(".")
-                && isSupportedImage(name);
-    }
-
-    /** The image types that the overview can show. */
-    private static boolean isSupportedImage(String fileName) {
-        String lower = fileName.toLowerCase(Locale.ROOT);
-        return lower.endsWith(".png")
-                || lower.endsWith(".jpg")
-                || lower.endsWith(".jpeg")
-                || lower.endsWith(".gif")
-                || lower.endsWith(".webp");
     }
 
     /**

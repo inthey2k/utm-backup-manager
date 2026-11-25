@@ -433,22 +433,27 @@ return "VirtualBox";
 
 The application uses this value in the UI.
 
-## `customIconFile(LocalVm)` (optional)
+## `iconFile(LocalVm)` (optional)
 
-Providers that store an icon for each VM can return its image file. The overview then shows this image instead of
-the generated initials. The method is optional: the default returns empty, and that VM uses the fallback icon.
+Providers that have an icon for a VM can return its image file. The icon may be an image stored with the VM or one
+of the provider's built-in images. The overview then shows this image instead of the generated initials. The method
+is optional: the default returns empty, and that VM uses the fallback icon.
 
 ```java
 @Override
-public Optional<Path> customIconFile(LocalVm vm) {
-    return UtmPackageIdentity.readCustomIcon(vm.backupSources().getFirst());
+public Optional<Path> iconFile(LocalVm vm) {
+    Path packageDirectory = vm.backupSources().getFirst();
+
+    return UtmPackageIdentity.readIconSetting(packageDirectory)
+            .flatMap(setting -> UtmIcons.resolve(packageDirectory, setting, builtInIcons));
 }
 ```
 
 Rules for the returned file:
 
-- It must be a regular file inside the VM's own backup source, and the backup manager serves it only through
-  `/vm/{id}/icon`. Requests never supply a path.
+- It must be a regular file whose real path lies inside a trusted location of the provider, such as the VM's own
+  backup source or the provider's built-in image folder. Symbolic links are resolved before this check. The backup
+  manager serves the file only through `/vm/{id}/icon`, and requests never supply a path.
 - Only `png`, `jpg`, `jpeg`, `gif` and `webp` are served. Anything else is treated as "no custom icon".
 - Missing, unreadable or unusually large files must yield empty. Do not throw for them.
 

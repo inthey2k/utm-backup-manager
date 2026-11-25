@@ -56,7 +56,7 @@ class VmProviderIdentityContractTest {
 
     @Test
     void theRuleOfEachProviderInstanceIsTheCatalogRule() {
-        UtmVmProvider utm = new UtmVmProvider(new UtmProperties(tempDir, ".utm", tempDir.resolve("utmctl")));
+        UtmVmProvider utm = new UtmVmProvider(new UtmProperties(tempDir, ".utm", tempDir.resolve("utmctl"), null));
         QemuVmProvider qemu = new QemuVmProvider(new QemuProperties(tempDir));
 
         assertSame(StableIdentityRules.forProvider("utm").orElseThrow(), utm.stableIdentity());

@@ -58,7 +58,7 @@ public class VmController {
     ResponseEntity<Resource> vmIcon(@PathVariable String vmId) {
         Optional<Path> icon = VmId.tryParse(vmId)
                 .flatMap(vmInventory.build()::find)
-                .flatMap(vmInventory::customIconFile);
+                .flatMap(vmInventory::iconFile);
 
         if (icon.isEmpty()) {
             return ResponseEntity.notFound().build();

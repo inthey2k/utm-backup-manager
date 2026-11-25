@@ -255,8 +255,8 @@ public class BackupScanner {
 
     /** The provider's custom icon when it has one, otherwise the generated fallback. */
     private VmIcon icon(ManagedVm localVm, String displayName) {
-        return vmInventory.customIconFile(localVm).isPresent()
-                ? VmIcon.customImage()
+        return vmInventory.iconFile(localVm).isPresent()
+                ? VmIcon.withImage()
                 : VmIcon.fallback(displayName);
     }
 

@@ -24,6 +24,10 @@ vm.utm.package-suffix=.utm
 # Path to the UTM command-line interface
 vm.utm.cli=/path/to/utmctl
 
+# Optional: folder of UTM's built-in icon images (Contents/Resources/Icons). Only needed when it
+# cannot be found from vm.utm.cli, which is resolved through symbolic links.
+#vm.utm.icons.directory=/Applications/UTM.app/Contents/Resources/Icons
+
 # QEMU provider, only used when qemu is listed in vm.providers, for example vm.providers=utm,qemu
 # Directory with one subdirectory per QEMU VM. The subdirectory name is the VM id, and it must
 # contain a top-level .qcow2 or .raw disk image. QEMU VMs are backed up only while stopped.

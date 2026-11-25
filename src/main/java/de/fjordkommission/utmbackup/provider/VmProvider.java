@@ -66,12 +66,13 @@ public interface VmProvider {
     StableIdentityRule stableIdentity();
 
     /**
-     * Returns the image file that the provider configured as the icon of a VM, or empty when
-     * the VM has none. The file must lie inside the VM's backup sources and must be a regular
-     * image file. The default is empty, so providers without icon metadata use the generated
-     * fallback icon.
+     * Returns the image file of the icon that the provider configured for a VM, or empty when
+     * the VM has none usable. The icon may be an image stored with the VM or one of the
+     * provider's built-in images. The file must be a regular image file that lies inside the
+     * provider's trusted locations. The default is empty, so providers without icon metadata
+     * use the generated fallback icon.
      */
-    default Optional<Path> customIconFile(LocalVm vm) {
+    default Optional<Path> iconFile(LocalVm vm) {
         return Optional.empty();
     }
 

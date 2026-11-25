@@ -412,13 +412,13 @@
                     </span>
                     <!-- Icon: the provider's image when it has one, otherwise a coloured circle with initials -->
                     <img class="vm-icon"
-                         th:if="${vm.icon().custom()}"
+                         th:if="${vm.icon().image()}"
                          th:src="@{/vm/{id}/icon(id=${vm.id()})}"
                          alt=""
                          width="22"
                          height="22">
                     <span class="vm-icon vm-icon-fallback"
-                          th:unless="${vm.icon().custom()}"
+                          th:unless="${vm.icon().image()}"
                           th:classappend="'vm-icon-color-' + ${vm.icon().colorIndex()}"
                           th:text="${vm.icon().initials()}"
                           aria-hidden="true">

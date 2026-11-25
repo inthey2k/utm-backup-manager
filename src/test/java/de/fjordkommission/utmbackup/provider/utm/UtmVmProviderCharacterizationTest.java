@@ -299,7 +299,7 @@ class UtmVmProviderCharacterizationTest {
     }
 
     private static UtmVmProvider provider(Path vmDirectory, Path utmctl) {
-        return new UtmVmProvider(new UtmProperties(vmDirectory, ".utm", utmctl));
+        return new UtmVmProvider(new UtmProperties(vmDirectory, ".utm", utmctl, null));
     }
 
     /**

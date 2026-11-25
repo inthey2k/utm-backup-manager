@@ -335,7 +335,7 @@ class BackupOverviewPageTest extends AbstractIntegrationTest {
     }
 
     @Test
-    void vmWithCustomIconReferencesTheIconOfItsCanonicalId() throws Exception {
+    void vmWithImageIconReferencesTheIconOfItsCanonicalId() throws Exception {
         VmOverview vm = new VmOverview(
                 UTM_VM,
                 VmId.providerBadge(UTM),
@@ -345,7 +345,7 @@ class BackupOverviewPageTest extends AbstractIntegrationTest {
                 VmStatus.STOPPED,
                 VmChangeStatus.UNKNOWN,
                 null,
-                VmIcon.customImage()
+                VmIcon.withImage()
         );
 
         stubOverview(List.of(vm), List.of(healthy(UTM, "UTM")), List.of());

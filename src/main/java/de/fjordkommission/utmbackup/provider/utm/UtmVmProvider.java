@@ -58,6 +58,8 @@ public class UtmVmProvider implements VmProvider {
     private final Path vmDirectory;
     private final Path executable;
     private final String packageSuffix;
+    /** UTM's built-in icon images, resolved once; empty when they could not be found. */
+    private final Optional<Path> builtInIcons;
 
     public UtmVmProvider(UtmProperties utm) {
         // Only created when UTM is enabled, so missing settings are a configuration error.
@@ -71,6 +73,12 @@ public class UtmVmProvider implements VmProvider {
         this.vmDirectory = utm.directory();
         this.executable = utm.cli();
         this.packageSuffix = utm.packageSuffix();
+        this.builtInIcons = UtmIcons.builtInIconDirectory(utm.cli(), utm.iconsDirectory());
+
+        if (builtInIcons.isEmpty()) {
+            log.warn("UTM's built-in icon folder was not found next to {}. Built-in icons are shown as "
+                    + "initials; set vm.utm.icons.directory to the Resources/Icons folder of UTM.", executable);
+        }
     }
 
     @Override
@@ -90,16 +98,19 @@ public class UtmVmProvider implements VmProvider {
     }
 
     /**
-     * The custom icon stored in the {@code .utm} package, when UTM has one configured. The
-     * package is the only backup source of a UTM VM.
+     * The icon of a UTM VM: the image stored in its package for a custom icon, or UTM's own
+     * image for a built-in icon. The package is the only backup source of a UTM VM.
      */
     @Override
-    public Optional<Path> customIconFile(LocalVm vm) {
+    public Optional<Path> iconFile(LocalVm vm) {
         if (vm.backupSources().isEmpty()) {
             return Optional.empty();
         }
 
-        return UtmPackageIdentity.readCustomIcon(vm.backupSources().getFirst());
+        Path packageDirectory = vm.backupSources().getFirst();
+
+        return UtmPackageIdentity.readIconSetting(packageDirectory)
+                .flatMap(setting -> UtmIcons.resolve(packageDirectory, setting, builtInIcons));
     }
 
     @Override

@@ -60,17 +60,17 @@ public class VmInventory {
     }
 
     /**
-     * Returns the custom icon file of a local VM, as configured by its provider. A provider
+     * Returns the icon file of a local VM, as configured by its provider. A provider
      * that is not enabled, or that fails while answering, yields empty, so the fallback icon
      * is used and the page keeps working.
      */
-    public Optional<Path> customIconFile(ManagedVm vm) {
+    public Optional<Path> iconFile(ManagedVm vm) {
         return registry.enabledProviders().stream()
                 .filter(provider -> provider.providerId().equals(vm.providerId()))
                 .findFirst()
                 .flatMap(provider -> {
                     try {
-                        return provider.customIconFile(vm.localVm());
+                        return provider.iconFile(vm.localVm());
                     } catch (RuntimeException e) {
                         return Optional.empty();
                     }

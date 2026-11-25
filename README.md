@@ -87,6 +87,8 @@ vm.providers=utm
 vm.utm.directory=/path/to/your/local/vms
 vm.utm.package-suffix=.utm
 vm.utm.cli=/path/to/utmctl
+# Optional: UTM's built-in icon folder, only if it cannot be found from vm.utm.cli
+#vm.utm.icons.directory=/Applications/UTM.app/Contents/Resources/Icons
 
 # Optional second provider
 # vm.providers=utm,qemu
@@ -358,8 +360,8 @@ integration. Version 1.5.0 includes providers for UTM on macOS and QEMU.
 The main page lists all your existing VMs as columns and their backups as 'cards' below them.
 VMs are grouped by provider and sorted alphabetically by their current name. Each VM header shows
 the size of the local VM, and each backup card shows the size of that backup, for example `117 GB`
-or `1.2 GB`. A VM shows its own icon when its provider supplies one, such as the icon configured in
-UTM. Otherwise a coloured circle with the VM's initials is shown.
+or `1.2 GB`. A VM shows its icon when UTM has one configured, either a custom image stored in the VM or one of
+UTM's built-in icons. Otherwise a coloured circle with the VM's initials is shown.
 
 ![UTM Backup Manager - Overview](docs/screenshots/01-overview-of-vms.png)
 

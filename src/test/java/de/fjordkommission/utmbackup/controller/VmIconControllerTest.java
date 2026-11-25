@@ -55,7 +55,7 @@ class VmIconControllerTest {
     void customIconOfTheVmIsServedWithItsImageType() throws Exception {
         byte[] bytes = {(byte) 0x89, 'P', 'N', 'G'};
         Path icon = Files.write(tempDirectory.resolve("icon.png"), bytes);
-        when(inventory.customIconFile(any())).thenReturn(Optional.of(icon));
+        when(inventory.iconFile(any())).thenReturn(Optional.of(icon));
 
         mockMvc.perform(get("/vm/{vmId}/icon", VM.toString()))
                 .andExpect(status().isOk())
@@ -66,7 +66,7 @@ class VmIconControllerTest {
 
     @Test
     void vmWithoutCustomIconAnswersNotFoundSoThePageUsesTheFallback() throws Exception {
-        when(inventory.customIconFile(any())).thenReturn(Optional.empty());
+        when(inventory.iconFile(any())).thenReturn(Optional.empty());
 
         mockMvc.perform(get("/vm/{vmId}/icon", VM.toString()))
                 .andExpect(status().isNotFound())
@@ -82,7 +82,7 @@ class VmIconControllerTest {
     @Test
     void fileThatIsNotAnImageIsNeverServed() throws Exception {
         Path notImage = Files.writeString(tempDirectory.resolve("config.txt"), "secret");
-        when(inventory.customIconFile(any())).thenReturn(Optional.of(notImage));
+        when(inventory.iconFile(any())).thenReturn(Optional.of(notImage));
 
         mockMvc.perform(get("/vm/{vmId}/icon", VM.toString()))
                 .andExpect(status().isNotFound());
