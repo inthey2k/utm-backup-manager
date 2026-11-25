@@ -7,8 +7,8 @@ Priorities and version assignments may change as the project evolves.
 
 ## 1.1.0 – Backup workflow improvements (Released)
 - For a complete list of changes see published GitHub release notes:
- 
- [Release notes for v1.1.0](https://github.com/inthey2k/utm-backup-manager/releases#release-v1.1.0)
+
+  [Release notes for v1.1.0](https://github.com/inthey2k/utm-backup-manager/releases#release-v1.1.0)
 
 ## 1.2.0 – UI, configuration and retention preparation (Released)
 - For a complete list of changes see published GitHub release notes:
@@ -22,41 +22,49 @@ Priorities and version assignments may change as the project evolves.
 
 ## 1.4.0 – Cleanup and operational visibility (Released)
 - For a complete list of changes see published GitHub release notes:
-  
+
   [Release notes for v1.4.0](https://github.com/inthey2k/utm-backup-manager/releases#release-v1.4.0)
 
-## 1.5.0  Multi-provider support and QEMU integration        
+## 1.5.0 – Multi-provider support and QEMU integration (Released)
 - For a complete list of changes see published GitHub release notes:
 
   [Release notes for v1.5.0](https://github.com/inthey2k/utm-backup-manager/releases#release-v1.5.0)
 
-## 1.5.1  UI and provider workflow refinements              Released
+## 1.5.1 – UI and provider workflow refinements (Released)
 - For a complete list of changes see published GitHub release notes:
 
   [Release notes for v1.5.1](https://github.com/inthey2k/utm-backup-manager/releases#release-v1.5.1)
 
-## 1.5.2  Stable VM identity and history migration          Released
+## 1.5.2 – Stable VM identity and history migration (Released)
 - For a complete list of changes see published GitHub release notes:
-  
+
   [Release notes for v1.5.2](https://github.com/inthey2k/utm-backup-manager/releases#release-v1.5.2)
 
-## 1.5.3  Manual cleanup and deletion reliability           Released
+## 1.5.3 – Manual cleanup and deletion reliability (Released)
 - For a complete list of changes see published GitHub release notes:
-  
+
   [Release notes for v1.5.3](https://github.com/inthey2k/utm-backup-manager/releases#release-v1.5.3)
 
-## 1.5.4  Backup progress and storage safety
-- Live per-VM transfer progress
-- Show free backup-root disk space
-- Compare selected backup size to available space on target drive
-- Conservative preflight warning/blocking
-- Sparse-aware sizing where possible
-- Backup size/statistics groundwork
+## 1.5.4 – UI refinements and backup visibility (Released)
+- For a complete list of changes see published GitHub release notes:
+
+  [Release notes for v1.5.4](https://github.com/inthey2k/utm-backup-manager/releases/tag/v1.5.4)
+
+## 1.5.5 – Backup storage safety (Planned)
+
+- Show free disk space on the filesystem containing the backup root
+- Show the available space and total estimated size of selected VMs in the backup dialog
+- Compare the estimated backup size to the usable space on the target filesystem
+- Warn or prevent backup creation when available space is insufficient, using a conservative safety margin
+- Investigate sparse-aware size estimation without underestimating the space required by the actual copy operation
+- Extend backup size statistics with aggregate sizes per VM and for the entire backup storage
 
 ## 1.6.0 – Backup restore
 
 - Restore a VM from an existing backup
-- Only allow restore operations while the affected VM is stopped
+- Only allow restore operations while the affected VM is stopped or no local VM exists
+- Distinguish locally available VMs from VMs that exist only as backups
+- Support restoring archived VMs without a corresponding local VM while preserving their canonical identity
 - Preserve the current local VM before restoring
   - rename the current VM directory instead of overwriting it
   - register the renamed directory as a local pre-restore backup
@@ -85,11 +93,13 @@ Priorities and version assignments may change as the project evolves.
 ## Outlook
 
 - Additional VM providers
+- Explore support for Docker and Podman container backups, including persistent volumes and consistent backup strategies
 - Improved backup history and statistics
 - More detailed job history
+- Persistent, dismissible job completion summaries with start time, end time and duration
 - Further automation around backup maintenance
-- Investigate platform-specific sparse file preservation during VM backup to minimize file sizes
-- OpenAPI/Swagger reintroduction, after removing it because of security vulnerabilities
+- Investigate platform-specific sparse-file preservation during VM backup to reduce actual storage consumption
+- Reintroduce OpenAPI/Swagger when a dependency version without the known security vulnerabilities becomes available
+  - integrate automated OpenAPI specification generation into the release script
 - Toolbar/UI consolidation
 - Browser auto-open upon startup of the application
-- Sparse-file preservation improvements
