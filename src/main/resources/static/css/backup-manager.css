@@ -20,6 +20,7 @@
     --stable: #f6c453;
     --danger: #fb7185;
     --success: #86efac;
+    --vm-header-height: auto;
 }
 
 body {
@@ -859,6 +860,7 @@ code { overflow-wrap: anywhere; }
     border-radius: 50%;
     object-fit: cover;
     justify-self: center;
+    align-self: flex-start;
 }
 
 .vm-icon-fallback {
