@@ -168,10 +168,11 @@ code { overflow-wrap: anywhere; }
 /* ---------- Header menu ---------- */
 
 .header-menu {
-    position: absolute;
+    /* Fixed below the 86px sticky header, so it opens under the settings button and stays there while scrolling. */
+    position: fixed;
     /* Above the sticky page header (z-index 30), which would otherwise cover the menu. */
     z-index: 40;
-    top: 64px;
+    top: 96px;
     right: 20px;
     width: 280px;
     padding: 14px;
@@ -804,7 +805,8 @@ code { overflow-wrap: anywhere; }
 }
 
 .vm-column .vm-header {
-    min-height: 130px;
+    /* Set by backup-manager.js to the tallest header, so all cards start at the same height. */
+    height: var(--vm-header-height, auto);
     padding: 12px 10px;
     border-bottom: 1px solid var(--border);
 }

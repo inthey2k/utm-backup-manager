@@ -91,12 +91,37 @@ const backupSubmitButton = backupDialog?.querySelector(
 // ---------------------------------------------------------------------------
 // VM carousel grouped by provider
 // ---------------------------------------------------------------------------
+// All VM headers get the height of the tallest one, so every card starts at the same
+// position. A VM name may wrap to several lines, and the headers still stay aligned.
+function equalizeVmHeaderHeights() {
+    const root = document.documentElement;
+
+    // Measure the natural heights first, then publish the tallest one.
+    root.style.removeProperty("--vm-header-height");
+
+    const headers = Array.from(
+        document.querySelectorAll(".vm-column:not(.vm-column-ghost) > .vm-header")
+    );
+
+    if (headers.length === 0) {
+        return;
+    }
+
+    const tallest = Math.max(...headers.map(header => header.offsetHeight));
+
+    root.style.setProperty("--vm-header-height", tallest + "px");
+}
+
+window.addEventListener("load", equalizeVmHeaderHeights);
+
 document.addEventListener("DOMContentLoaded", () => {
     const source = document.getElementById("vm-carousel-source");
 
     if (!source) {
         return;
     }
+
+    equalizeVmHeaderHeights();
 
     const cards = Array.from(source.querySelectorAll(":scope > .vm-column"));
     const providers = new Map();

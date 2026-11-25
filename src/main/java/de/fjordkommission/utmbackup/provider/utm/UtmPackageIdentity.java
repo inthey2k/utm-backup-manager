@@ -40,7 +40,8 @@ public final class UtmPackageIdentity {
     static final String UUID_KEY = "UUID";
     static final String ICON_KEY = "Icon";
     static final String ICON_CUSTOM_KEY = "IconCustom";
-    static final String DEFAULT_ICON_FILE = "icon.png";
+    /** UTM keeps a custom icon image in the {@code Data} folder of the package. */
+    static final String ICON_DIRECTORY = "Data";
 
     /** A custom icon is a small image. Larger files are ignored rather than served. */
     private static final long MAX_ICON_BYTES = 2L * 1024 * 1024;
@@ -98,11 +99,12 @@ public final class UtmPackageIdentity {
     }
 
     /**
-     * Returns the custom icon image of a {@code .utm} package. UTM stores a custom icon in the
-     * package and sets {@code IconCustom} in the {@code Information} dictionary. The file name
-     * comes from {@code Icon} when that is a plain image name, and otherwise {@code icon.png}
-     * is used. Built-in icons, which are named but not stored in the package, yield empty, and
-     * so does a file that is missing, unreadable, too large or not a supported image.
+     * Returns the custom icon image of a {@code .utm} package. A custom icon is configured by
+     * {@code Information/IconCustom = true} together with {@code Information/Icon}, which names
+     * the image file. On macOS the file lies in {@code <package>/Data/<Icon>}; it is never
+     * searched for in the package root. Empty when the flag is off, the name is absent or not a
+     * plain supported image name, the file is missing, unreadable or too large, or its real path
+     * is not inside the package, for example through a symbolic link.
      */
     public static Optional<Path> readCustomIcon(Path packageDirectory) {
         Path config = packageDirectory.resolve(CONFIG_FILE);
@@ -120,20 +122,26 @@ public final class UtmPackageIdentity {
                 return Optional.empty();
             }
 
-            String configured = stringAt(config, INFORMATION_KEY, ICON_KEY)
+            String fileName = stringAt(config, INFORMATION_KEY, ICON_KEY)
                     .map(String::trim)
-                    .orElse("");
+                    .filter(UtmPackageIdentity::isPlainImageName)
+                    .orElse(null);
 
-            String fileName = isPlainImageName(configured) ? configured : DEFAULT_ICON_FILE;
-            Path icon = packageDirectory.resolve(fileName);
-
-            if (!Files.isRegularFile(icon)
-                    || Files.size(icon) > MAX_ICON_BYTES
-                    || !isSupportedImage(fileName)) {
+            if (fileName == null) {
                 return Optional.empty();
             }
 
-            return Optional.of(icon);
+            Path icon = packageDirectory.resolve(ICON_DIRECTORY).resolve(fileName);
+
+            if (!Files.isRegularFile(icon) || Files.size(icon) > MAX_ICON_BYTES) {
+                return Optional.empty();
+            }
+
+            // The real paths must agree, so a symbolic link cannot lead out of the package.
+            Path realPackage = packageDirectory.toRealPath();
+            Path realIcon = icon.toRealPath();
+
+            return realIcon.startsWith(realPackage) ? Optional.of(realIcon) : Optional.empty();
         } catch (IOException | RuntimeException e) {
             return Optional.empty();
         }
